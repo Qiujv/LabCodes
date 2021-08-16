@@ -1,0 +1,25 @@
+from setuptools import setup, find_packages
+
+with open('README.md', 'r') as fh:
+    readme = fh.read()
+
+setup(
+    name="labcodes",
+    version="0.1",
+    author='Qiujv',
+    author_email='qiujv@outlook.com',
+    description='Set of codes used in SUSTech cQED lab.',
+    long_description=readme,
+    packages=find_packages(),
+    install_requires=[
+        'numpy',
+        'scipy',
+        'matplotlib',
+        'pandas',
+        'lmfit>=0.9.5',
+        # 'h5py>=2.6',
+        'tqdm',
+        # 'dpath',
+        # 'PyQt5',  # requirements of Labber API here and below.
+    ],
+)
