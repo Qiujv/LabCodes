@@ -1,0 +1,190 @@
+# %%
+from pathlib import Path
+from configparser import ConfigParser
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def data_path(dir, id, suffix='csv'):
+    """Return the full file path of Labrad datafile by given data ID.
+    
+    Args:
+        dir: path, directory for the datafile.
+        id: int, ID of the datafile.
+            e.g. 12 for file named '00012 - balabala'.
+        suffix: 'csv' or 'ini'.
+    """
+    prn = f'{str(id).zfill(5)} - *.{suffix}'
+    all_match = list(Path(dir).glob(prn))
+    if len(all_match) == 0:
+        raise ValueError(f'Data file not found at given dir: {dir}')
+    return all_match[0]
+
+def load_config(path):
+    """Load ini file as config."""
+    config = ConfigParser()
+    config.read(path)
+    return config
+
+def get_param_names(config, which='Independent'):
+    """Get name of independent, depedent or parameters from Labrad ini file.
+    
+    Args:
+        config: path or configparser.ConfigParser, get by load_config(path).
+        which: 'independent', 'depedent' or 'parameters'
+    """
+    if isinstance(config, str):
+        config = load_config(config)
+
+    num = int(config['General'][which.lower()])
+
+    which = which.capitalize()
+    if which == 'Parameters': which = which[:-1]
+
+    names = []
+    for i in range(num):
+        section = config[f'{which} {i+1}']
+
+        if section.get('category'):
+            name = section['category']
+        elif section.get('label'):
+            name = section['label']
+        else:
+            raise Exception(f'Cannot resolve name from section "{section.name}".')
+        name = pretty_name(name)
+
+        if section.get('units'):
+            name += f'_{section["units"]}'
+        names.append(name)
+
+    return names
+
+def pretty_name(name, abbrev=None):
+    """Returns name in lowercase and words replaced according to abbrev.
+    
+    Args:
+        name: str, to be modified.
+        abbrev: dict, words to be replaced, in dict(old=new).
+    """
+    if abbrev is None:
+        abbrev = {
+            'pi pulse': 'pi',
+            'prob.': 'prob',
+            '|1> state': 's1',
+            '|0> state': 's0',
+            'amplitude': 'amp',
+            'coupler bias pulse amp': 'cpa',
+            'coupler pulse amp': 'cpa',
+            'z pulse amp': 'zpa',
+            'readout': 'ro',
+            'frequency': 'freq',
+            ' ': '_',
+        }
+    name = name.lower()
+    for k, v in abbrev.items():
+        name = name.replace(k, v)
+    return name
+
+def ini_to_dict(config):
+    """Iterate over all items in ini and return them as a dict."""
+    datamap = {}
+    for section in config.sections():
+        datamap[section] = {}
+        for name, value in config.items(section):
+            datamap[section].update({name:value})
+    return datamap
+
+class LabradRead(object):
+    def __init__(self, dir, id):
+        self.path = data_path(dir, id, suffix='csv')
+        self._config = load_config(self.path.with_suffix('.ini'))
+        self.name = self._config['General']['title']
+        self.indeps = get_param_names(self._config, which='independent')
+        self.deps = get_param_names(self._config, which='dependent')
+        self.df = pd.read_csv(self.path, names=self.indeps + self.deps)
+
+    @property
+    def config(self):
+        try:
+            return self._config_dict
+        except AttributeError:
+            self._config_dict = ini_to_dict(self._config)
+            return self._config_dict
+
+    def _get_plot_title(self):
+        title = self.path.with_stem(self.config['General']['title'])
+        title = str(title)
+        lw = 60
+        title = '\n'.join([title[i:i+lw] for i in range(0, len(title), lw)])
+        return title
+
+    def plot1d(self, x_name=0, y_name=0, ax=None):
+        """Quick line plot.
+        
+        Args:
+            x_name, y_name: str or int, name of quantities to plot.
+                if int, take self.indeps / self.deps [int].
+            ax: matplotlib.axis.
+
+        Returns:
+            ax with the plot.
+        """
+        if ax is None:
+            fig, ax = plt.subplots(tight_layout=True)
+        else:
+            fig = ax.get_figure()
+        if isinstance(x_name, int):
+            x_name = self.indeps[x_name]
+        if isinstance(y_name, int):
+            y_name = self.deps[y_name]
+
+        df = self.df
+        ax.plot(df[x_name], df[y_name], marker='.')
+        ax.set(
+            xlabel=x_name,
+            ylabel=y_name,
+            title=self._get_plot_title(),
+        )
+        return fig, ax
+
+    def plot2d(self, x_name=1, y_name=0, z_name=0, ax=None):
+        """Quick 2d plot.
+        
+        Args:
+            x_name, y_name, z_name: str or int, name of quantities to plot.
+                if int, take self.indeps / self.deps [int].
+            ax: matplotlib.axis.
+
+        Returns:
+            axis with the plot.
+        """
+        if ax is None:
+            fig, ax = plt.subplots(tight_layout=True)
+        else:
+            fig = ax.get_figure()
+        if isinstance(x_name, int):
+            x_name = self.indeps[x_name]
+        if isinstance(y_name, int):
+            y_name = self.indeps[y_name]
+        if isinstance(z_name, int):
+            z_name = self.deps[z_name]
+
+        df = self.df.pivot(index=x_name, columns=y_name, values=z_name)
+        im = ax.pcolormesh(
+            df.index,
+            df.columns,
+            df.T,
+            shading='nearest',
+            cmap='coolwarm'
+        )
+        ax.set(
+            xlabel=x_name,
+            ylabel=y_name,
+            title=self._get_plot_title(),
+        )
+        colorbar = fig.colorbar(im, ax=ax, label=z_name)
+        return ax
+
+if __name__ == '__main__':
+    logf = LabradRead('.', 13)
+    print(f'logflie "{logf.name}" loaded!')

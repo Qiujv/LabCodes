@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from labcodes.analysis import models
+from labcodes import models
 
 
 def find_model(model):
@@ -41,7 +41,7 @@ class CurveFit(object):
         Args:
             xdata, ydata: 1d np.arrays with same shape.
             model: str or lmfit.Model,
-                str should be name of models in labcodes.analysis.models.
+                str should be name of models in labcodes.models.
             hold: boolean,
                 if False, try to do fit right after initialization.
         """
@@ -199,7 +199,7 @@ class BatchFit(object):
             xbatch, ybatch: 2d array with same shape.
                 list of data traces which may has different length.
             model: str or lmfit.Model,
-                str should be name of models in labcodes.analysis.models.
+                str should be name of models in labcodes.models.
             hold: boolean,
                 if False, try to do fit right after initialization.
         """
@@ -630,8 +630,8 @@ class BatchFit_withDots(BatchFit):
         cover_if_exist=False,
     ):
         """Save fit parameters into Labber logfile, with metadatas from given logfile."""
-        from labcodes.analysis import fileio  # Only import when used so to remove unnecessary dependence to Labber.
-        logf_new = fileio.LabberWrite(
+        from labcodes.fileio import labber  # Only import when used so to remove unnecessary dependence to Labber.
+        logf_new = labber.LabberWrite(
             dots=self.params.reset_index(),
             path=logfile.path.with_name(logfile.path.stem + suffix),
             user=user,
