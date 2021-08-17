@@ -1,9 +1,9 @@
 try:
     from labcodes.fileio.labber import LabberRead, LabberWrite
 except:
-    pass
+    print('WARNING: Fail to import fileio.labber.')
 
 try:
     from labcodes.fileio.labrad import LabradRead
 except:
-    pass
+    print('WARNING: Fail to import fileio.labrad.')

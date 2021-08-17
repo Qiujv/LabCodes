@@ -98,7 +98,7 @@ class LabradRead(object):
     def __init__(self, dir, id):
         self.path = data_path(dir, id, suffix='csv')
         self._config = load_config(self.path.with_suffix('.ini'))
-        self.name = self._config['General']['title']
+        self.name = f'{str(id).zfill(5)} - {self._config["General"]["title"]}'
         self.indeps = get_param_names(self._config, which='independent')
         self.deps = get_param_names(self._config, which='dependent')
         self.df = pd.read_csv(self.path, names=self.indeps + self.deps)
@@ -112,7 +112,7 @@ class LabradRead(object):
             return self._config_dict
 
     def _get_plot_title(self):
-        title = self.path.with_stem(self.config['General']['title'])
+        title = self.path.with_stem(self.name)
         title = str(title)
         lw = 60
         title = '\n'.join([title[i:i+lw] for i in range(0, len(title), lw)])
@@ -145,7 +145,7 @@ class LabradRead(object):
             ylabel=y_name,
             title=self._get_plot_title(),
         )
-        return fig, ax
+        return ax
 
     def plot2d(self, x_name=1, y_name=0, z_name=0, ax=None):
         """Quick 2d plot.
