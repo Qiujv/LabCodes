@@ -177,6 +177,15 @@ class LabradRead(object):
             shading='nearest',
             cmap='coolwarm'
         )
+        # df = self.df
+        # im = ax.scatter(
+        #     df[x_name],
+        #     df[y_name],
+        #     c=df[z_name],
+        #     s=1,  # Relative to space around each point.
+        #     marker='s',  # Square to fill the space.
+        #     cmap='coolwarm'
+        # )
         ax.set(
             xlabel=x_name,
             ylabel=y_name,
