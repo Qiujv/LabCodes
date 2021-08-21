@@ -4,6 +4,8 @@ from configparser import ConfigParser
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from labcodes import plotter as pltr
+
 
 def data_path(dir, id, suffix='csv'):
     """Return the full file path of Labrad datafile by given data ID.
@@ -147,13 +149,14 @@ class LabradRead(object):
         )
         return ax
 
-    def plot2d(self, x_name=1, y_name=0, z_name=0, ax=None):
+    def plot2d(self, x_name=1, y_name=0, z_name=0, ax=None, kind='scan', **kwargs):
         """Quick 2d plot.
         
         Args:
             x_name, y_name, z_name: str or int, name of quantities to plot.
                 if int, take self.indeps / self.deps [int].
-            ax: matplotlib.axis.
+            ax: matplotlib.axes.
+            kind: str, 'scan', 'pcolormesh' or 'scatter'.
 
         Returns:
             axis with the plot.
@@ -169,29 +172,14 @@ class LabradRead(object):
         if isinstance(z_name, int):
             z_name = self.deps[z_name]
 
-        df = self.df.pivot(index=x_name, columns=y_name, values=z_name)
-        im = ax.pcolormesh(
-            df.index,
-            df.columns,
-            df.T,
-            shading='nearest',
-            cmap='coolwarm'
-        )
-        # df = self.df
-        # im = ax.scatter(
-        #     df[x_name],
-        #     df[y_name],
-        #     c=df[z_name],
-        #     s=1,  # Relative to space around each point.
-        #     marker='s',  # Square to fill the space.
-        #     cmap='coolwarm'
-        # )
+        plot_func = getattr(pltr, f'plot2d_{kind}')
+        plot_func(self.df, x_name=x_name, y_name=y_name, z_name=z_name, ax=ax, **kwargs)
+
         ax.set(
             xlabel=x_name,
             ylabel=y_name,
             title=self._get_plot_title(),
         )
-        colorbar = fig.colorbar(im, ax=ax, label=z_name)
         return ax
 
 if __name__ == '__main__':
