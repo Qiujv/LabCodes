@@ -105,21 +105,21 @@ def plot2d_scan(df, x_name, y_name, z_name, ax=None):
     df['height'] = df.groupby(x_name)[y_name].transform(np.gradient)
     rects = [Rectangle((x - w/2, y - h/2), w, h )
             for x, y, w, h in df[[x_name, y_name, 'width', 'height']].itertuples(index=False)]
-    col = PatchCollection(rects)
-    col.set_linewidth(0)
 
-    # Computer colors.
     z = df[z_name]
     z_norm = (z - z.min()) / (z.max() - z.min())
     cmap = plt.cm.get_cmap('coolwarm')
-    col.set_facecolor(cmap(z_norm))
+    col = PatchCollection(rects, facecolors=cmap(z_norm), cmap=cmap, linewidth=0)
 
-    # Plot on axis.
     ax.add_collection(col)
-    ax.axis('tight')  # Modify ax xlim and ylim's to show all data.
-
-    # Plot the colorbar.
-    mappable = plt.cm.ScalarMappable(cmap=cmap)
-    mappable.set_array(z)
-    fig.colorbar(mappable)
+    # ax.axis('tight')
+    ax.set(
+        xlabel=x_name, 
+        xlim=(df[x_name].min() - df['width'].iloc[0]/2, 
+              df[x_name].max() - df['width'].iloc[-1]/2),
+        ylabel=y_name, 
+        ylim=(df[y_name].min() - df['height'].iloc[0]/2, 
+              df[y_name].max() - df['height'].iloc[-1]/2),
+    )
+    cbar = fig.colorbar(col, ax=ax, label=z_name)  # Also found in ax.collections[-1].colorbar
     return ax
