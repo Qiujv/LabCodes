@@ -149,14 +149,14 @@ class LabradRead(object):
         )
         return ax
 
-    def plot2d(self, x_name=1, y_name=0, z_name=0, ax=None, kind='scan', **kwargs):
+    def plot2d(self, x_name=1, y_name=0, z_name=0, ax=None, kind='collection', **kwargs):
         """Quick 2d plot.
         
         Args:
             x_name, y_name, z_name: str or int, name of quantities to plot.
                 if int, take self.indeps / self.deps [int].
             ax: matplotlib.axes.
-            kind: str, 'scan', 'pcolormesh' or 'scatter'.
+            kind: str, 'collection', 'pcolormesh' or 'scatter'.
 
         Returns:
             axis with the plot.
