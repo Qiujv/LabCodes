@@ -79,7 +79,7 @@ def plot2d_scatter(df, x_name, y_name, z_name, ax=None, marker='s', marker_size=
     )
     return ax
 
-def plot2d_collection(df, x_name, y_name, z_name, ax=None):
+def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None):
     """Labrad style 2D pseudocolor plot 2D scan data.
 
     Data points are plotted as rectangular scatters with proper width and height 
@@ -89,6 +89,8 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None):
         df: pandas.DataFrame, container of data.
         x_name, y_name, z_name: str, column name of data to plot.
         ax: matplotlib.axes, where to plot the figure.
+        cmin, cmax: float, used to set colorbar range.
+            Can also be achieved by `collection.set_clim()`.
 
     Returns:
         ax with the plot.
@@ -108,9 +110,24 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None):
             for x, y, w, h in df[[x_name, y_name, 'width', 'height']].itertuples(index=False)]
 
     z = df[z_name]
-    z_norm = (z - z.min()) / (z.max() - z.min())
+    zmin, zmax = z.min(), z.max()
+    if cmin is None:
+        cmin = zmin
+    if cmax is None:
+        cmax = zmax
+    if (zmin < cmin) and (zmax > cmax):
+        extend_cbar = 'both'
+    elif zmin < cmin:
+        extend_cbar = 'min'
+    elif zmax > cmax:
+        extend_cbar = 'max'
+    else:
+        extend_cbar = 'neither'
+    norm = mpl.colors.Normalize(cmin, cmax)
     cmap = plt.cm.get_cmap('coolwarm')
-    col = PatchCollection(rects, facecolors=cmap(z_norm), cmap=cmap, linewidth=0)
+    colors = cmap(norm(z))
+    col = PatchCollection(rects, facecolors=colors, cmap=cmap, norm=norm, 
+                          linewidth=0)
 
     ax.add_collection(col)
     # ax.axis('tight')
@@ -122,7 +139,7 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None):
         ylim=(df[y_name].min() - df['height'].iloc[0]/2, 
               df[y_name].max() - df['height'].iloc[-1]/2),
     )
-    cbar = fig.colorbar(col, ax=ax, label=z_name)  # Also found in ax.collections[-1].colorbar
+    cbar = fig.colorbar(col, ax=ax, label=z_name, extend=extend_cbar)  # Also found in ax.collections[-1].colorbar
     return ax
 
 def plot_density_matrix_real(rho, ax=None, cmap='jet', alpha=0.6):
@@ -150,7 +167,7 @@ def plot_density_matrix_real(rho, ax=None, cmap='jet', alpha=0.6):
     colors = cmap(norm(dz))
 
     bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=colors, alpha=alpha, 
-                       edgecolor='white', linewidth=1, cmap=cmap, norm=norm)
+                       cmap=cmap, norm=norm, edgecolor='white', linewidth=1)
 
     ax.axes.w_xaxis.set_major_locator(plt.IndexLocator(1, bar_width/2))
     ax.axes.w_yaxis.set_major_locator(plt.IndexLocator(1, bar_width/2))

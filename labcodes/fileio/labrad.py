@@ -142,6 +142,7 @@ class LabradRead(object):
 
         df = self.df
         ax.plot(df[x_name], df[y_name], marker='.')
+        ax.grid()
         ax.set(
             xlabel=x_name,
             ylabel=y_name,
@@ -149,7 +150,7 @@ class LabradRead(object):
         )
         return ax
 
-    def plot2d(self, x_name=1, y_name=0, z_name=0, ax=None, kind='collection', **kwargs):
+    def plot2d(self, x_name=0, y_name=1, z_name=0, ax=None, kind='collection', **kwargs):
         """Quick 2d plot.
         
         Args:
