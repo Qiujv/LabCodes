@@ -407,9 +407,9 @@ class GaussianDecayWithShiftModel(MyCompositeModel):
 
 
 class ResonatorModel(MyModel):
-    """amp * (1 - Q * Q_e^-1 / (1 + 2j * Q * (x - f_0) / f_0))
+    """amp * (1 - Qi * Qc^-1 / (1 + 2j * Qi * (x - f0) / f0))
 
-    Q_e is complex to take into account mismatches in the input and output 
+    Qc is complex to take into account mismatches in the input and output 
     transmission impedances.
 
     Following the example provided lmfit:
@@ -421,36 +421,37 @@ class ResonatorModel(MyModel):
         kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
                        'independent_vars': independent_vars})
         
-        def linear_resonator(x, f_0, Q, Q_e_real, Q_e_imag, amp=1):
-            Q_e = Q_e_real + 1j*Q_e_imag
-            return amp * (1 - (Q * Q_e**-1 / (1 + 2j * Q * (x - f_0) / f_0)))
+        def linear_resonator(x, f0, Qi, Qc, phi, amp=1):
+            Qc = Qc * np.exp(1j*phi)
+            return amp * (1 - (Qi * Qc**-1 / (1 + 2j * Qi * (x - f0) / f0)))
         
         super().__init__(linear_resonator, **kwargs)
 
-        self.set_param_hint('Q', min=0)  # Enforce Q is positive
+        self.set_param_hint('Qi', min=0)  # Enforce Q is positive
+        self.set_param_hint('Qc', min=0)  # Enforce Q is positive
 
     def guess(self, data, x=None, **kwargs):
         verbose = kwargs.pop('verbose', None)
         pars = self.make_params()
-        amp_guess = np.abs(data[0])  # assume x is sorted.
+        amp_guess = np.abs(data[0])*1.001  # assume x is sorted.
         if x is not None:
             norm_data = data / amp_guess
             argmin_s21 = np.abs(norm_data).argmin()
             xmin = x.min()
             xmax = x.max()
-            f_0_guess = x[argmin_s21]  # guess that the resonance is the lowest point
-            Q_min = 0.1 * (f_0_guess/(xmax-xmin))  # assume the user isn't trying to fit just a small part of a resonance curve.
+            f0_guess = x[argmin_s21]  # guess that the resonance is the lowest point
+            Qi_min = 0.1 * (f0_guess/(xmax-xmin))  # assume the user isn't trying to fit just a small part of a resonance curve.
             delta_x = np.diff(x)  # assume f is sorted
             min_delta_x = delta_x[delta_x > 0].min()
-            Q_max = f_0_guess/min_delta_x  # assume data actually samples the resonance reasonably
-            Q_guess = np.sqrt(Q_min*Q_max)  # geometric mean, why not?
-            Q_e_real_guess = Q_guess/(1-np.abs(norm_data[argmin_s21]))
+            Qi_max = f0_guess/min_delta_x  # assume data actually samples the resonance reasonably
+            Qi_guess = np.sqrt(Qi_min*Qi_max)  # geometric mean, why not?
+            Qc_guess = Qi_guess/(1-np.abs(norm_data[argmin_s21]))
             pars = self.make_params(
                 amp=amp_guess,
-                f_0=f_0_guess,
-                Q=Q_guess,
-                Q_e_real=Q_e_real_guess,
-                Q_e_imag=0,
+                f0=f0_guess,
+                Qi=Qi_guess,
+                Qc=Qc_guess,
+                phi=0,
             )
         else:
             pars = self.make_params(
@@ -460,5 +461,73 @@ class ResonatorModel(MyModel):
             pars.pretty_print()
             
         return update_param_vals(pars, self.prefix, **kwargs)
+
+    __init__.__doc__ = 'Resonator model' + COMMON_INIT_DOC
+
+class ResonatorModel_inverse(MyModel):
+    """amp * (1 + Qi * Qc^-1 / (1 + 2j * Qi * (x - f0) / f0))
+
+    Resonator fitting model fitting 1/s21 but not s21, equivelently assigning 
+    more weights to those point around resonance. Hence ydata must be normalized.
+    Normalization is done implicitly when calling .fit().
+    """
+
+    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
+                 **kwargs):
+        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
+                       'independent_vars': independent_vars})
+        
+        def linear_resonator(x, f0=5e9, Qi=1e5, Qc=1e5, phi=0):
+            """Returns 1/s21."""
+            Qc = Qc * np.exp(1j*phi)
+            return 1 + (Qi * Qc**-1 / (1 + 2j * Qi * (x - f0) / f0))
+        
+        super().__init__(linear_resonator, **kwargs)
+
+        self.set_param_hint('Qi', min=0)
+        self.set_param_hint('Qc', min=0)
+
+    def guess(self, data, x=None, **kwargs):
+        verbose = kwargs.pop('verbose', None)
+        pars = self.make_params()
+        if x is not None:
+            argmax_s21 = np.abs(data).argmax()
+            xmin = x.min()
+            xmax = x.max()
+            f0_guess = x[argmax_s21]  # guess that the resonance is the lowest point
+            Qi_min = 0.1 * (f0_guess/(xmax-xmin))  # assume the user isn't trying to fit just a small part of a resonance curve.
+            delta_x = np.diff(x)  # assume f is sorted
+            min_delta_x = delta_x[delta_x > 0].min()
+            Qi_max = f0_guess/min_delta_x  # assume data actually samples the resonance reasonably
+            Qi_guess = np.sqrt(Qi_min*Qi_max)  # geometric mean, why not?
+            Qc_guess = Qi_guess/(1-np.abs(data[argmax_s21]))
+            Qc_guess = np.abs(Qc_guess)
+            pars = self.make_params(
+                f0=f0_guess,
+                Qi=Qi_guess,
+                Qc=Qc_guess,
+            )
+        if verbose:
+            pars.pretty_print()
+            
+        return update_param_vals(pars, self.prefix, **kwargs)
+
+    @classmethod
+    def remove_electric_delay(cls, freq, phase, plot=False):
+        """Returns phases whose electric delay has been removed."""
+        phase = np.unwrap(phase)
+        lfit = fitter.CurveFit(
+            xdata=freq,
+            ydata=phase,
+            model=LinearModel(),
+        )
+        if plot is True: lfit.plot()
+        return phase - lfit.fdata()
+
+    @classmethod
+    def normalize(cls, s21):
+        """Return normalized s21 with abs(background) = 1."""
+        amp = np.mean(np.concatenate(np.abs((s21[:9], s21[-9:]))))
+        return s21 / amp
 
     __init__.__doc__ = 'Resonator model' + COMMON_INIT_DOC

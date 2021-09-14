@@ -127,7 +127,7 @@ class CurveFit(object):
             )
         return axes
 
-    def plot(self, fit_report=False):
+    def plot(self, ax=None, fit_report=False, plot_init=True):
         """Plot the fit result with matplotlib.
         If not fit result, plot data with guess params.
         
@@ -136,25 +136,37 @@ class CurveFit(object):
                 whether or not to plot fitted data along with fit report.
 
         Returns:
-            fig, ax of matplotlib.
+            ax of matplotlib.
         """
-        fig, ax = plt.subplots()
-        ax.plot(self.xdata, self.ydata, 'bo')
-        ax.plot(self.xdata, self.result.init_fit, 'k--', label='initial fit')
-        ax.plot(self.xdata, self.result.best_fit, 'r-', label='best fit')
-        ax.set_title(self.model.name)
-        ax.set_xlabel('x')
+        if ax is None:
+            fig, ax = plt.subplots()
+
         if np.iscomplexobj(self.ydata):
             ax.set_ylabel('|y|')
         else:
             ax.set_ylabel('y')
-        ax.ticklabel_format(scilimits=(-2,4))
-        ax.legend(loc='best')
+
+        ax.plot(self.xdata, self.ydata, 'bo')
+        if self.result is None:
+            p_guess = self.model.guess(self.ydata, x=self.xdata)
+            y_guess = self.model.eval(p_guess, x=self.xdata)
+            ax.plot(self.xdata, y_guess, 'k--', label='guess')
+        else:
+            if plot_init is True:
+                ax.plot(self.xdata, self.result.init_fit, 'k--', label='initial fit')
+            ax.plot(self.xdata, self.result.best_fit, 'r-', label='best fit')
+        ax.legend()
+
         if fit_report:
             ax = self._add_fit_report(ax)
-        return fig, ax
 
-    def plot_complex(self, fit_report=False):
+        ax.set(
+            title=self.model.name,
+            xlabel='x',
+        )
+        return ax
+
+    def plot_complex(self, ax=None, fit_report=False, plot_init=True):
         """Plot the fit result on complex plane.
         
         Args:
@@ -162,23 +174,35 @@ class CurveFit(object):
                 whether or not to plot fitted data along with fit report.
 
         Returns:
-            fig, ax of matplotlib.
+            ax of matplotlib.
         """
-        fig, ax = plt.subplots()
-        def plot_ri(data, *args, **kwargs):
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        def plot_c(data, *args, **kwargs):
             ax.plot(data.real, data.imag, *args, **kwargs)
-        plot_ri(self.ydata, '.')
-        plot_ri(self.result.init_fit, 'k--', label='initial fit')
-        plot_ri(self.result.best_fit, 'r.-', label='best fit')
-        ax.set_title(self.model.name)
-        ax.set_xlabel('Re(y)')
-        ax.set_ylabel('Im(y)')
-        ax.ticklabel_format(scilimits=(-2,4))
-        ax.legend(loc='best')
-        ax.set_aspect('equal')
+
+        plot_c(self.ydata, '.')
+        if self.result is None:
+            p_guess = self.model.guess(self.ydata, x=self.xdata)
+            y_guess = self.model.eval(p_guess, x=self.xdata)
+            plot_c(y_guess, 'k--', label='guess')
+        else:
+            if plot_init is True: 
+                plot_c(self.result.init_fit, 'k--', label='initial fit')
+            plot_c(self.result.best_fit, 'r-', label='best fit')
+        ax.legend()
+
         if fit_report:
             ax = self._add_fit_report(ax)
-        return fig, ax
+
+        ax.set(
+            title=self.model.name,
+            xlabel='Re(y)',
+            ylabel='Im(y)',
+            aspect='equal',
+        )
+        return ax
 
 
 class BatchFit(object):
@@ -273,14 +297,18 @@ class BatchFit(object):
 
     def curvefit(self, index):
         """Return curvefit at given fit index."""
-        cfit = CurveFit(self.xbatch[index], self.ybatch[index], self.model, 
-            hold=True)
         try:
-            cfit.result = self.result[index]
+            result = self.result[index]
         except IndexError:  # FIXME: the reported error should not be IndexError.
-            cfit.fit()
+            result = None
             print(f'WARNING: fit #{index} failed at batch fit. The result of '
                 'curvefit may be different.')
+        if result:
+            cfit = CurveFit(self.xbatch[index], self.ybatch[index], self.model, 
+                hold=True)
+            cfit.result = result
+        else:
+            cfit = CurveFit(self.xbatch[index], self.ybatch[index], self.model)
         return cfit
 
     def get_dots(self):
@@ -307,30 +335,33 @@ class BatchFit(object):
             fig.suptitle(self.model.name)
             ax = fig.subplots()
             ax.plot(self.params['chi'].to_numpy(), '.')
-            ax.set_ylabel(show_param)
-            ax.set_xlabel('fit index')
-            ax.ticklabel_format(scilimits=(-2,4))
             ax.grid(linestyle='--')
+            ax.set(
+                xlabel='fit index',
+                ylabel=show_param,
+            )
             return fig, ax, None
         else:
             fig = plt.figure(figsize=(10,3))
             fig.suptitle(self.model.name)
             ax_val = fig.add_subplot(121)
             ax_val.plot(self.params[show_param].values, '.')
-            ax_val.set_ylabel(show_param)
-            ax_val.set_xlabel('fit index')
-            ax_val.ticklabel_format(scilimits=(-2,4))
             ax_val.grid(linestyle='--')
+            ax_val.set(
+                xlabel='fit index',
+                ylabel=show_param,
+            )
 
             ax_err = fig.add_subplot(122)
             ax_err.plot(self.params[show_param+'_err'].values, '.')
-            ax_err.set_ylabel(show_param+'_err')
-            ax_err.set_xlabel('fit index')
-            ax_err.ticklabel_format(scilimits=(-2,4))
             ax_err.grid(linestyle='--')
+            ax_err.set(
+                xlabel='fit index',
+                ylabel=show_param+'_err',
+            )
             return fig, ax_val, ax_err
 
-    def plot_fit(self, index=None):
+    def plot_fit(self, index=None, ax=None):
         """Plot the fit result at specified fit index.
         
         Args:
@@ -338,30 +369,37 @@ class BatchFit(object):
                 if None, all fits will be shown.
 
         Returns:
-            fig, ax of matplotlib.
+            ax of matplotlib.
         """
+
         if isinstance(index, int):
             i = index
             cfit = CurveFit(self.xbatch[i], self.ybatch[i], model=self.model, 
                         hold=True)
             cfit.result = self.result[i]
-            return cfit.plot()
+            return cfit.plot(ax)
+
         if index is None:
             index = np.arange(self.num_of_fits)
-        fig, ax = plt.subplots()
+        if ax is None:
+            fig, ax = plt.subplots()
+            
         color_idx = -1
         for i in index:
             color_idx += 1
             ax.plot(self.xbatch[i], self.ybatch[i], '.', color=f'C{color_idx}')
             ax.plot(self.xbatch[i], self.fbatch[i], '-', color=f'C{color_idx}')
-        ax.set_title('fitted data at '+str(index))
-        ax.set_xlabel('x')
+
+        ax.set(
+            title='fitted data at '+str(index),
+            xlabel='x',
+        )
         if np.iscomplexobj(self.ybatch):
             ax.set_ylabel('|y|')
         else:
             ax.set_ylabel('y')
-        ax.ticklabel_format(scilimits=(-2,4))
-        return fig, ax
+
+        return ax
 
     def fit(self, **kwargs):
         """Perform fits with self.xbatch and self.ybatch.
