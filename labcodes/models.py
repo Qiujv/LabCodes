@@ -530,4 +530,55 @@ class ResonatorModel_inverse(MyModel):
         amp = np.mean(np.concatenate(np.abs((s21[:9], s21[-9:]))))
         return s21 / amp
 
+    @classmethod
+    def photon_num(cls, f0, Qi, Qc, Pin, h=6.63e-34):
+        """Returns photon number in the resonator."""
+        n = Qc/(2*np.pi*f0) * (Qi/(Qi+Qc))**2 * Pin/(h*f0)
+        return n
+
     __init__.__doc__ = 'Resonator model' + COMMON_INIT_DOC
+
+class TransmonModel(MyModel):
+    """amp * np.exp(-(x - center)**2 / (2 * width**2)) + offset"""
+
+    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
+                 **kwargs):
+        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
+                       'independent_vars': independent_vars})
+        
+        def transmon_freq(x, xmax=0, fmax=6e9, xmin=0.5, fmin=2e9):
+            """Frequency of transmon, following koch_charge_2007 Eq.2.18.
+            Paper found at https://journals.aps.org/pra/abstract/10.1103/PhysRevA.76.042319
+            """
+            phi = 0.5 * (x - xmax) / (xmin - xmax)  # Rescale [xmax, xmin] to [0,0.5], i.e. in Phi_0.
+            d = (fmin / fmax) ** 2
+            f = fmax * np.sqrt(np.abs(np.cos(np.pi*phi))
+                               * np.sqrt(1 + d**2 * np.tan(np.pi*phi)**2))
+            return f
+
+        super().__init__(transmon_freq, **kwargs)
+        
+    def guess(self, data, x=None, **kwargs):
+        """Estimate initial model parameter values from data."""
+        imax = np.argmax(data)
+        imin = np.argmin(data)
+        fmax = data[imax]
+        fmin = data[imin]
+        if x is not None:
+            xmax = x[imax]
+            xmin = x[imin]
+            pars = self.make_params(
+                fmax=fmax,
+                fmin=fmin,
+                xmax=xmax,
+                xmin=xmin,
+            )
+        else:
+            pars = self.make_params(
+                fmax=fmax,
+                fmin=fmin,
+            )
+
+        return update_param_vals(pars, self.prefix, **kwargs)
+
+    __init__.__doc__ = 'Transmon model' + COMMON_INIT_DOC

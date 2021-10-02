@@ -71,17 +71,17 @@ def get_rotate_angle(data):
     rot_angle = -angle % np.pi
     return rot_angle # in rad
 
-def phase_rotate_x(data, x, rot_rate):
-    """Returns data with additional phase propotional to x value."""
-    return data*np.exp(1j*x*rot_rate)
+# def phase_rotate_x(data, x, rot_rate):  # TODO: Remove this.
+#     """Returns data with additional phase propotional to x value."""
+#     return data*np.exp(1j*x*rot_rate)
 
-def correct_electric_delay(data, freq):
-    """Returns data without phase dependence on freq."""
-    e_delay_coarse = 2*np.pi*find_freq_guess_complex(x=freq, y=data)
-    data_corrected = phase_rotate_x(data, freq, -e_delay_coarse)
-    e_delay_fine = np.angle(data_corrected[-1]/data_corrected[0]) / (freq[-1] - freq[0])
-    data_corrected = phase_rotate_x(data_corrected, freq, -e_delay_fine)
-    return phase_rotate(data_corrected, -np.angle(data_corrected[0]))
+def remove_e_delay(angle, freq):
+    """Returns phase without linear freq dependence."""
+    angle = np.unwrap(angle)
+    e_delay = (angle[-1] - angle[0]) / (freq[-1] - freq[0])
+    angle -= e_delay * (freq - freq[0])
+    angle -= angle[0]
+    return angle
 
 def find_freq_guess(x, y):
     """Finds the dominant fft component for input (x, y) data."""

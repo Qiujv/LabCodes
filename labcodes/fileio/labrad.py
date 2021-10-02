@@ -1,8 +1,10 @@
 # %%
+import re
+import matplotlib.pyplot as plt
+import pandas as pd
+
 from pathlib import Path
 from configparser import ConfigParser
-import pandas as pd
-import matplotlib.pyplot as plt
 
 from labcodes import plotter as pltr
 
@@ -21,6 +23,19 @@ def data_path(dir, id, suffix='csv'):
     if len(all_match) == 0:
         raise ValueError(f'Data file not found at given dir: {dir}')
     return all_match[0]
+
+def simplify_file_name(name):
+    """Convert filename into simpler one. e.g.
+        '00123 - Q1, |Q2>, Q3: balabala' -> '00123 - Q2 - balabala'."""
+    pattern = r'(\d+) - (.*)%v(.*)%g(.*)%c (.*)'  # |, >, : in filename were replaced by %v, %g, %c.
+    match = re.search(pattern, name)
+    if match is None:
+        print(f'WARNING: Unknown pattern in name: {name}')
+        return name
+    else:
+        new_name = ' - '.join([match.group(1), match.group(3), match.group(5)])  # Index starts from 1.
+        new_name = new_name.replace(r'%c', ',')  # Replace ':' with ','.
+        return new_name
 
 def load_config(path):
     """Load ini file as config."""
@@ -113,12 +128,19 @@ class LabradRead(object):
             self._config_dict = ini_to_dict(self._config)
             return self._config_dict
 
+    @property
+    def new_name(self):
+        return simplify_file_name(self.path.stem)
+
     def _get_plot_title(self):
         title = self.path.with_stem(self.name)
         title = str(title)
         lw = 60
         title = '\n'.join([title[i:i+lw] for i in range(0, len(title), lw)])
         return title
+
+    def get_save_name(self):
+        pass
 
     def plot1d(self, x_name=0, y_name=0, ax=None):
         """Quick line plot.
