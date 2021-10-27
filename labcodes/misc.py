@@ -2,9 +2,9 @@
 """
 
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 import numpy as np
 from pathlib import Path
+from labcodes import plotter
 
 
 def phase_rotate(data, angle=None, show=False):
@@ -27,25 +27,10 @@ def phase_rotate(data, angle=None, show=False):
     rot_data = data * np.exp(1j*angle) # counter-clockwise
     
     if show:
-        show_data = rot_data.ravel()
-        n_pt_max = 3000
-        fig, ax = plt.subplots(tight_layout=True)
-        if show_data.size <= n_pt_max:
-            ax.plot(show_data.real, show_data.imag, 
-                '.', alpha=0.7)
-        else:
-            ax.hist2d(show_data.real, show_data.imag, 
-                bins=100, norm=mcolors.PowerNorm(0.5))
-
-        ax.set(
-            title=f'Data rotated by {angle*180/np.pi:+.2f} (CCW)',
-            xlabel='real',
-            ylabel='imag',
-        )
-        ax.ticklabel_format(scilimits=(-2,4))
-        
+        ax = plotter.plot_iq(rot_data.ravel())
+        ax.set_title(f'Data rotated by {angle*180/np.pi:+.2f} (CCW)')
         plt.show()
-        plt.close(fig)
+        plt.close(ax.get_figure())
     return rot_data
 
 def get_rotate_angle(data):
