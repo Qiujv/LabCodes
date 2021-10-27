@@ -31,15 +31,21 @@ def fit_resonator(logf, atten=0, **kwargs):
     ax = cfit.plot_complex(plot_init=False, fit_report=True)
     return cfit, ax
     
-def fit_t1(logf, ax, xy_text, unit='\\mu s'):
+def fit_t1(logf, ax, xy_text, unit='\\mu s', t2e=False):
     cfit = fitter.CurveFit(
         xdata=logf.df['delay_us'].values,
         ydata=logf.df['s1_prob'].values,
         model=models.ExponentialModel(),
     )
     ax.plot(cfit.xdata, cfit.fdata(), 'r-', lw=1)
-    ax.text(xy_text[0], xy_text[1], 
-        f'$T_1\\approx {cfit.result.params["tau"].value:.2f} {unit}$')
+    tau = cfit.result.params["tau"].value
+    tau_err = cfit.result.params["tau"].stderr
+    if t2e is False:
+        ax.text(xy_text[0], xy_text[1], 
+            f'$T_1\\approx {tau:.2f}\\pm{tau_err:.4f} {unit}$')
+    else:
+        ax.text(xy_text[0], xy_text[1], 
+            f'$T_{{2e}}\\approx {tau:.2f}\\pm{tau_err:.4f} {unit}$')
     return cfit, ax
 
 def fit_t2(logf, ax, xy_text, unit='\\mu s'):

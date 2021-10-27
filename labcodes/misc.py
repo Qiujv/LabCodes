@@ -49,27 +49,21 @@ def phase_rotate(data, angle=None, show=False):
     return rot_data
 
 def get_rotate_angle(data):
-    """Try to find the angle for phase rotation after which the data distribute along real axis
-    
-    Args:
-        data: numpy.array.
-    
-    Returns:
-        proper rotate angle, in rad.
-    """
-    # TODO: might be better estimation.
-    xdata = np.real(data.ravel())
-    ydata = np.imag(data.ravel())
-    slope1 = np.polyfit(xdata, ydata, 1)[0]
-    slope2 = np.polyfit(ydata, xdata, 1)[0]
-    # find the one further from x axis in fitting.
-    if abs(slope1) < abs(slope2):
-        angle = np.arctan(slope1)
-    else:
-        angle = np.pi/2 - np.arctan(slope2)
-    # get the angle to rotate
-    rot_angle = -angle % np.pi
-    return rot_angle # in rad
+    """Returns phase angle (in rad) that minize imaginary part of data. 
+    Algorithm by Kaho."""
+    # xdata = np.real(data.ravel())
+    # ydata = np.imag(data.ravel())
+    # slope1 = np.polyfit(xdata, ydata, 1)[0]
+    # slope2 = np.polyfit(ydata, xdata, 1)[0]
+    # # find the one further from x axis in fitting.
+    # if abs(slope1) < abs(slope2):
+    #     angle = np.arctan(slope1)
+    # else:
+    #     angle = np.pi/2 - np.arctan(slope2)
+    # # get the angle to rotate
+    # rot_angle = -angle % np.pi
+    angle = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)
+    return angle # in rad
 
 # def phase_rotate_x(data, x, rot_rate):  # TODO: Remove this.
 #     """Returns data with additional phase propotional to x value."""
