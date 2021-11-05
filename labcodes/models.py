@@ -3,7 +3,8 @@
 import operator
 
 import numpy as np
-from labcodes import misc  # pylint: disable=import-error
+import matplotlib.pyplot as plt
+from labcodes import misc
 from lmfit import CompositeModel, Model
 import lmfit.models
 
@@ -343,6 +344,8 @@ class GaussianModel(MyModel):
 
         super().__init__(exp, **kwargs)
         
+    __init__.__doc__ = 'Gaussian model' + COMMON_INIT_DOC
+
     def guess(self, data, x=None, **kwargs):
         """Estimate initial model parameter values from data."""
         y = data
@@ -374,8 +377,6 @@ class GaussianModel(MyModel):
             pars = self.make_params()
 
         return update_param_vals(pars, self.prefix, **kwargs)
-
-    __init__.__doc__ = 'Gaussian model' + COMMON_INIT_DOC
 
 
 class GaussianDecayModel(MyCompositeModel):
@@ -430,6 +431,8 @@ class ResonatorModel(MyModel):
         self.set_param_hint('Qi', min=0)  # Enforce Q is positive
         self.set_param_hint('Qc', min=0)  # Enforce Q is positive
 
+    __init__.__doc__ = 'Resonator model' + COMMON_INIT_DOC
+
     def guess(self, data, x=None, **kwargs):
         verbose = kwargs.pop('verbose', None)
         pars = self.make_params()
@@ -462,7 +465,6 @@ class ResonatorModel(MyModel):
             
         return update_param_vals(pars, self.prefix, **kwargs)
 
-    __init__.__doc__ = 'Resonator model' + COMMON_INIT_DOC
 
 class ResonatorModel_inverse(MyModel):
     """amp * (1 + Qi * Qc^-1 / (1 + 2j * Qi * (x - f0) / f0))
@@ -486,6 +488,8 @@ class ResonatorModel_inverse(MyModel):
 
         self.set_param_hint('Qi', min=0)
         self.set_param_hint('Qc', min=0)
+
+    __init__.__doc__ = 'Resonator model' + COMMON_INIT_DOC
 
     def guess(self, data, x=None, **kwargs):
         verbose = kwargs.pop('verbose', None)
@@ -536,7 +540,6 @@ class ResonatorModel_inverse(MyModel):
         n = Qc/(2*np.pi*f0) * (Qi/(Qi+Qc))**2 * Pin/(h*f0)
         return n
 
-    __init__.__doc__ = 'Resonator model' + COMMON_INIT_DOC
 
 class TransmonModel(MyModel):
     """amp * np.exp(-(x - center)**2 / (2 * width**2)) + offset"""
@@ -557,7 +560,12 @@ class TransmonModel(MyModel):
             return f
 
         super().__init__(transmon_freq, **kwargs)
+
+        self.set_param_hint(f'{self.prefix}period', 
+            expr=f'2*abs({self.prefix}xmax - {self.prefix}xmin)')
         
+    __init__.__doc__ = 'Transmon model' + COMMON_INIT_DOC
+
     def guess(self, data, x=None, **kwargs):
         """Estimate initial model parameter values from data."""
         imax = np.argmax(data)
@@ -580,5 +588,26 @@ class TransmonModel(MyModel):
             )
 
         return update_param_vals(pars, self.prefix, **kwargs)
+    
+    def plot(self, cfit, ax=None, fdata=True):
+        """Plot fit with result parameters"""
+        if ax is None:
+            fig, ax = plt.subplots(tight_layout=True)
+        else:
+            fig = ax.get_figure()
 
-    __init__.__doc__ = 'Transmon model' + COMMON_INIT_DOC
+        if fdata is True:
+            ax.plot(cfit.xdata, cfit.ydata, 'o')
+            ax.plot(*cfit.fdata(50))
+
+        gs = dict(ls='--', color='k', alpha=0.5)  # Guide line style
+        ax.axhline(cfit['fmax'], **gs)
+        ax.axhline(cfit['fmin'], **gs)
+        ax.axvline(cfit['xmin'], **gs)
+        ax.axvline(cfit['xmax'], **gs)
+        ax.annotate(f'z={cfit["xmax"]:.3f}, f={cfit["fmax"]:.3f}', (cfit['xmax'], cfit['fmax']))
+        ax.annotate((f'z={cfit["xmin"]:.3f}, f={cfit["fmin"]:.3f},\n'
+                    f'period={cfit["period"]:.3f},\n'
+                    f'df={abs(cfit["fmax"] - cfit["fmin"]):.3f}.'), 
+                    (cfit['xmin'], cfit['fmin']))
+        return ax

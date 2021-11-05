@@ -2,29 +2,13 @@
 """
 
 import copy
-from typing import List
-from importlib import reload
 from tqdm import tqdm, trange
 
-import lmfit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from labcodes import models
 
-
-def find_model(model):
-    """Returns lmfit.model with given name."""
-
-    if isinstance(model, str):
-        model_cls = getattr(models, model+'Model')
-        # TODO: 'omit' policy may omit all data points and cause TypeError('n > m')!
-        return model_cls(nan_policy='omit')  # Instanting Model class.
-    elif isinstance(model, lmfit.Model):
-        return model
-    else:
-        raise TypeError(f'Expecting instance or name of lmfit.Model, while {type(model)} is given.')
 
 class CurveFit(object):
     """Class encapsulating data, model and fit result for curve fitting.
@@ -33,6 +17,7 @@ class CurveFit(object):
         xdata, ydata: the fit data.
         model: lmfit.Model.
         result: lmfit.ModelResult.
+        params: pandas.Series updated with result.
         fit_report: str.
     """
     def __init__(self, xdata, ydata, model, hold=False):
@@ -40,62 +25,67 @@ class CurveFit(object):
 
         Args:
             xdata, ydata: 1d np.arrays with same shape.
-            model: str or lmfit.Model,
-                str should be name of models in labcodes.models.
+            model: lmfit.Model,
             hold: boolean,
                 if False, try to do fit right after initialization.
         """
         self.xdata = xdata
         self.ydata = ydata
-        self.model = find_model(model)
+        self.model = model
+        self.result = None
+        self.params = None
         if not hold:
             try:
                 self.fit()
             except Exception as exc:
                 print(f'WARNING: Fit failed. Error reports \n{exc}')
-        else:
-            self.result = None
 
-    @property
-    def params(self):
-        dot_dict = {'chi': np.sqrt(self.result.chisqr)}
+    def _update_result(self, result):
+        self.result = result
+
+        # Update params.
+        d = {'chi': np.sqrt(result.chisqr)}
         for key in self.model.param_names:
-            dot_dict[key] = self.result.params[key].value
-            err = self.result.params[key].stderr
+            d[key] = result.params[key].value
+            err = result.params[key].stderr
             if err is None:
-                dot_dict[key+'_err'] = np.nan
+                d[key+'_err'] = np.nan
             else:
-                dot_dict[key+'_err'] = err
-        dots = pd.DataFrame(dot_dict, index=[0])
-        return dots
+                d[key+'_err'] = err
+        self.params = pd.Series(d)
+        return
+
+    def __getitem__(self, key):
+        return self.params[key]
 
     @property
     def fit_report(self):
         return self.result.fit_report()
 
-    def fdata(self, n_pts=None):
+    def fdata(self, x=None):
         """Return values of fitted curve.
         
         Args:
-            n_pts: int, number of sample points for the curve.
-                if None, keep it same as xdata.
+            x: int, number of sample points for the curve.
+                or array of values.
 
         Return:
             y, if n_pts is None,
             x, y, np.array of values of fitted curve, if n_pts is not None.
         """
-        if not n_pts:
+        if not x:
             return self.result.best_fit
-        else:
+        elif np.size(x) == 1:
             ip = np.linspace(0, 1, num=len(self.xdata))
-            i = np.linspace(0, 1, num=n_pts)
-            new_sample_pt = np.interp(i, ip, self.xdata)
-            new_y = self.result.eval(x=new_sample_pt)
-            return new_sample_pt, new_y
+            i = np.linspace(0, 1, num=x)
+            x = np.interp(i, ip, np.sort(self.xdata))
+            return x, self.result.eval(x=x)
+        else:
+            return x, self.result.eval(x=x)
 
     def get_dots(self):
         """Return dots with both fit result and fit data for saving."""
-        dots = self.params
+        dots = self.params.to_frame().T
         dots['x'] = self.xdata
         dots['y'] = self.ydata
         dots['f'] = self.fdata()
@@ -107,12 +97,8 @@ class CurveFit(object):
         Args:
             kwargs: fit initial values of parameters passed to model.
         """
-        self.result = self.model.fit(self.ydata, x=self.xdata, **kwargs)
-
-    def reload_model(self):
-        reload(models)
-        model_name = type(self.model).__name__[:-5]
-        self.model = find_model(model_name)
+        result = self.model.fit(self.ydata, x=self.xdata, **kwargs)
+        self._update_result(result)
 
     def _add_fit_report(self, axes):
         """Attach fit report on matplotlib.axes."""
@@ -120,7 +106,7 @@ class CurveFit(object):
         y0, y1 = axes.get_ylim()
         axes.text(
                 x=x0 + (x1-x0)*1.1,
-                y=y0 + (y1-y0)*0.9,
+                y=y0 + (y1-y0)*1.0,
                 s=self.fit_report,
                 ha='left',
                 va='top'
@@ -222,14 +208,13 @@ class BatchFit(object):
         Args:
             xbatch, ybatch: 2d array with same shape.
                 list of data traces which may has different length.
-            model: str or lmfit.Model,
-                str should be name of models in labcodes.models.
+            model: lmfit.Model,
             hold: boolean,
                 if False, try to do fit right after initialization.
         """
         self.xbatch = xbatch
         self.ybatch = ybatch
-        self.model = find_model(model)
+        self.model = model
         if not hold:
             try:
                 self.fit()

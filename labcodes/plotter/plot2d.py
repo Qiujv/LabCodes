@@ -39,7 +39,7 @@ def plot2d_pcolormesh(df, x_name, y_name, z_name, ax=None):
         y_grid, 
         z_grid, 
         shading='nearest', 
-        cmap='RdBu',
+        cmap='viridis',
     )
     colorbar = fig.colorbar(im, ax=ax, label=z_name)
     ax.set(xlabel=x_name, ylabel=y_name)
@@ -68,7 +68,7 @@ def plot2d_scatter(df, x_name, y_name, z_name, ax=None, marker='s', marker_size=
         c=df[z_name],
         s=marker_size,
         marker=marker,
-        cmap='RdBu'
+        cmap='viridis'
     )
     colorbar = fig.colorbar(im, ax=ax, label=z_name)
     ax.set(
@@ -80,7 +80,7 @@ def plot2d_scatter(df, x_name, y_name, z_name, ax=None, marker='s', marker_size=
     return ax
 
 def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None, 
-                      colorbar=True, cmap='RdBu', norm=None, **kwargs):
+                      colorbar=True, cmap='viridis', norm=None, **kwargs):
     """Labrad style 2D pseudocolor plot 2D scan data.
 
     Data points are plotted as rectangular scatters with proper width and height 

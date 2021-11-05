@@ -6,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 from configparser import ConfigParser
 
-from labcodes import plotter as pltr
+from labcodes import plotter
 
 
 def data_path(dir, id, suffix='csv'):
@@ -62,16 +62,16 @@ def get_param_names(config, which='Independent'):
     for i in range(num):
         section = config[f'{which} {i+1}']
 
-        if section.get('category'):
-            name = section['category']
-        elif section.get('label'):
-            name = section['label']
-        else:
+        name = [section[k] for k in ['category', 'label'] if section.get(k)]
+        if len(name) == 0:
             raise Exception(f'Cannot resolve name from section "{section.name}".')
+        else:
+            name = '_'.join(name)
         name = pretty_name(name)
 
         if section.get('units'):
             name += f'_{section["units"]}'
+
         names.append(name)
 
     return names
@@ -89,6 +89,8 @@ def pretty_name(name, abbrev=None):
             'prob.': 'prob',
             '|1> state': 's1',
             '|0> state': 's0',
+            '|0>': 's0',
+            '|1>': 's1',
             'amplitude': 'amp',
             'coupler bias pulse amp': 'cpa',
             'coupler pulse amp': 'cpa',
@@ -132,17 +134,16 @@ class LabradRead(object):
     def new_name(self):
         return simplify_file_name(self.path.stem)
 
-    def _get_plot_title(self):
-        title = self.path.with_stem(self.name)
+    def _get_plot_title(self, name=None):
+        if name is None:
+            name = self.name
+        title = self.path.with_stem(name)
         title = str(title)
         lw = 60
         title = '\n'.join([title[i:i+lw] for i in range(0, len(title), lw)])
         return title
 
-    def get_save_name(self):
-        pass
-
-    def plot1d(self, x_name=0, y_name=0, ax=None):
+    def plot1d(self, x_name=0, y_name=0, ax=None, **kwargs):
         """Quick line plot.
         
         Args:
@@ -161,9 +162,12 @@ class LabradRead(object):
             x_name = self.indeps[x_name]
         if isinstance(y_name, int):
             y_name = self.deps[y_name]
+            
+        kw = dict(marker='.')
+        kw.update(kwargs)
 
         df = self.df
-        ax.plot(df[x_name], df[y_name], marker='.')
+        ax.plot(df[x_name], df[y_name], **kw)
         ax.grid()
         ax.set(
             xlabel=x_name,
@@ -195,7 +199,7 @@ class LabradRead(object):
         if isinstance(z_name, int):
             z_name = self.deps[z_name]
 
-        plot_func = getattr(pltr, f'plot2d_{kind}')
+        plot_func = getattr(plotter, f'plot2d_{kind}')
         plot_func(self.df, x_name=x_name, y_name=y_name, z_name=z_name, ax=ax, **kwargs)
 
         ax.set(

@@ -1,58 +1,17 @@
 """Module contains miscellaneous useful functions.
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
-from labcodes import plotter
 
 
-def phase_rotate(data, angle=None, show=False):
-    """Rotate data clockwise with angle in rad.
+def auto_rotate(data, with_angle=False):
+    angle = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)  # Minize imag(var(data)), by Kaho
     
-    Args:
-        data: np.array.
-        angle: float, phase angle to rotate.
-            if None, estimated value by get_rotate_angle will be admitted.
-        show: boolean,
-            Whether or not to plot the rotated data in complex plane.
-            Default is False.
-    
-    Returns:
-        data * np.exp(1j*angle)
-    """
-    data = np.array(data)
-    if angle is None: angle = get_rotate_angle(data)
-
-    rot_data = data * np.exp(1j*angle) # counter-clockwise
-    
-    if show:
-        ax = plotter.plot_iq(rot_data.ravel())
-        ax.set_title(f'Data rotated by {angle*180/np.pi:+.2f} (CCW)')
-        plt.show()
-        plt.close(ax.get_figure())
-    return rot_data
-
-def get_rotate_angle(data):
-    """Returns phase angle (in rad) that minize imaginary part of data. 
-    Algorithm by Kaho."""
-    # xdata = np.real(data.ravel())
-    # ydata = np.imag(data.ravel())
-    # slope1 = np.polyfit(xdata, ydata, 1)[0]
-    # slope2 = np.polyfit(ydata, xdata, 1)[0]
-    # # find the one further from x axis in fitting.
-    # if abs(slope1) < abs(slope2):
-    #     angle = np.arctan(slope1)
-    # else:
-    #     angle = np.pi/2 - np.arctan(slope2)
-    # # get the angle to rotate
-    # rot_angle = -angle % np.pi
-    angle = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)
-    return angle # in rad
-
-# def phase_rotate_x(data, x, rot_rate):  # TODO: Remove this.
-#     """Returns data with additional phase propotional to x value."""
-#     return data*np.exp(1j*x*rot_rate)
+    if with_angle is True:
+        return data * np.exp(1j*angle), angle  # counter-clockwise
+    else:
+        return data * np.exp(1j*angle)
 
 def remove_e_delay(angle, freq):
     """Returns phase without linear freq dependence."""
@@ -155,37 +114,3 @@ def attenuate(v, atten):
     """Returns voltage attenuated by given value."""
     ratio = db_to_ratio(db=-atten)  # +atten = -amp.
     return v * ratio
-
-def mid_every_pair(v, expand=False):
-    """v: [1,2,3,4] -> mv: [1.5, 2.5, 3.5] or [0.5, 1.5, 2.5, 3.5, 4.5]."""
-    v = np.array(v)
-    mv = (v[1:] + v[:-1]) / 2
-    if expand is True:
-        head = 2 * v[0] - mv[0]
-        mv = np.insert(mv, 0, head)
-        tail = 2 * v[-1] - mv[-1]
-        mv = np.append(mv, tail)
-        return mv
-    elif expand is False:
-        return mv
-    else:
-        raise TypeError(f'Except boolean `expand`, while {type(expand)} is given.')
-
-def plot_2d(ax, x, y, z, data, **kw):
-    """Plot z in colormap versus x and y.
-    
-    Args:
-        ax: matplotlib.axes.Axe, where to plot the artiest.
-        x, y, z: str, key of the quantites to plot with.
-        data: pandas.DataFrame.
-        **kw: other kwargs passed to ax.pcolormesh()
-
-    Returns:
-        matplotlib.collections.QuadMesh.
-    """
-    table = data[[x, y, z]].pivot(index=y, columns=x)
-    vx = table.columns.levels[1].values
-    vy = table.index.values
-    mx = mid_every_pair(vx, expand=True)
-    my = mid_every_pair(vy, expand=True)
-    return ax.pcolormesh(mx, my, table.values, **kw)

@@ -16,9 +16,9 @@ def plot_iq(data, ax=None, **kwargs):
 
     data = np.ravel(data)
 
-    n_pt_max = 3000
+    n_pt_max = 5000
     if data.size <= n_pt_max:
-        kw = dict(marker='.', alpha=0.3)
+        kw = dict(marker='.', alpha=0.3, linewidth=0)
         kw.update(kwargs)
         ax.scatter(np.real(data), np.imag(data), **kw)
     else:
@@ -84,11 +84,12 @@ def plot_visibility(s0v, s1v, ax=None, ax2=None, bins=50):
     ax.legend(loc='upper left')
 
     # Plot visibility.
-    visi = cdf1 - cdf0
-    visi_argmax = np.argmax(visi)
+    visi = abs(cdf1 - cdf0)
+    argmax = np.argmax(visi)
     ax2.plot(x0, visi, label='|1>-|0>')
-    ax2.annotate(f'best visibility = {np.max(visi):.3f}', (x0[visi_argmax], visi[visi_argmax]), 
-        (0.35, 0.95), textcoords=ax2.transAxes, arrowprops=dict(arrowstyle="->"))
+    text_pos = (0.35, 0.95) if visi[argmax] < 0.9 else (0.35, 0.8)
+    ax2.annotate(f'best visibility = {visi[argmax]:.3f}', (x0[argmax], visi[argmax]), 
+        text_pos, textcoords=ax2.transAxes, arrowprops=dict(arrowstyle="->"))
     ax2.legend(loc='center right')
     return ax, ax2
 
@@ -100,6 +101,7 @@ if __name__ == '__main__':
     noise2 = 0.7 * rng.standard_normal(500)
     s0 = (1+noise) + 1j*(1+noise2)
     s1 = (-1+noise) + 1j*(-1+noise2)
+    s1 = np.hstack([s0[::10], s1])[:s0.size]
 
     from labcodes import misc
     fig = plt.figure(figsize=(6,6), tight_layout=True)
@@ -107,7 +109,7 @@ if __name__ == '__main__':
     ax4 = ax3.twinx()
     plot_iq(s0, ax=ax, label='|0>')  # The best plot maybe PDF contour plot with colored line.
     plot_iq(s1, ax=ax, label='|1>')
-    s0, s1 = misc.phase_rotate([s0, s1])  # Must pass np.array.
+    s0, s1 = misc.auto_rotate(np.array([s0, s1]))
     plot_iq(s0, ax=ax2, label='|0>')
     plot_iq(s1, ax=ax2, label='|1>')
     ax.legend()
