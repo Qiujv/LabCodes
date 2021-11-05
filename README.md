@@ -1,20 +1,13 @@
-# LabberCodes
-Set of codes used in SUSTech cQED lab.
+# LabCodes
+Data processing codes shared in SUSTech cQED lab.
 
 # Contents
-
-## Analysis
-
-Tools for data analysis, include:
-  - `fileio`: Reading and writing datafiles;
-  - `fitter`: Convenient fitting tools.
-  - `models`: Fitting models with pre-defined initial value guess algorithm.
-
-## Misc.
-
-Useful function do not fit anywhere else.
-
-`dir(labcodes.misc)` to see what it contains.
+`fitter`: CurveFit and BatchFit handling fitting and fit datas.
+`models`: Fitting models with pre-defined initial value guess algorithm.
+`plotter`: Quick plotter for data generated in 2d scan, state discrimination, tomography experiments and so on.
+`fileio`: Reading and writing data files, now supports Labber and LabRAD;
+`misc`: Useful functions do not fit anywhere else.
+`frog`: Codes for FORG experiments only.
 
 # Installation
 
