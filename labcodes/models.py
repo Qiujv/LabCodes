@@ -1,4 +1,4 @@
-"""Module containing frequently used models."""
+"""Module containing models for fitter or lmfit."""
 
 import operator
 
