@@ -7,6 +7,7 @@ from functools import wraps
 import attr
 import numpy as np
 import scipy.constants as const
+import matplotlib.pyplot as plt
 
 Phi_0 = const.h / (2*const.e)  # Flux quantum.
 
@@ -40,16 +41,49 @@ def use_attr_as_default(f):
         return f(self, **kw)
     return wrapped_f
 
+class Calculator(object):
+    def plot(self, yname, ax=None, plot_kw={}, **kwargs):
+        """Quick plot quantities.
+        
+        Args:
+            yname: str, name of function to call.
+            **kwargs: passed to the function.
+            ax: axes to plot on.
+            plot_kw: passed to ax.plot.
+
+        Returns:
+            The axes.
+        """
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.get_figure()
+
+        xname, xval = [(k,v) for k, v in kwargs.items() 
+                        if isinstance(v, np.ndarray)][0]
+
+        ax.plot(
+            xval,
+            getattr(self, yname)(**kwargs),
+            **plot_kw
+        )
+        ax.set(
+            xlabel=xname,
+            ylabel=yname,
+        )
+        return ax
+
+
 @attr.s(auto_attribs=True)
-class Capacitor(object):
+class Capacitor(Calculator):
     c: float = 100e-15
 
     @use_attr_as_default
     def Ec(self, c, **kw):
-        return const.e**2 / (2*c)  # in J but not Hz.
+        return const.e**2 / (2*c) / const.h  # in Hz but not J.
 
 @attr.s(auto_attribs=True)
-class Junction(object):
+class Junction(Calculator):
     w: float = 0.4e-6
     h: float = 0.2e-6
     # R*S = Oxidation constant, 650 Ohm*um^2 is and emprical value.
@@ -74,7 +108,7 @@ class Junction(object):
 
     @use_attr_as_default
     def Ej(self, Ic, **kw):
-        return Ic*Phi_0 / (2*np.pi)  # TODO: use Lj0 to compute it.
+        return Ic*Phi_0 / (2*np.pi) / const.h  # TODO: use Lj0 to compute it.
 
 @attr.s(auto_attribs=True)
 class Transmon(Junction, Capacitor):
@@ -88,7 +122,46 @@ class Transmon(Junction, Capacitor):
         return m*np.sqrt(8*Ec*Ej) - Ec/12 * (6*m**2 + 6*m + 3)
 
 @attr.s(auto_attribs=True)
-class TCoupler(object):
+class Gmon(Junction):
+    Lg: float = 0.2e-9
+    Lw: float = 0.1e-9
+    delta: float = np.pi  # The maximal coupling point.
+
+    w1: float = 4e9
+    w2: float = 4e9
+    L1: float = 15e-9
+    L2: float = 15e-9
+
+    @use_attr_as_default
+    def L_linear(self, Lg, Lw, **kw):
+        return 2*Lg + Lw
+    
+    @use_attr_as_default
+    def r(self, Lj0, L_linear, **kw):
+        return L_linear / Lj0
+
+    @use_attr_as_default
+    def M(self, Lj0, L_linear, Lg, delta, **kw):
+        return Lg**2 / (L_linear + Lj0/np.cos(delta))
+
+    @use_attr_as_default
+    def g(self, M, L1, L2, w1, w2, **kw):
+        return 0.5 * M / np.sqrt(L1*L2) * np.sqrt(w1*w2)
+
+    @use_attr_as_default
+    def w1_shift(self, g, Lg, L1, L2, **kw):
+        return g * np.sqrt((Lg+L2) / (Lg+L1))
+
+    @use_attr_as_default
+    def kappa(self, g, wFSR):
+        """Decay rate to multimode resonator, by Fermi's golden rule."""
+        # No unit conversion! The 2*pi comes from intergration of sin(x)^2/x^2 
+        # filter function by sinusoidal drive signal (square wave also has this 
+        # form). For detail please refer to textbook about time-depedent perturbation.
+        return 2*np.pi * g**2 / wFSR
+
+@attr.s(auto_attribs=True)
+class TCoupler(Calculator):
     wc: float = 5e9
     w1: float = 4e9
     w2: float = 4e9
@@ -102,12 +175,13 @@ class TCoupler(object):
 
     @use_attr_as_default  # Equivelant to eta = use_attr_as_default(ete)(self, **kwargs)
     def eta(self, c1c, c2c, c12, cc, **kw):
+        """Dimensionless ratio showing indirect coupling strength comparing to direct one."""
         return (c1c*c2c) / (c12*cc)
 
     @use_attr_as_default
     def g12(self, c12, c1, c2, w1, w2, **kw):
         """Coupling by C12 only, not including the whole capacitance network."""
-        return c12 / np.sqrt(c1*c2) * np.sqrt(w1*w2)  # by c12 only, not include C network.
+        return 0.5 * c12 / np.sqrt(c1*c2) * np.sqrt(w1*w2)  # by c12 only, not include C network.
 
     @use_attr_as_default
     def f_in(self, wc, w1, w2, eta, **kw):
@@ -116,7 +190,7 @@ class TCoupler(object):
     @use_attr_as_default
     def g_in(self, f_in, g12, **kw):
         """Indirect coupling via 010 and 111 state."""
-        return 0.5 * g12 * f_in
+        return g12 * f_in
 
     @use_attr_as_default
     def f_di(self, eta, **kw):
@@ -125,12 +199,12 @@ class TCoupler(object):
     @use_attr_as_default
     def g_di(self, f_di, g12, **kw):
         """Direct coupling via capatance network."""
-        return 0.5 * g12 * f_di
+        return g12 * f_di
 
     @use_attr_as_default
     def g(self, g12, f_in, f_di, **kw):
         """The tunable coupling with wc."""
-        return 0.5 * g12 * (f_in + f_di)
+        return g12 * (f_in + f_di)
 
     @use_attr_as_default
     def g1c(self, w1, wc, c1, cc, c1c, **kw):
