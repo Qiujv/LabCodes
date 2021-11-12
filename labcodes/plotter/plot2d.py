@@ -142,7 +142,7 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
         extend_cbar = 'neither'
     colors = cmap(norm(z))
     col = PatchCollection(rects, facecolors=colors, cmap=cmap, norm=norm, 
-                          linewidth=0)
+                          linewidth=0, **kwargs)
 
     ax.add_collection(col)
     # ax.axis('tight')

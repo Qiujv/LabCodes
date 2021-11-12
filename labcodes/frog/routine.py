@@ -122,33 +122,41 @@ class GmonModel(models.MyCompositeModel):
         kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
                        'independent_vars': independent_vars})
        
-        def coupling(x, r=0.9, freq=1, shift=0):
-            delta = junc_phase(2*np.pi*freq*(x-shift),r)
+        def coupling(x, r=0.9, period=1, shift=0):
+            delta = junc_phase(2*np.pi/period*(x-shift),r)
             M = 1 / (r + 1/np.cos(delta))
             return M
 
         mod = models.AmpFeature() * models.MyModel(coupling)
         mod.set_param_hint(name='r', max=1, min=0)  # r = L_linear / L_j0, see my notes.
         mod.set_param_hint(name='amp', min=0)
-        mod.set_param_hint(name='zero1', expr='(pi/2+r)/(2*pi*freq) + shift')
-        mod.set_param_hint(name='zero2', expr='(pi*3/2-r)/(2*pi*freq) + shift')
-        mod.set_param_hint(name='period', expr='1/freq')
+        mod.set_param_hint(name='zero1', expr='(pi/2+r)/(2*pi/period) + shift')
+        mod.set_param_hint(name='zero2', expr='(pi*3/2-r)/(2*pi/period) + shift')
         mod.set_param_hint(name='max_y_shift', expr='amp/(r-1)')
 
         super().__init__(mod, models.OffsetFeature(), models.operator.add, **kwargs)
 
     __init__.__doc__ = 'Gmon model' + models.COMMON_INIT_DOC
 
-    def plot(self, cfit, ax=None, fdata=True):
-        """Plot fit with results parameters."""
+    def plot(self, cfit, ax=None, fdata=50):
+        """Plot fit with results parameters.
+        
+        Args:
+            cfit: fit with result.
+            ax: ax to plot, if None, create a new ax.
+            fdata: passed to cfit.fdata().
+
+        Returns:
+            ax with plot and annotations.
+        """
         if ax is None:
             fig, ax = plt.subplots(tight_layout=True)
         else:
             fig = ax.get_figure()
 
-        if fdata is True:
+        if fdata:
             ax.plot(cfit.xdata, cfit.ydata, 'o')
-            ax.plot(*cfit.fdata(50))
+            ax.plot(*cfit.fdata(fdata))
 
         gs = dict(ls='--', color='k', alpha=0.5)  # Guide line style
         ax.axhline(y=cfit['offset'], **gs)
@@ -159,25 +167,33 @@ class GmonModel(models.MyCompositeModel):
         dip_y = cfit['offset'] + cfit['max_y_shift']
         ax.axhline(y=dip_y, **gs)
         ax.axvline(x=dip_x, **gs)
-        ax.annotate(f"dip: {dip_x:.3f}\nmax y shift: {cfit['max_y_shift']:.4f}", 
-            (dip_x, dip_y), ha='center')
+        ax.annotate((f"x={dip_x:.3f}\n"
+                     f"$\\Delta y_\\mathrm{{max}}={cfit['max_y_shift']:.4f}\\pm{cfit['max_y_shift_err']:.4f}$"), 
+            (dip_x, dip_y), va='bottom', ha='left')
 
-        ax.axvline(x=cfit['shift'], **gs)
-        ax.annotate(f"x={cfit['shift']:.3f}", 
-            (cfit['shift'], ax.get_ylim()[1]), va='top', ha='center')
+        xmin, xmax = ax.get_xlim()
+        for i in np.arange(-2,3):
+            shift = cfit['shift'] + i*cfit['period']
+            if (shift > xmin) and (shift < xmax):
+                ax.axvline(x=shift, **gs)
+                ax.annotate(f"x={shift:.3f}", 
+                    (shift, ax.get_ylim()[1]), va='top', ha='right', rotation='vertical')
 
-        ax.axvline(x=cfit['zero1'], **gs)
-        ax.annotate(f"x={cfit['zero1']:.3f}", 
-            (cfit['zero1'], cfit['offset']), va='bottom', ha='center')
+            zero1 = cfit['zero1'] + i*cfit['period']
+            if (zero1 > xmin) and (zero1 < xmax):
+                ax.axvline(x=zero1, **gs)
+                ax.annotate(f"x={zero1:.3f}", 
+                    (zero1, cfit['offset']), va='bottom', ha='right', rotation='vertical')
 
-        ax.axvline(x=cfit['zero2'], **gs)
-        ax.annotate(f"x={cfit['shift']:.3f}", 
-            (cfit['zero2'], cfit['offset']), va='bottom', ha='center')
+            zero2 = cfit['zero2'] + i*cfit['period']
+            if (zero2 > xmin) and (zero2 < xmax):
+                ax.axvline(x=zero2, **gs)
+                ax.annotate(f"x={zero2:.3f}", 
+                    (zero2, cfit['offset']), va='bottom', ha='right', rotation='vertical')
 
-        ax.set(
-            xlabel='x',
-            ylabel='y'
-        )
+        ax.annotate(f"$R=L_\\mathrm{{linear}}/L_{{j0}}={cfit['r']:.3f}\\pm{cfit['r_err']:.4f}$", 
+            (1,0), xycoords=ax.transAxes, va='bottom', ha='right')
+
         return ax
 
 def junc_phase(delta_ext, r):
