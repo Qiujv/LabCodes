@@ -133,27 +133,19 @@ class Gmon(Junction):
     L2: float = 15e-9
 
     @use_attr_as_default
-    def L_linear(self, Lg, Lw, **kw):
-        return 2*Lg + Lw
-    
-    @use_attr_as_default
-    def r(self, Lj0, L_linear, **kw):
-        return L_linear / Lj0
+    def M(self, Lj0, Lg, Lw, delta, **kw):
+        return Lg**2 / (2*Lg + Lw + Lj0/np.cos(delta))
 
     @use_attr_as_default
-    def M(self, Lj0, L_linear, Lg, delta, **kw):
-        return Lg**2 / (L_linear + Lj0/np.cos(delta))
-
-    @use_attr_as_default
-    def g(self, M, L1, L2, w1, w2, **kw):
-        return 0.5 * M / np.sqrt(L1*L2) * np.sqrt(w1*w2)
+    def g(self, M, L1, L2, w1, w2, Lg, **kw):
+        return 0.5 * M / np.sqrt((L1+Lg)*(L2+Lg)) * np.sqrt(w1*w2)
 
     @use_attr_as_default
     def w1_shift(self, g, Lg, L1, L2, **kw):
         return g * np.sqrt((Lg+L2) / (Lg+L1))
 
     @use_attr_as_default
-    def kappa(self, g, wFSR):
+    def kappa(self, g, wFSR, **kw):
         """Decay rate to multimode resonator, by Fermi's golden rule."""
         # No unit conversion! The 2*pi comes from intergration of sin(x)^2/x^2 
         # filter function by sinusoidal drive signal (square wave also has this 

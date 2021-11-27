@@ -9,7 +9,7 @@ from labcodes import misc, fitter, models, plotter
 
 def prep_data_one(logf, atten=0):
     """Normalize S21 data for models.ResonatorModel_inverse."""
-    df = logf.df.copy()
+    df = logf.df.rename(columns={'s21_log_mag_dB': 's21_dB', 's21_phase_rad': 's21_rad'})
     angle = misc.remove_e_delay(df['s21_rad'].values, df['freq_GHz'].values)
     df['s21'] = 10 ** (df['s21_dB'] / 20) * np.exp(1j*angle)
     df['s21'] = models.ResonatorModel_inverse.normalize(df['s21'])
@@ -33,7 +33,7 @@ def fit_resonator(logf, atten=0, **kwargs):
     ax = cfit.plot_complex(plot_init=False, fit_report=True)
     return cfit, ax
     
-def fit_coherence(logf, ax, model=None, xy=(0.6,0.9)):
+def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=100, **kwargs):
     if 'T1' in logf.name:
         mod = models.ExponentialModel()
         symbol = 'T_1'
@@ -56,12 +56,14 @@ def fit_coherence(logf, ax, model=None, xy=(0.6,0.9)):
         xdata=logf.df[xname].values,
         ydata=logf.df['s1_prob'].values,
         model=mod,
+        hold=True,
     )
+    cfit.fit(**kwargs)
 
     fig = ax.get_figure()
     fig.set_size_inches(5,3)
 
-    ax.plot(*cfit.fdata(100), 'r-', lw=1)
+    ax.plot(*cfit.fdata(fdata), 'r-', lw=1)
     ax.annotate(f'${symbol}\\approx {cfit["tau"]:,.2f}\\pm{cfit["tau_err"]:,.4f} {xname[-2:]}$', 
         xy, xycoords='axes fraction')
     return cfit, ax

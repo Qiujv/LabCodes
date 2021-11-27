@@ -589,16 +589,16 @@ class TransmonModel(MyModel):
 
         return update_param_vals(pars, self.prefix, **kwargs)
     
-    def plot(self, cfit, ax=None, fdata=True):
+    def plot(self, cfit, ax=None, fdata=50):
         """Plot fit with result parameters"""
         if ax is None:
             fig, ax = plt.subplots(tight_layout=True)
         else:
             fig = ax.get_figure()
 
-        if fdata is True:
+        if fdata:
             ax.plot(cfit.xdata, cfit.ydata, 'o')
-            ax.plot(*cfit.fdata(50))
+            ax.plot(*cfit.fdata(fdata))
 
         gs = dict(ls='--', color='k', alpha=0.5)  # Guide line style
         ax.axhline(cfit['fmax'], **gs)
