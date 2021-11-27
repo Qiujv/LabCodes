@@ -1,18 +1,14 @@
 """Modules contains class calculating parameters of models, e.g. Transmon, Gmon, and T coupler."""
 
 import inspect
-import typing
 from functools import wraps
 
-import attr
 import numpy as np
 import scipy.constants as const
 import matplotlib.pyplot as plt
 
 Phi_0 = const.h / (2*const.e)  # Flux quantum.
 
-# A calculator class has two kind of attributes only: values and functions accepting 
-# only keyword arguments.
 # NOTE: Quantities here are in SI units unless noted.
 
 def use_attr_as_default(f):
@@ -42,52 +38,22 @@ def use_attr_as_default(f):
     return wrapped_f
 
 class Calculator(object):
-    def plot(self, yname, ax=None, plot_kw={}, **kwargs):
-        """Quick plot quantities.
-        
-        Args:
-            yname: str, name of function to call.
-            **kwargs: passed to the function.
-            ax: axes to plot on.
-            plot_kw: passed to ax.plot.
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
-        Returns:
-            The axes.
-        """
-        if ax is None:
-            fig, ax = plt.subplots()
-        else:
-            fig = ax.get_figure()
-
-        xname, xval = [(k,v) for k, v in kwargs.items() 
-                        if isinstance(v, np.ndarray)][0]
-
-        ax.plot(
-            xval,
-            getattr(self, yname)(**kwargs),
-            **plot_kw
-        )
-        ax.set(
-            xlabel=xname,
-            ylabel=yname,
-        )
-        return ax
-
-
-@attr.s(auto_attribs=True)
 class Capacitor(Calculator):
-    c: float = 100e-15
+    c = 100e-15
 
-    @use_attr_as_default
-    def Ec(self, c, **kw):
+    @use_attr_as_default  # Equivelant to Ec = use_attr_as_default(Ec)(self, **kwargs)
+    def Ec(self, c, **kw):  # **kw is there for passing arguments through.
         return const.e**2 / (2*c) / const.h  # in Hz but not J.
 
-@attr.s(auto_attribs=True)
 class Junction(Calculator):
-    w: float = 0.4e-6
-    h: float = 0.2e-6
+    w = 0.4e-6
+    h = 0.2e-6
     # R*S = Oxidation constant, 650 Ohm*um^2 is and emprical value.
-    rs_const: float = 650 * 1e-6**2
+    rs_const = 650 * 1e-6**2
 
     @use_attr_as_default
     def s(self, w, h, **kw):
@@ -110,7 +76,6 @@ class Junction(Calculator):
     def Ej(self, Ic, **kw):
         return Ic*Phi_0 / (2*np.pi) / const.h  # TODO: use Lj0 to compute it.
 
-@attr.s(auto_attribs=True)
 class Transmon(Junction, Capacitor):
     @use_attr_as_default
     def E10(self, Ec, Ej, **kw):
@@ -121,16 +86,15 @@ class Transmon(Junction, Capacitor):
         """Energy of levels, m=0, 1, 2..."""
         return m*np.sqrt(8*Ec*Ej) - Ec/12 * (6*m**2 + 6*m + 3)
 
-@attr.s(auto_attribs=True)
 class Gmon(Junction):
-    Lg: float = 0.2e-9
-    Lw: float = 0.1e-9
-    delta: float = np.pi  # The maximal coupling point.
+    Lg = 0.2e-9
+    Lw = 0.1e-9
+    delta = np.pi  # The maximal coupling point.
 
-    w1: float = 4e9
-    w2: float = 4e9
-    L1: float = 15e-9
-    L2: float = 15e-9
+    w1 = 4e9
+    w2 = 4e9
+    L1 = 15e-9
+    L2 = 15e-9
 
     @use_attr_as_default
     def M(self, Lj0, Lg, Lw, delta, **kw):
@@ -146,26 +110,26 @@ class Gmon(Junction):
 
     @use_attr_as_default
     def kappa(self, g, wFSR, **kw):
-        """Decay rate to multimode resonator, by Fermi's golden rule."""
+        """Decay rate to multimode resonator, by Fermi's golden rule.
+        In same unit as arguments."""
         # No unit conversion! The 2*pi comes from intergration of sin(x)^2/x^2 
         # filter function by sinusoidal drive signal (square wave also has this 
         # form). For detail please refer to textbook about time-depedent perturbation.
         return 2*np.pi * g**2 / wFSR
 
-@attr.s(auto_attribs=True)
 class TCoupler(Calculator):
-    wc: float = 5e9
-    w1: float = 4e9
-    w2: float = 4e9
+    wc = 5e9
+    w1 = 4e9
+    w2 = 4e9
 
-    c1: float = 100e-15
-    c2: float = 100e-15
-    cc: float = 100e-15
-    c1c: float = 1e-15
-    c2c: float = 1e-15
-    c12: float = 0.02e-15
+    c1 = 100e-15
+    c2 = 100e-15
+    cc = 100e-15
+    c1c = 1e-15
+    c2c = 1e-15
+    c12 = 0.02e-15
 
-    @use_attr_as_default  # Equivelant to eta = use_attr_as_default(ete)(self, **kwargs)
+    @use_attr_as_default
     def eta(self, c1c, c2c, c12, cc, **kw):
         """Dimensionless ratio showing indirect coupling strength comparing to direct one."""
         return (c1c*c2c) / (c12*cc)
@@ -208,8 +172,8 @@ if __name__ == '__main__':
 
     tcplr = TCoupler()
     # With default it should be 1.5 and -1.38, same as @yan_tunable_2018.
-    print('The directive coupling strength (dimensionless) is:\n', tcplr.f_di())
-    print('The indirective coupling strength (dimensionless) is:\n', tcplr.f_in())
+    print('The directive coupling factor is:\n', tcplr.f_di())
+    print('The indirective coupling factor is:\n', tcplr.f_in())
 
     # With another set of values, This plot should recovers fig.2(b) in @yan_tunable_2018.
     wc = np.linspace(4.3e9, 7e9)
