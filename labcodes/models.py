@@ -589,7 +589,7 @@ class TransmonModel(MyModel):
 
         return update_param_vals(pars, self.prefix, **kwargs)
     
-    def plot(self, cfit, ax=None, fdata=50):
+    def plot(self, cfit, ax=None, fdata=500):
         """Plot fit with result parameters"""
         if ax is None:
             fig, ax = plt.subplots(tight_layout=True)

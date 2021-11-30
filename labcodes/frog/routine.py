@@ -119,8 +119,8 @@ class GmonModel(models.MyCompositeModel):
     """Model fitting Gmon induced tunable coupling.
     WARNING: The fit is sensitive to initial value, which must be provided by user."""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
+    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise', 
+                 with_slope=None, **kwargs):
         kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
                        'independent_vars': independent_vars})
        
@@ -136,11 +136,20 @@ class GmonModel(models.MyCompositeModel):
         mod.set_param_hint(name='zero2', expr='(pi*3/2-r)/(2*pi/period) + shift')
         mod.set_param_hint(name='max_y_shift', expr='amp/(r-1)')
 
-        super().__init__(mod, models.OffsetFeature(), models.operator.add, **kwargs)
+        def slope(x, slope=0):
+            return x*slope
+        mod2 = models.MyModel(slope)
+        if with_slope:
+            mod2.set_param_hint(name='slope', vary=True, value=with_slope)
+        else:
+            mod2.set_param_hint(name='slope', vary=False)
+        mod2 = models.OffsetFeature() + mod2
+
+        super().__init__(mod, mod2, models.operator.add, **kwargs)
 
     __init__.__doc__ = 'Gmon model' + models.COMMON_INIT_DOC
 
-    def plot(self, cfit, ax=None, fdata=50):
+    def plot(self, cfit, ax=None, fdata=500):  # TODO: Include the slope feature.
         """Plot fit with results parameters.
         
         Args:
