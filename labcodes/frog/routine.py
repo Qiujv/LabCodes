@@ -9,7 +9,7 @@ from labcodes import misc, fitter, models, plotter
 
 def prep_data_one(logf, atten=0):
     """Normalize S21 data for models.ResonatorModel_inverse."""
-    df = logf.df.copy()
+    df = logf.df.rename(columns={'s21_log_mag_dB': 's21_dB', 's21_phase_rad': 's21_rad'})
     angle = misc.remove_e_delay(df['s21_rad'].values, df['freq_GHz'].values)
     df['s21'] = 10 ** (df['s21_dB'] / 20) * np.exp(1j*angle)
     df['s21'] = models.ResonatorModel_inverse.normalize(df['s21'])
@@ -33,7 +33,7 @@ def fit_resonator(logf, atten=0, **kwargs):
     ax = cfit.plot_complex(plot_init=False, fit_report=True)
     return cfit, ax
     
-def fit_coherence(logf, ax, model=None, xy=(0.6,0.9)):
+def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=100, **kwargs):
     if 'T1' in logf.name:
         mod = models.ExponentialModel()
         symbol = 'T_1'
@@ -56,12 +56,14 @@ def fit_coherence(logf, ax, model=None, xy=(0.6,0.9)):
         xdata=logf.df[xname].values,
         ydata=logf.df['s1_prob'].values,
         model=mod,
+        hold=True,
     )
+    cfit.fit(**kwargs)
 
     fig = ax.get_figure()
     fig.set_size_inches(5,3)
 
-    ax.plot(*cfit.fdata(100), 'r-', lw=1)
+    ax.plot(*cfit.fdata(fdata), 'r-', lw=1)
     ax.annotate(f'${symbol}\\approx {cfit["tau"]:,.2f}\\pm{cfit["tau_err"]:,.4f} {xname[-2:]}$', 
         xy, xycoords='axes fraction')
     return cfit, ax
@@ -117,8 +119,8 @@ class GmonModel(models.MyCompositeModel):
     """Model fitting Gmon induced tunable coupling.
     WARNING: The fit is sensitive to initial value, which must be provided by user."""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
+    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise', 
+                 with_slope=None, **kwargs):
         kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
                        'independent_vars': independent_vars})
        
@@ -134,11 +136,20 @@ class GmonModel(models.MyCompositeModel):
         mod.set_param_hint(name='zero2', expr='(pi*3/2-r)/(2*pi/period) + shift')
         mod.set_param_hint(name='max_y_shift', expr='amp/(r-1)')
 
-        super().__init__(mod, models.OffsetFeature(), models.operator.add, **kwargs)
+        def slope(x, slope=0):
+            return x*slope
+        mod2 = models.MyModel(slope)
+        if with_slope:
+            mod2.set_param_hint(name='slope', vary=True, value=with_slope)
+        else:
+            mod2.set_param_hint(name='slope', vary=False)
+        mod2 = models.OffsetFeature() + mod2
+
+        super().__init__(mod, mod2, models.operator.add, **kwargs)
 
     __init__.__doc__ = 'Gmon model' + models.COMMON_INIT_DOC
 
-    def plot(self, cfit, ax=None, fdata=50):
+    def plot(self, cfit, ax=None, fdata=500):  # TODO: Include the slope feature.
         """Plot fit with results parameters.
         
         Args:
