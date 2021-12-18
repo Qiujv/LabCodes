@@ -137,7 +137,7 @@ class LabradRead(object):
     def _get_plot_title(self, name=None):
         if name is None:
             name = self.name
-        title = self.path.with_stem(name)
+        title = self.path.with_name(name)
         title = str(title)
         lw = 60
         title = '\n'.join([title[i:i+lw] for i in range(0, len(title), lw)])
