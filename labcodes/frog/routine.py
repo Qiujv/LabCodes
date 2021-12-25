@@ -7,6 +7,11 @@ from scipy.optimize import fsolve
 from labcodes import misc, fitter, models, plotter
 
 
+def plot_yourself(logf):
+    """Choosing plot function according to logf.name. Returns depends on input.
+    User should know exactly what they are doing."""
+    pass
+
 def prep_data_one(logf, atten=0):
     """Normalize S21 data for models.ResonatorModel_inverse."""
     df = logf.df.rename(columns={'s21_log_mag_dB': 's21_dB', 's21_phase_rad': 's21_rad'})
@@ -33,7 +38,7 @@ def fit_resonator(logf, atten=0, **kwargs):
     ax = cfit.plot_complex(plot_init=False, fit_report=True)
     return cfit, ax
     
-def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=100, **kwargs):
+def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, **kwargs):
     if 'T1' in logf.name:
         mod = models.ExponentialModel()
         symbol = 'T_1'
@@ -113,6 +118,35 @@ def plot_visibility(logf, axs=None, drop=True, **kwargs):
     plotter.plot_visibility(np.real(df['s0_rot']), np.real(df['s1_rot']), ax3, ax4)
 
     return ax, ax2, ax3, ax4
+
+def plot_iq_vs_freq(logf, axs=None):
+    if axs is None:
+        fig, (ax, ax2, ax3) = plt.subplots(tight_layout=True, figsize=(6,6), nrows=3, sharex=True)
+    else:
+        ax, ax2, ax3 = axs
+        fig = ax.get_figure()
+    df = logf.df
+    ax.plot(df['ro_freq_MHz'], df['iq_amp_(0)'], label='|0>')
+    ax.plot(df['ro_freq_MHz'], df['iq_amp_(1)'], label='|1>')
+    ax.grid()
+    ax.legend()
+    ax.set(
+        ylabel='IQ amp',
+    )
+
+    ax2.plot(df['ro_freq_MHz'], df['iq_difference_(0-1)'])
+    ax2.grid()
+    ax2.set(
+        ylabel='IQ diff',
+    )
+    ax3.plot(df['ro_freq_MHz'], df['iq_snr'])
+    ax3.grid()
+    ax3.set(
+        ylabel='SNR',
+        xlabel='RO freq (MHz)'
+    )
+    fig.suptitle(logf._get_plot_title())
+    return ax, ax2, ax3
 
 
 class GmonModel(models.MyCompositeModel):

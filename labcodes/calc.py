@@ -6,6 +6,7 @@ from functools import wraps
 import numpy as np
 import scipy.constants as const
 import matplotlib.pyplot as plt
+from scipy.optimize import fsolve
 
 Phi_0 = const.h / (2*const.e)  # Flux quantum.
 
@@ -38,6 +39,7 @@ def use_attr_as_default(f):
     return wrapped_f
 
 class Calculator(object):
+    """Calculators are bacically a dict, with properties derived from that."""
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -76,6 +78,25 @@ class Junction(Calculator):
     def Ej(self, Ic, **kw):
         return Ic*Phi_0 / (2*np.pi) / const.h  # TODO: use Lj0 to compute it.
 
+class RF_SQUID(Junction):
+    L_linear = 0.5e-9
+    delta_ext = np.pi
+
+    @use_attr_as_default
+    def delta(self, delta_ext, L_linear, Lj0, **kw):
+        """Junction phase difference in presence of external bias."""
+        def _delta_ext(delta, L_linear, Lj0):
+            return delta + np.sin(delta) * (L_linear / Lj0)
+        # fsolve does not works with np.array.
+        if isinstance(delta_ext, np.ndarray):
+            # Solve the values one by one instead of a high-dimensional system (it is decoupled).
+            delta = [fsolve(lambda d: de - _delta_ext(d, L_linear, Lj0), 0)[0] 
+                    for de in delta_ext.ravel()]
+            delta = np.array(delta).reshape(delta_ext.shape)
+        else:
+            delta = fsolve(lambda d: delta_ext - _delta_ext(d, L_linear, Lj0), 0)[0]
+        return delta
+
 class Transmon(Junction, Capacitor):
     @use_attr_as_default
     def E10(self, Ec, Ej, **kw):
@@ -86,15 +107,19 @@ class Transmon(Junction, Capacitor):
         """Energy of levels, m=0, 1, 2..."""
         return m*np.sqrt(8*Ec*Ej) - Ec/12 * (6*m**2 + 6*m + 3)
 
-class Gmon(Junction):
+class Gmon(RF_SQUID):
     Lg = 0.2e-9
     Lw = 0.1e-9
-    delta = np.pi  # The maximal coupling point.
+    delta_ext = np.pi  # The maximal coupling point.
 
     w1 = 4e9
     w2 = 4e9
     L1 = 15e-9
     L2 = 15e-9
+
+    @use_attr_as_default
+    def L_linear(self, Lg, Lw, **kw):  # Reloading L_linear from parent class.
+        return 2*Lg + Lw
 
     @use_attr_as_default
     def M(self, Lj0, Lg, Lw, delta, **kw):
@@ -116,6 +141,28 @@ class Gmon(Junction):
         # filter function by sinusoidal drive signal (square wave also has this 
         # form). For detail please refer to textbook about time-depedent perturbation.
         return 2*np.pi * g**2 / wFSR
+
+    @use_attr_as_default
+    def off_bias(self, L_linear, Lj0):
+        """Bias point where coupling off"""
+        return np.pi/2 + (L_linear / Lj0)
+
+    @use_attr_as_default
+    def max_bias(self, L_linear, Lj0):
+        """Bias point where coupling is maximal (negative)."""
+        return np.pi/2 - (L_linear / Lj0)
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
+    squid = RF_SQUID()
+    gmon = Gmon()
+    delta_ext = np.linspace(0,2*np.pi)
+    delta = gmon.delta(delta_ext=delta_ext, Lj0=0.6e-9)
+    fig, (ax, ax2) = plt.subplots(figsize=(10,4), ncols=2)
+    ax.plot(delta_ext / np.pi, delta / np.pi)
+    ax2.plot(delta_ext / np.pi, gmon.M(delta=delta_ext)/1e-9)
+    ax2.plot(delta_ext / np.pi, gmon.M(delta=delta)/1e-9)
 
 class TCoupler(Calculator):
     wc = 5e9
@@ -177,7 +224,8 @@ if __name__ == '__main__':
 
     # With another set of values, This plot should recovers fig.2(b) in @yan_tunable_2018.
     wc = np.linspace(4.3e9, 7e9)
-    plt.plot(
+    fig, ax = plt.subplots()
+    ax.plot(
         wc/1e9,
         2*tcplr.g(
             wc=wc,
