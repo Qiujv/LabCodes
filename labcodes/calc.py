@@ -78,6 +78,16 @@ class Junction(Calculator):
     def Ej(self, Ic, **kw):
         return Ic*Phi_0 / (2*np.pi) / const.h  # TODO: use Lj0 to compute it.
 
+
+def _delta_ext(delta, L_linear, Lj0):
+    """Relation between delta and delta_ext."""
+    return delta + np.sin(delta) * (L_linear / Lj0)
+def _solve(delta_ext, L_linear, Lj0):
+    """Solve delta from delta_ext"""
+    res = fsolve(lambda delta: delta_ext - _delta_ext(delta, L_linear, Lj0), 0)
+    return res[0]
+vsolve = np.vectorize(_solve)  # expand fsolve for arguments in np.array.
+
 class RF_SQUID(Junction):
     L_linear = 0.5e-9
     delta_ext = np.pi
@@ -85,16 +95,7 @@ class RF_SQUID(Junction):
     @use_attr_as_default
     def delta(self, delta_ext, L_linear, Lj0, **kw):
         """Junction phase difference in presence of external bias."""
-        def _delta_ext(delta, L_linear, Lj0):
-            return delta + np.sin(delta) * (L_linear / Lj0)
-        # fsolve does not works with np.array.
-        if isinstance(delta_ext, np.ndarray):
-            # Solve the values one by one instead of a high-dimensional system (it is decoupled).
-            delta = [fsolve(lambda d: de - _delta_ext(d, L_linear, Lj0), 0)[0] 
-                    for de in delta_ext.ravel()]
-            delta = np.array(delta).reshape(delta_ext.shape)
-        else:
-            delta = fsolve(lambda d: delta_ext - _delta_ext(d, L_linear, Lj0), 0)[0]
+        delta = vsolve(delta_ext, L_linear, Lj0)
         return delta
 
 class Transmon(Junction, Capacitor):
@@ -239,3 +240,6 @@ if __name__ == '__main__':
             w2=4e9,
         )/1e6,
     )
+
+
+# TODO: resonator: c, g, chi, Q, cpl_len...
