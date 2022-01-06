@@ -515,6 +515,37 @@ class ResonatorModel_inverse(MyModel):
             pars.pretty_print()
             
         return update_param_vals(pars, self.prefix, **kwargs)
+    
+    def plot(self, cfit, ax=None, fdata=500, annotate=''):
+        if ax is None:
+            fig, ax = plt.subplots(tight_layout=True)
+        else:
+            fig = ax.get_figure()
+            
+        ax.plot(
+            cfit.ydata.real, 
+            cfit.ydata.imag,
+            '.'
+        )
+        _, fdata = cfit.fdata(fdata)
+        ax.plot(
+            fdata.real,
+            fdata.imag,
+            'r-',
+        )
+        ax.annotate(
+            f'$f_0$={cfit["f0"]:.3e},\n$Q_i$={cfit["Qi"]:.3e},\n$Q_c$={cfit["Qc"]:.3e}\n'+annotate,
+            (0.5, 0.5),
+            xycoords='axes fraction',
+            ha='center',
+            va='center',
+        )
+        ax.set(
+            aspect='equal',
+            xlabel='Re[$S_{21}^{-1}$]',
+            ylabel='Im[$S_{21}^{-1}$]',
+        )
+        return ax
 
     @classmethod
     def remove_electric_delay(cls, freq, phase, plot=False):

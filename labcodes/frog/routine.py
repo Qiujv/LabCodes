@@ -26,7 +26,7 @@ def prep_data_one(logf, atten=0):
     df['frr_GHz'] = df['freq_GHz'].mean()
     return df
 
-def fit_resonator(logf, atten=0, **kwargs):
+def fit_resonator(logf, atten=0, fdata=500, **kwargs):
     df = prep_data_one(logf, atten)
     cfit = fitter.CurveFit(
         xdata=df['freq_GHz'].values,
@@ -35,7 +35,8 @@ def fit_resonator(logf, atten=0, **kwargs):
         hold=True,
     )
     cfit.fit(**kwargs)
-    ax = cfit.plot_complex(plot_init=False, fit_report=True)
+    ax = cfit.model.plot(cfit, fdata=fdata)
+    ax.set_title(logf._get_plot_title())
     return cfit, ax
     
 def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, **kwargs):
@@ -74,13 +75,13 @@ def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, **kwargs):
     return cfit, ax
 
 
-def fit_spec(spec_map, logf, ax=None):
+def fit_spec(spec_map, logf, ax=None, **kwargs):
     cfit = fitter.CurveFit(
         xdata=np.array(list(spec_map.keys())),
         ydata=np.array(list(spec_map.values())),
         model=models.TransmonModel()
     )
-    ax = cfit.model.plot(cfit, ax=ax)
+    ax = cfit.model.plot(cfit, ax=ax, **kwargs)
     ax.set(
         xlabel=logf.indeps[0],
         ylabel='Frequency (GHz)',
