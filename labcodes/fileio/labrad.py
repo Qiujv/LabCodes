@@ -1,41 +1,13 @@
 # %%
 import re
+import textwrap
+from configparser import ConfigParser
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import pandas as pd
-
-from pathlib import Path
-from configparser import ConfigParser
-
 from labcodes import plotter
 
-
-def data_path(dir, id, suffix='csv'):
-    """Return the full file path of Labrad datafile by given data ID.
-    
-    Args:
-        dir: path, directory for the datafile.
-        id: int, ID of the datafile.
-            e.g. 12 for file named '00012 - balabala'.
-        suffix: 'csv' or 'ini'.
-    """
-    prn = f'{str(id).zfill(5)} - *.{suffix}'
-    all_match = list(Path(dir).glob(prn))
-    if len(all_match) == 0:
-        raise ValueError(f'Data file not found at given dir: {dir}')
-    return all_match[0]
-
-def simplify_file_name(name):
-    """Convert filename into simpler one. e.g.
-        '00123 - Q1, |Q2>, Q3: balabala' -> '00123 - Q2 - balabala'."""
-    pattern = r'(\d+) - (.*)%v(.*)%g(.*)%c (.*)'  # |, >, : in filename were replaced by %v, %g, %c.
-    match = re.search(pattern, name)
-    if match is None:
-        print(f'WARNING: Unknown pattern in name: {name}')
-        return name
-    else:
-        new_name = ' - '.join([match.group(1), match.group(3), match.group(5)])  # Index starts from 1.
-        new_name = new_name.replace(r'%c', ',')  # Replace ':' with ','.
-        return new_name
 
 def load_config(path):
     """Load ini file as config."""
@@ -43,7 +15,7 @@ def load_config(path):
     config.read(path)
     return config
 
-def get_param_names(config, which='Independent'):
+def get_param_names(config, which='independent'):
     """Get name of independent, depedent or parameters from Labrad ini file.
     
     Args:
@@ -63,11 +35,8 @@ def get_param_names(config, which='Independent'):
         section = config[f'{which} {i+1}']
 
         name = [section[k] for k in ['category', 'label'] if section.get(k)]
-        if len(name) == 0:
-            raise Exception(f'Cannot resolve name from section "{section.name}".')
-        else:
-            name = '_'.join(name)
-        name = pretty_name(name)
+        name = '_'.join(name).lower()
+        name = replace(name, ABBREV)
 
         if section.get('units'):
             name += f'_{section["units"]}'
@@ -76,51 +45,109 @@ def get_param_names(config, which='Independent'):
 
     return names
 
-def pretty_name(name, abbrev=None):
-    """Returns name in lowercase and words replaced according to abbrev.
-    
-    Args:
-        name: str, to be modified.
-        abbrev: dict, words to be replaced, in dict(old=new).
-    """
-    if abbrev is None:
-        abbrev = {
-            'pi pulse': 'pi',
-            'prob.': 'prob',
-            '|1> state': 's1',
-            '|0> state': 's0',
-            '|0>': 's0',
-            '|1>': 's1',
-            'amplitude': 'amp',
-            'coupler bias pulse amp': 'cpa',
-            'coupler pulse amp': 'cpa',
-            'z pulse amp': 'zpa',
-            'readout': 'ro',
-            'frequency': 'freq',
-            ' ': '_',
-        }
-    name = name.lower()
-    for k, v in abbrev.items():
-        name = name.replace(k, v)
-    return name
+def replace(text, dict):
+    for k, v in dict.items():
+        text = text.replace(k, v)
+    return text
 
-def ini_to_dict(config):
+ESCAPE_CHARS = {  # |, >, : in filename were replaced by %v, %g, %c.
+    r'%v': '|',
+    r'%g': '>',
+    r'%c': ':',
+}
+ABBREV = {  # Some abbreviations.
+    'pi pulse': 'pi',
+    'prob.': 'prob',
+    '|1> state': 's1',
+    '|0> state': 's0',
+    '|0>': 's0',
+    '|1>': 's1',
+    'amplitude': 'amp',
+    'coupler bias pulse amp': 'cpa',
+    'coupler pulse amp': 'cpa',
+    'z pulse amp': 'zpa',
+    'readout': 'ro',
+    'frequency': 'freq',
+    'log mag': 'mag',
+    ' ': '_',
+}
+
+def ini_to_dict(config, return_dirty=False):
     """Iterate over all items in ini and return them as a dict."""
-    datamap = {}
+    dirty = {}
     for section in config.sections():
-        datamap[section] = {}
+        dirty[section] = {}
         for name, value in config.items(section):
-            datamap[section].update({name:value})
-    return datamap
+            dirty[section].update({name:value})
+    if return_dirty is True: return dirty
+
+    clean = dict()  # TODO: finish this.
+    clean['general'] = dirty['General']
+    clean['general']['parameter'] = clean['general'].pop('parameters')
+    clean['comments'] = dirty['Comments']
+    for sect in ['independent', 'dependent', 'parameter']:
+        clean[sect] = [dirty[f'{sect.capitalize()} {i+1}'] 
+            for i in range(int(clean['general'][sect]))]
+    return clean
+
+class LogName(object):  # Unify self.name, new_name, _get_plot_title()
+    """Handle metadatas of a LabRAD logfile."""
+    def __init__(self, path, title=None):
+        path = Path(path)
+        self.dir, self.id, self.qubit, self.title = self.resolve_path(path)
+        if title is not None: self.title = title
+
+    @staticmethod
+    def resolve_path(path):
+        dir = str(path.parent).replace('.dir', '')
+        match = re.search(r'(\d+) - (.*)%v(.*)%g(.*)%c (.*)', path.stem)  # |, >, : in filename were replaced by %v, %g, %c.
+        if match:
+            id, qubit, title = match.group(1), match.group(3), match.group(5)  # Index starts from 1.
+        else:
+            id, qubit, title = path.stem[:5], '', path.stem[8:]
+        title = replace(title, ESCAPE_CHARS)
+        return dir, id, qubit, title
+
+    def __repr__(self) -> str:
+        return self.to_str()
+
+    def to_str(self, **kwargs):
+        kw = self.__dict__.copy()
+        kw.update(kwargs)
+        return f'{str(kw["id"]).zfill(5)} {kw["qubit"]} {kw["title"]}'
+
+    def as_plot_title(self, width=60, **kwargs):
+        title = '\n'.join([textwrap.fill(msg, width=width) 
+            for msg in [self.dir, self.to_str(**kwargs)]])
+        return title
+
+    def as_file_name(self, **kwargs):
+        return self.to_str(**kwargs).replace(':', ',')
 
 class LabradRead(object):
     def __init__(self, dir, id):
-        self.path = data_path(dir, id, suffix='csv')
+        self.path = self.find(dir, id, suffix='csv')
         self._config = load_config(self.path.with_suffix('.ini'))
-        self.name = f'{str(id).zfill(5)} - {self._config["General"]["title"]}'
+        self.name = LogName(self.path)
         self.indeps = get_param_names(self._config, which='independent')
         self.deps = get_param_names(self._config, which='dependent')
         self.df = pd.read_csv(self.path, names=self.indeps + self.deps)
+
+    @staticmethod
+    def find(dir, id, suffix='csv'):
+        """Return the full file path of Labrad datafile by given data ID.
+        
+        Args:
+            dir: path, directory for the datafile.
+            id: int, ID of the datafile.
+                e.g. 12 for file named '00012 - balabala'.
+            suffix: 'csv' or 'ini'.
+        """
+        prn = f'{str(id).zfill(5)} - *.{suffix}'
+        all_match = list(Path(dir).glob(prn))
+        if len(all_match) == 0:
+            raise ValueError(f'Data file not found at given dir: {dir}')
+        return all_match[0]
 
     @property
     def config(self):
@@ -129,19 +156,6 @@ class LabradRead(object):
         except AttributeError:
             self._config_dict = ini_to_dict(self._config)
             return self._config_dict
-
-    @property
-    def new_name(self):
-        return simplify_file_name(self.path.stem)
-
-    def _get_plot_title(self, name=None):
-        if name is None:
-            name = self.name
-        title = self.path.with_name(name)
-        title = str(title)
-        lw = 60
-        title = '\n'.join([title[i:i+lw] for i in range(0, len(title), lw)])
-        return title
 
     def plot1d(self, x_name=0, y_name=0, ax=None, **kwargs):
         """Quick line plot.
@@ -172,7 +186,7 @@ class LabradRead(object):
         ax.set(
             xlabel=x_name,
             ylabel=y_name,
-            title=self._get_plot_title(),
+            title=self.name.as_plot_title(),
         )
         return ax
 
@@ -205,10 +219,14 @@ class LabradRead(object):
         ax.set(
             xlabel=x_name,
             ylabel=y_name,
-            title=self._get_plot_title(),
+            title=self.name.as_plot_title(),
         )
         return ax
 
 if __name__ == '__main__':
-    logf = LabradRead('.', 13)
+    test_dir = 'C:/Users/qiujv/Downloads'
+    logf = LabradRead(test_dir, 499)
     print(f'logflie "{logf.name}" loaded!')
+    # from pprint import pprint
+    # pprint(logf.config)
+    ax = logf.plot1d()
