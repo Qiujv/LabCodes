@@ -36,17 +36,17 @@ def fit_resonator(logf, atten=0, fdata=500, **kwargs):
     )
     cfit.fit(**kwargs)
     ax = cfit.model.plot(cfit, fdata=fdata)
-    ax.set_title(logf._get_plot_title())
+    ax.set_title(logf.name.as_plot_title())
     return cfit, ax
     
 def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, **kwargs):
-    if 'T1' in logf.name:
+    if 'T1' in str(logf.name):
         mod = models.ExponentialModel()
         symbol = 'T_1'
-    elif 'Ramsey' in logf.name:
+    elif 'Ramsey' in str(logf.name):
         mod = models.ExpSineModel()
         symbol = 'T_2^*'
-    elif 'Echo' in logf.name:
+    elif 'Echo' in str(logf.name):
         mod = models.ExpSineModel()
         symbol = 'T_{2e}'
     else:
@@ -85,7 +85,7 @@ def fit_spec(spec_map, logf, ax=None, **kwargs):
     ax.set(
         xlabel=logf.indeps[0],
         ylabel='Frequency (GHz)',
-        title=logf._get_plot_title(),
+        title=logf.name.as_plot_title(),
     )
     return cfit, ax
 
@@ -106,7 +106,7 @@ def plot_visibility(logf, axs=None, drop=True, **kwargs):
     if drop is True:
         df.drop(columns=['runs', 'i0', 'q0', 'i1', 'q1'], inplace=True)
 
-    fig.suptitle(logf._get_plot_title())
+    fig.suptitle(logf.name.as_plot_title())
     plotter.plot_iq(df['s0'], ax=ax, label='|0>')  # The best plot maybe PDF contour plot with colored line.
     plotter.plot_iq(df['s1'], ax=ax, label='|1>')
     ax.legend()
@@ -146,7 +146,7 @@ def plot_iq_vs_freq(logf, axs=None):
         ylabel='SNR',
         xlabel='RO freq (MHz)'
     )
-    fig.suptitle(logf._get_plot_title())
+    fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
 
