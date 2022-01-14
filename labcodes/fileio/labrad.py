@@ -19,6 +19,13 @@ ESCAPE_CHARS = {  # |, >, : in filename were replaced by %v, %g, %c.
     r'%g': '>',
     r'%c': ':',
 }
+PATH_LEGAL = {
+    '->': '→',
+    '<-': '←',
+    ':': ',',
+    '|': 'l',
+    # '?': '？',
+}
 ABBREV = {  # Some abbreviations.
     'pi pulse': 'pi',
     'prob.': 'prob',
@@ -61,7 +68,7 @@ class LogName(object):  # Unify self.name, new_name, _get_plot_title()
         """returns 'id qubit title'."""
         kw = self.__dict__.copy()
         kw.update(kwargs)
-        return f'{str(kw["id"]).zfill(5)} {kw["qubit"]} {kw["title"]}'
+        return f'{str(kw["id"]).zfill(5)}: {kw["qubit"]} {kw["title"]}'
 
     def as_plot_title(self, width=60, **kwargs):
         filled = textwrap.fill(self.to_str(**kwargs), width=width)
@@ -69,7 +76,7 @@ class LogName(object):  # Unify self.name, new_name, _get_plot_title()
         return title
 
     def as_file_name(self, **kwargs):
-        return self.to_str(**kwargs).replace(':', ',')
+        return replace(self.to_str(**kwargs), PATH_LEGAL)
 
 
 class LabradRead(object):

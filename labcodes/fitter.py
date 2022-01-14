@@ -393,7 +393,7 @@ class BatchFit(object):
             kwargs: fit initial values of parameters passed to model.
         """
         self.result = []
-        for i in trange(self.num_of_fits):
+        for i in trange(self.num_of_fits, desc='Fitting'):
             try:
                 result = self.model.fit(self.ybatch[i], x=self.xbatch[i], **kwargs)
                 self.result.append(result)

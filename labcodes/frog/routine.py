@@ -85,14 +85,14 @@ def fit_spec(spec_map, logf, ax=None, **kwargs):
     ax.set(
         xlabel=logf.indeps[0],
         ylabel='Frequency (GHz)',
-        title=logf.name.as_plot_title(),
+        title=logf.name.as_plot_title(title='qubit spec'),
     )
     return cfit, ax
 
 def plot_visibility(logf, axs=None, drop=True, **kwargs):
     """Plot visibility, for iq_scatter experiments only."""
     if axs is None:
-        fig = plt.figure(figsize=(6,6), tight_layout=True)
+        fig = plt.figure(figsize=(5,5), tight_layout=True)
         ax, ax2, ax3 = fig.add_subplot(221), fig.add_subplot(222), fig.add_subplot(212)
         ax4 = ax3.twinx()
     else:
@@ -109,12 +109,12 @@ def plot_visibility(logf, axs=None, drop=True, **kwargs):
     fig.suptitle(logf.name.as_plot_title())
     plotter.plot_iq(df['s0'], ax=ax, label='|0>')  # The best plot maybe PDF contour plot with colored line.
     plotter.plot_iq(df['s1'], ax=ax, label='|1>')
-    ax.legend()
+    # ax.legend()
 
     df[['s0_rot', 's1_rot']] = misc.auto_rotate(df[['s0', 's1']].values)  # Must pass np.array.
     plotter.plot_iq(df['s0_rot'], ax=ax2, label='|0>')
     plotter.plot_iq(df['s1_rot'], ax=ax2, label='|1>')
-    ax2.legend()
+    # ax2.legend()
 
     plotter.plot_visibility(np.real(df['s0_rot']), np.real(df['s1_rot']), ax3, ax4)
 
@@ -122,7 +122,8 @@ def plot_visibility(logf, axs=None, drop=True, **kwargs):
 
 def plot_iq_vs_freq(logf, axs=None):
     if axs is None:
-        fig, (ax, ax2, ax3) = plt.subplots(tight_layout=True, figsize=(6,6), nrows=3, sharex=True)
+        fig, (ax, ax2) = plt.subplots(tight_layout=True, figsize=(5,5), nrows=2, sharex=True)
+        ax3 = ax2.twinx()
     else:
         ax, ax2, ax3 = axs
         fig = ax.get_figure()
@@ -139,13 +140,11 @@ def plot_iq_vs_freq(logf, axs=None):
     ax2.grid()
     ax2.set(
         ylabel='IQ diff',
-    )
-    ax3.plot(df['ro_freq_MHz'], df['iq_snr'])
-    ax3.grid()
-    ax3.set(
-        ylabel='SNR',
         xlabel='RO freq (MHz)'
     )
+    ax3.plot(df['ro_freq_MHz'], df['iq_snr'], color='C1')
+    # ax3.grid()
+    ax3.set_ylabel('SNR', color='C1')
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
