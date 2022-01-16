@@ -45,10 +45,11 @@ ABBREV = {  # Some abbreviations.
 
 class LogName(object):  # Unify self.name, new_name, _get_plot_title()
     """Handle metadatas of a LabRAD logfile."""
-    def __init__(self, path, title=None):
+    def __init__(self, path, **kwargs):
         path = Path(path)
-        self.dir, self.id, self.qubit, self.title = self.resolve_path(path)
-        if title is not None: self.title = title
+        kw = self.resolve_path(path)
+        kw.update(kwargs)
+        self.dir, self.id, self.qubit, self.title = kw['dir'], kw['id'], kw['qubit'], kw['title']
 
     @staticmethod
     def resolve_path(path):
@@ -58,8 +59,9 @@ class LogName(object):  # Unify self.name, new_name, _get_plot_title()
             id, qubit, title = match.group(1), match.group(3), match.group(5)  # Index starts from 1.
         else:
             id, qubit, title = path.stem[:5], '', path.stem[8:]
+        id = int(id)
         title = replace(title, ESCAPE_CHARS)
-        return dir, id, qubit, title
+        return dict(dir=dir, id=id, qubit=qubit, title=title)
 
     def __repr__(self) -> str:
         return self.to_str()
@@ -68,7 +70,7 @@ class LogName(object):  # Unify self.name, new_name, _get_plot_title()
         """returns 'id qubit title'."""
         kw = self.__dict__.copy()
         kw.update(kwargs)
-        return f'{str(kw["id"]).zfill(5)}: {kw["qubit"]} {kw["title"]}'
+        return f'#{kw["id"]}: {kw["qubit"]} {kw["title"]}'
 
     def as_plot_title(self, width=60, **kwargs):
         filled = textwrap.fill(self.to_str(**kwargs), width=width)
@@ -80,11 +82,11 @@ class LogName(object):  # Unify self.name, new_name, _get_plot_title()
 
 
 class LabradRead(object):
-    def __init__(self, dir, id):
+    def __init__(self, dir, id, **kwargs):
         self.path = self.find(dir, id, suffix='csv')
         self.ini = self.load_ini(self.path.with_suffix('.ini'))
         self.conf = self.ini_to_dict(self.ini)
-        self.name = LogName(self.path)
+        self.name = LogName(self.path, **kwargs)
         self.indeps = list(self.conf['independent'].keys())
         self.deps = list(self.conf['dependent'].keys())
         self.df = pd.read_csv(self.path, names=self.indeps + self.deps)

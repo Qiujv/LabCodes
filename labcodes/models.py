@@ -636,9 +636,20 @@ class TransmonModel(MyModel):
         ax.axhline(cfit['fmin'], **gs)
         ax.axvline(cfit['xmin'], **gs)
         ax.axvline(cfit['xmax'], **gs)
-        ax.annotate(f'z={cfit["xmax"]:.3f}, f={cfit["fmax"]:.3f}', (cfit['xmax'], cfit['fmax']))
+        if cfit['xmin'] < cfit['xmax']:
+            ha1 = 'right'
+            ha2 = 'left'
+        else:
+            ha1 = 'left'
+            ha2 = 'right'
+        ax.annotate(f'z={cfit["xmax"]:.3f}, f={cfit["fmax"]:.3f}', 
+            (cfit['xmax'], cfit['fmax']),
+            va='top', ha=ha1,
+        )
         ax.annotate((f'z={cfit["xmin"]:.3f}, f={cfit["fmin"]:.3f},\n'
                     f'period={cfit["period"]:.3f},\n'
                     f'df={abs(cfit["fmax"] - cfit["fmin"]):.3f}.'), 
-                    (cfit['xmin'], cfit['fmin']))
+            (cfit['xmin'], cfit['fmin']),
+            ha=ha2,
+        )
         return ax

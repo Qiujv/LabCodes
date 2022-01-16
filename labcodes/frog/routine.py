@@ -12,6 +12,44 @@ def plot_yourself(logf):
     User should know exactly what they are doing."""
     pass
 
+def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
+    """Plot 2d with data from multiple logfiles.
+    Args:
+        sid, title: str, information shown in title and file name.
+        **kwargs: passed to lf.plot2d()
+
+    Returns:
+        the axes, list of logfiles and str of file name.
+    """
+    lfs = [fileio.LabradRead(dir, id) for id in ids]
+    lf = lfs[0]
+
+    if sid is None: sid = f'{ids[0]}-{ids[-1]}'
+    if title is None: title = lf.name.title
+    if isinstance(x_name, int):
+        x_name = lf.indeps[x_name]
+    if isinstance(y_name, int):
+        y_name = lf.indeps[y_name]
+    if isinstance(z_name, int):
+        z_name = lf.deps[z_name]
+
+    cmin = np.min([lf.df[z_name].min() for lf in lfs])
+    cmax = np.max([lf.df[z_name].max() for lf in lfs])
+    plot_kw = dict(x_name=x_name, y_name=y_name, z_name=z_name, cmin=cmin, cmax=cmax)
+    plot_kw.update(kwargs)
+    xlims = []
+    ylims = []
+    ax = lf.plot2d(ax=ax, **plot_kw)
+    for lf in lfs:
+        lf.plot2d(ax=ax, colorbar=False, **plot_kw)  # Actually lfs[0] is plotted twice.
+        xlims.append(ax.get_xlim())
+        ylims.append(ax.get_ylim())
+    ax.set_xlim(np.min(xlims), np.max(xlims))
+    ax.set_ylim(np.min(ylims), np.max(ylims))
+    ax.set_title(lf.name.as_plot_title(id=sid, title=title))
+    fname = lf.name.as_file_name(id=sid, title=title)
+    return ax, lfs, fname
+
 def prep_data_one(logf, atten=0):
     """Normalize S21 data for models.ResonatorModel_inverse."""
     df = logf.df.rename(columns={'s21_log_mag_dB': 's21_dB', 's21_phase_rad': 's21_rad'})
