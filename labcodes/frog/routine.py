@@ -4,7 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
-from labcodes import misc, fitter, models, plotter
+from labcodes import misc, fitter, models, plotter, fileio
 
 
 def plot_yourself(logf):
