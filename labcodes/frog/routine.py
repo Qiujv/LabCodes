@@ -113,18 +113,13 @@ def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, **kwargs):
     return cfit, ax
 
 
-def fit_spec(spec_map, logf, ax=None, **kwargs):
+def fit_spec(spec_map, ax=None, **kwargs):
     cfit = fitter.CurveFit(
         xdata=np.array(list(spec_map.keys())),
         ydata=np.array(list(spec_map.values())),
         model=models.TransmonModel()
     )
     ax = cfit.model.plot(cfit, ax=ax, **kwargs)
-    ax.set(
-        xlabel=logf.indeps[0],
-        ylabel='Frequency (GHz)',
-        title=logf.name.as_plot_title(title='qubit spec'),
-    )
     return cfit, ax
 
 def plot_visibility(logf, axs=None, drop=True, **kwargs):
@@ -238,7 +233,7 @@ class GmonModel(models.MyCompositeModel):
             fig = ax.get_figure()
 
         if fdata:
-            ax.plot(cfit.xdata, cfit.ydata, 'o')
+            ax.plot(cfit.xdata, cfit.ydata, 'x')
             ax.plot(*cfit.fdata(fdata))
 
         gs = dict(ls='--', color='k', alpha=0.5)  # Guide line style
