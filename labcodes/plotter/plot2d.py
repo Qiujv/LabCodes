@@ -41,7 +41,7 @@ def plot2d_pcolormesh(df, x_name, y_name, z_name, ax=None):
         shading='nearest', 
         cmap='RdBu_r',
     )
-    colorbar = fig.colorbar(im, ax=ax, label=z_name)
+    cbar = fig.colorbar(im, ax=ax, label=z_name)
     ax.set(xlabel=x_name, ylabel=y_name)
     return ax
 
@@ -70,12 +70,12 @@ def plot2d_scatter(df, x_name, y_name, z_name, ax=None, marker='s', marker_size=
         marker=marker,
         cmap='RdBu_r'
     )
-    colorbar = fig.colorbar(im, ax=ax, label=z_name)
+    cbar = fig.colorbar(im, ax=ax, label=z_name)
+    ax.margins(0)
+    ax.autoscale_view()
     ax.set(
         xlabel=x_name, 
-        xlim=(df[x_name].min(), df[x_name].max()),
         ylabel=y_name, 
-        ylim=(df[y_name].min(), df[y_name].max()),
     )
     return ax
 
