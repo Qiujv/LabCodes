@@ -37,15 +37,9 @@ def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, a
     cmax = np.max([lf.df[z_name].max() for lf in lfs])
     plot_kw = dict(x_name=x_name, y_name=y_name, z_name=z_name, cmin=cmin, cmax=cmax)
     plot_kw.update(kwargs)
-    xlims = []
-    ylims = []
     ax = lf.plot2d(ax=ax, **plot_kw)
-    for lf in lfs:
-        lf.plot2d(ax=ax, colorbar=False, **plot_kw)  # Actually lfs[0] is plotted twice.
-        xlims.append(ax.get_xlim())
-        ylims.append(ax.get_ylim())
-    ax.set_xlim(np.min(xlims), np.max(xlims))
-    ax.set_ylim(np.min(ylims), np.max(ylims))
+    for lf in lfs[1:]:
+        lf.plot2d(ax=ax, colorbar=False, **plot_kw)
     ax.set_title(lf.name.as_plot_title(id=sid, title=title))
     fname = lf.name.as_file_name(id=sid, title=title)
     return ax, lfs, fname
@@ -163,20 +157,20 @@ def plot_iq_vs_freq(logf, axs=None):
     df = logf.df
     ax.plot(df['ro_freq_MHz'], df['iq_amp_(0)'], label='|0>')
     ax.plot(df['ro_freq_MHz'], df['iq_amp_(1)'], label='|1>')
-    ax.grid()
+    ax.grid(True)
     ax.legend()
     ax.set(
         ylabel='IQ amp',
     )
 
     ax2.plot(df['ro_freq_MHz'], df['iq_difference_(0-1)'])
-    ax2.grid()
+    ax2.grid(True)
     ax2.set(
         ylabel='IQ diff',
         xlabel='RO freq (MHz)'
     )
     ax3.plot(df['ro_freq_MHz'], df['iq_snr'], color='C1')
-    # ax3.grid()
+    # ax3.grid(True)
     ax3.set_ylabel('SNR', color='C1')
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3

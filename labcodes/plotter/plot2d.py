@@ -145,14 +145,11 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
                           linewidth=0, **kwargs)
 
     ax.add_collection(col)
-    # ax.axis('tight')
+    ax.margins(0)
+    ax.autoscale_view()
     ax.set(
         xlabel=x_name, 
-        xlim=(df[x_name].min() - df['width'].iloc[0]/2, 
-              df[x_name].max() + df['width'].iloc[-1]/2),
         ylabel=y_name, 
-        ylim=(df[y_name].min() - df['height'].iloc[0]/2, 
-              df[y_name].max() + df['height'].iloc[-1]/2),
     )
     if colorbar is True:
         cbar = fig.colorbar(col, ax=ax, label=z_name, extend=extend_cbar)  # Also found in ax.collections[-1].colorbar

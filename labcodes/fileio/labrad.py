@@ -123,7 +123,7 @@ class LabradRead(object):
 
         df = self.df
         ax.plot(df[x_name], df[y_name], **kw)
-        ax.grid()
+        ax.grid(True)
         ax.set(
             xlabel=x_name,
             ylabel=y_name,

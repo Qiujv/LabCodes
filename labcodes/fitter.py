@@ -320,7 +320,7 @@ class BatchFit(object):
             fig.suptitle(self.model.name)
             ax = fig.subplots()
             ax.plot(self.params['chi'].to_numpy(), '.')
-            ax.grid(linestyle='--')
+            ax.grid(True, linestyle='--')
             ax.set(
                 xlabel='fit index',
                 ylabel=show_param,
@@ -331,7 +331,7 @@ class BatchFit(object):
             fig.suptitle(self.model.name)
             ax_val = fig.add_subplot(121)
             ax_val.plot(self.params[show_param].values, '.')
-            ax_val.grid(linestyle='--')
+            ax_val.grid(True, linestyle='--')
             ax_val.set(
                 xlabel='fit index',
                 ylabel=show_param,
@@ -339,7 +339,7 @@ class BatchFit(object):
 
             ax_err = fig.add_subplot(122)
             ax_err.plot(self.params[show_param+'_err'].values, '.')
-            ax_err.grid(linestyle='--')
+            ax_err.grid(True, linestyle='--')
             ax_err.set(
                 xlabel='fit index',
                 ylabel=show_param+'_err',
