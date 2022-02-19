@@ -155,6 +155,7 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
               df[y_name].max() + df['height'].iloc[-1]/2),
     )
     if colorbar is True:
-        cbar = fig.colorbar(col, ax=ax, label=z_name, extend=extend_cbar)  # Also found in ax.collections[-1].colorbar
+        # Way to remove colorbar: ax.collections[-1].colorbar.remove()
+        cbar = fig.colorbar(col, ax=ax, label=z_name, extend=extend_cbar)
     return ax
 
