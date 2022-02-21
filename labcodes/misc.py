@@ -114,3 +114,10 @@ def attenuate(v, atten):
     """Returns voltage attenuated by given value."""
     ratio = db_to_ratio(db=-atten)  # +atten = -amp.
     return v * ratio
+
+def multiples(period, shift, vmin, vmax):
+    """Returns multiples of period with shift within [vmin, vmax]."""
+    nmin = (vmin - shift) // period + 1
+    nmax = (vmax - shift) // period
+    vs = np.arange(nmin, nmax+1) * period + shift
+    return vs
