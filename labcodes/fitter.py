@@ -40,6 +40,16 @@ class CurveFit(object):
             except Exception as exc:
                 print(f'WARNING: Fit failed. Error reports \n{exc}')
 
+    @classmethod
+    def from_result(cls, result, xdata=None):
+        if xdata is None:
+            xdata = result.userkws['x']  # x for most of LabCodes models.
+        ydata = result.data
+        model = result.model
+        cfit = cls(xdata, ydata, model, hold=True)
+        cfit._update_result(result)
+        return cfit
+
     def _update_result(self, result):
         self.result = result
 
@@ -289,9 +299,7 @@ class BatchFit(object):
             print(f'WARNING: fit #{index} failed at batch fit. The result of '
                 'curvefit may be different.')
         if result:
-            cfit = CurveFit(self.xbatch[index], self.ybatch[index], self.model, 
-                hold=True)
-            cfit.result = result
+            cfit = CurveFit.from_result(result, xdata=self.xbatch[index])
         else:
             cfit = CurveFit(self.xbatch[index], self.ybatch[index], self.model)
         return cfit

@@ -71,14 +71,15 @@ def fit_resonator(logf, atten=0, fdata=500, **kwargs):
     ax.set_title(logf.name.as_plot_title())
     return cfit, ax
     
-def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, **kwargs):
-    if 'T1' in str(logf.name):
+def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kwargs):
+    if kind is None: kind = str(logf.name)
+    if 'T1' in kind:
         mod = models.ExponentialModel()
         symbol = 'T_1'
-    elif 'Ramsey' in str(logf.name):
+    elif 'Ramsey' in kind:
         mod = models.ExpSineModel()
         symbol = 'T_2^*'
-    elif 'Echo' in str(logf.name):
+    elif 'Echo' in kind:
         mod = models.ExpSineModel()
         symbol = 'T_{2e}'
     else:
@@ -174,6 +175,28 @@ def plot_iq_vs_freq(logf, axs=None):
     ax3.set_ylabel('SNR', color='C1')
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
+
+def plot2d_ruler(logf, slope=-0.01, offset=0.0, **kwargs):
+    """Plot 2d with a guide line.
+    For xtalk data.
+    
+    Args:
+        slope, offset: float, property of the guide line.
+        kwargs: passed to logf.plot2d.
+    
+    """
+    ax = logf.plot2d(**kwargs)
+
+    xlims = ax.get_xlim()
+    ylims = ax.get_ylim()
+    c = np.mean(xlims), np.mean(ylims)
+    x = np.linspace(*xlims)
+    y = slope*(x-c[0]) + c[1] + offset*(ylims[1]-ylims[0])/2
+    mask = (y>ylims[0]) & (y<ylims[1])
+    ax.plot(x[mask], y[mask], lw=3, color='k')
+    ax.annotate(f'{slope*100:.2f}%', c, size='xx-large', ha='left', va='bottom', 
+        bbox=dict(facecolor='w', alpha=0.7, edgecolor='none'))
+    return ax
 
 
 class GmonModel(models.MyCompositeModel):
@@ -281,3 +304,21 @@ def junc_phase(delta_ext, r):
 
 def _delta_ext(delta, r):
     return delta + np.sin(delta) * r
+
+
+def plot_cramsey(cfit0, cfit1, ax=None):
+    if ax is None:
+        _, ax = plt.subplots()
+    ax.plot(cfit0.xdata, cfit0.ydata, 'o', color='C0')
+    ax.plot(cfit1.xdata, cfit1.ydata, 'x', color='C1')
+    ax.plot(*cfit0.fdata(100), color='C0', label='Ctrl 0')
+    ax.plot(*cfit1.fdata(100), color='C1', label='Ctrl 1')
+    def mark_maxi(ax, cfit, **kwargs):
+        shift = (np.pi/2 - cfit['phase']) / (2*np.pi*cfit['freq'])
+        for x in misc.multiples(0.5/cfit['freq'], shift, cfit.xdata.min(), cfit.xdata.max()):
+            ax.axvline(x, **kwargs)
+    mark_maxi(ax, cfit0, ls='--', color='C0', alpha=0.5)
+    mark_maxi(ax, cfit1, ls='--', color='C1', alpha=0.5)
+    ax.legend()
+    ax.grid(True)
+    return ax
