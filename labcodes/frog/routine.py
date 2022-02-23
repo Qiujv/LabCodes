@@ -322,3 +322,32 @@ def plot_cramsey(cfit0, cfit1, ax=None):
     ax.legend()
     ax.grid(True)
     return ax
+
+def plot_ro_mat(logf, states=('gg', 'ge', 'eg', 'ee'), ax=None, check_label=False):
+    if ax is None:
+        _, ax = plt.subplots()
+    n_sts = np.size(states)
+    mat_vals = logf.df.mean()  # pandas.Series, with index as channel names.
+    if np.size(mat_vals) != n_sts**2:
+        mat_vals = mat_vals.iloc[1:]  # 1st column or df is #run.
+    mat = np.reshape(mat_vals.values, (n_sts, n_sts))
+    ax.matshow(mat)
+    
+    if check_label is True:
+        txt_mat = np.reshape(mat_vals.index.values, (n_sts, n_sts))
+        fmt = '{}'.format
+    else:
+        txt_mat = mat*100  # Percentage.
+        fmt = '{:.1f}%'.format
+    for i in range(n_sts):
+        for j in range(n_sts):
+            ax.annotate(fmt(txt_mat[i,j]), (i, j), ha='center', va='center')
+    ticklabels = [0] + list(states)  # Pad an dummy label.
+    ax.set(
+        title=logf.name.as_plot_title(),
+        xlabel='Prepare',
+        xticklabels=ticklabels,
+        ylabel='Measure',
+        yticklabels=ticklabels,
+    )
+    return ax, mat
