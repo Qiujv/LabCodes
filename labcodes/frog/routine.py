@@ -323,7 +323,7 @@ def plot_cramsey(cfit0, cfit1, ax=None):
     ax.grid(True)
     return ax
 
-def plot_ro_mat(logf, states=('gg', 'ge', 'eg', 'ee'), ax=None, check_label=False):
+def plot_ro_mat(logf, states=('gg', 'ge', 'eg', 'ee'), ax=None, check_label=False, txt_color=('white', 'black')):
     if ax is None:
         _, ax = plt.subplots()
     n_sts = np.size(states)
@@ -331,7 +331,7 @@ def plot_ro_mat(logf, states=('gg', 'ge', 'eg', 'ee'), ax=None, check_label=Fals
     if np.size(mat_vals) != n_sts**2:
         mat_vals = mat_vals.iloc[1:]  # 1st column or df is #run.
     mat = np.reshape(mat_vals.values, (n_sts, n_sts))
-    ax.matshow(mat)
+    im = ax.matshow(mat)
     
     if check_label is True:
         txt_mat = np.reshape(mat_vals.index.values, (n_sts, n_sts))
@@ -339,15 +339,18 @@ def plot_ro_mat(logf, states=('gg', 'ge', 'eg', 'ee'), ax=None, check_label=Fals
     else:
         txt_mat = mat*100  # Percentage.
         fmt = '{:.1f}%'.format
+    threshold = (im.norm.vmax + im.norm.vmin) / 2
     for i in range(n_sts):
         for j in range(n_sts):
-            ax.annotate(fmt(txt_mat[i,j]), (i, j), ha='center', va='center')
-    ticklabels = [0] + list(states)  # Pad an dummy label.
+            color = txt_color[int(mat[i,j] > threshold)]
+            ax.annotate(fmt(txt_mat[i,j]), (i, j), ha='center', va='center', color=color)
     ax.set(
         title=logf.name.as_plot_title(),
         xlabel='Prepare',
-        xticklabels=ticklabels,
+        xticks=np.arange(n_sts),
+        xticklabels=states,
+        yticks=np.arange(n_sts),
         ylabel='Measure',
-        yticklabels=ticklabels,
+        yticklabels=states,
     )
     return ax, mat
