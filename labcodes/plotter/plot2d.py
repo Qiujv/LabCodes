@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
+from labcodes.plotter import misc
 
 
 def plot2d_pcolormesh(df, x_name, y_name, z_name, ax=None):
@@ -43,40 +44,6 @@ def plot2d_pcolormesh(df, x_name, y_name, z_name, ax=None):
     )
     cbar = fig.colorbar(im, ax=ax, label=z_name)
     ax.set(xlabel=x_name, ylabel=y_name)
-    return ax
-
-def plot2d_scatter(df, x_name, y_name, z_name, ax=None, marker='s', marker_size=1):
-    """2D pseudocolor plot with scatter.
-    
-    Args:
-        df: pandas.DataFrame, container of data.
-        x_name, y_name, z_name: str, column name of data to plot.
-        ax: matplotlib.axes, where to plot the figure.
-        marker: str, kind of scatter, 's' for square.
-
-    Returns:
-        ax with the plot.
-    """
-    if ax is None:
-        fig, ax = plt.subplots(tight_layout=True)
-    else:
-        fig = ax.get_figure()
-
-    im = ax.scatter(
-        df[x_name],
-        df[y_name],
-        c=df[z_name],
-        s=marker_size,
-        marker=marker,
-        cmap='RdBu_r'
-    )
-    cbar = fig.colorbar(im, ax=ax, label=z_name)
-    ax.margins(0)
-    ax.autoscale_view()
-    ax.set(
-        xlabel=x_name, 
-        ylabel=y_name, 
-    )
     return ax
 
 def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None, 
@@ -122,25 +89,10 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
             for x, y, w, h in df[[x_name, y_name, 'width', 'height']].itertuples(index=False)]
 
     z = df[z_name]
-    if norm is None:
-        norm = mpl.colors.Normalize(cmin, cmax)
-    if isinstance(cmap, str):
-        cmap = plt.cm.get_cmap(cmap)
-    cmin, cmax = norm.vmin, norm.vmax
-    zmin, zmax = z.min(), z.max()
-    if cmin is None:
-        cmin = zmin
-    if cmax is None:
-        cmax = zmax
-    if (zmin < cmin) and (zmax > cmax):
-        extend_cbar = 'both'
-    elif zmin < cmin:
-        extend_cbar = 'min'
-    elif zmax > cmax:
-        extend_cbar = 'max'
-    else:
-        extend_cbar = 'neither'
+    norm, extend_cbar = misc.get_norm(z, cmin=cmin, cmax=cmax)
+    cmap = plt.cm.get_cmap(cmap)
     colors = cmap(norm(z))
+
     col = PatchCollection(rects, facecolors=colors, cmap=cmap, norm=norm, 
                           linewidth=0, **kwargs)
 

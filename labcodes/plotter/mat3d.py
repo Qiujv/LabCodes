@@ -2,7 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
+from labcodes.plotter import misc
 
 
 def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0, 
@@ -28,27 +28,11 @@ def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0,
     ypos = ypos.T.flatten() - bar_width/2
     zpos = np.zeros(mat.size)
     dx = dy = bar_width * np.ones(mat.size)
-    dz = mat.real.flatten()
+    dz = mat.flatten()
 
-    if isinstance(cmap, str):
-        cmap = plt.cm.get_cmap(cmap)
-    adjust_clims = True if (cmin is None) or (cmax is None) else False
-    zmin, zmax = dz.min(), dz.max()
-    if cmin is None:
-        cmin = zmin
-    if cmax is None:
-        cmax = zmax
-    if adjust_clims:
-        cmax = max(abs(cmin), abs(cmax)); cmin = -cmax  # Make sure 0 in the mid.
-    if (zmin < cmin) and (zmax > cmax):
-        extend_cbar = 'both'
-    elif zmin < cmin:
-        extend_cbar = 'min'
-    elif zmax > cmax:
-        extend_cbar = 'max'
-    else:
-        extend_cbar = 'neither'
-    norm = mpl.colors.Normalize(cmin, cmax)
+    adjust_clims = (cmin is None) or (cmax is None)
+    norm, extend_cbar = misc.get_norm(dz, cmin=cmin, cmax=cmax, symmetric=adjust_clims)
+    cmap = plt.cm.get_cmap(cmap)
     colors = cmap(norm(dz))
 
     bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=colors, alpha=alpha, 
@@ -57,7 +41,7 @@ def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0,
     ax.set(
         xticks=np.arange(1, mat.shape[0] + 1, 1),
         yticks=np.arange(1, mat.shape[1] + 1, 1),
-        zticks=np.arange(0.5*(zmax//0.5 + 1), 0.5*(zmin//0.5 - 1), -0.5),
+        zticks=np.arange(0.5*(dz.max()//0.5 + 1), 0.5*(dz.min()//0.5 - 1), -0.5),
     )
 
     if colorbar is True:
@@ -65,9 +49,7 @@ def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0,
         cbar = fig.colorbar(bar_col, shrink=0.6, pad=0.1, extend=extend_cbar)
     return ax
 
-def 
-
-def plot_complex_mat3d(mat, axs=None, **kwargs):
+def plot_complex_mat3d(mat, axs=None, cmin=None, cmax=None, cmap='bwr', colorbar=True, **kwargs):
     """Plot 3d bar for complex matrix, both the real and imag part.
     """
     if axs is None:
@@ -76,11 +58,21 @@ def plot_complex_mat3d(mat, axs=None, **kwargs):
         ax_imag = fig.add_subplot(1,2,2,projection='3d')
     else:
         ax_real, ax_imag = axs
-    fig.subplots_adjust(right=0.9)
-    cbar_ax = fig.add_axes([0.95, 0.15, 0.05, 0.7])
 
-    cmin = 
-    plot_mat3d(mat.real, ax=ax_real, colorbar=False, **kwargs)
-    plot_mat3d(mat.imag, ax=ax_imag, colorbar=False, **kwargs)
+    if colorbar is True:
+        fig.subplots_adjust(right=0.9)
+        cax = fig.add_axes([0.95, 0.15, 0.01, 0.6])
+        norm, extend_cbar = misc.get_norm(np.hstack((mat.imag, mat.real)), cmin=cmin, cmax=cmax)
+        cmap = plt.cm.get_cmap(cmap)
+        cbar = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, extend=extend_cbar)
+    
+    kwargs.update(dict(
+        cmap=cmap,
+        cmin=norm.vmin,
+        cmax=norm.vmax,
+        colorbar=False,
+    ))
+    plot_mat3d(mat.real, ax=ax_real, **kwargs)
+    plot_mat3d(mat.imag, ax=ax_imag, **kwargs)
 
     return ax_real, ax_imag
