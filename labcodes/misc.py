@@ -61,42 +61,6 @@ def split_freq(freq, side_range):
     lo_freq = freq - side_freq
     return lo_freq, side_freq
 
-def search_file(dir, keyword):
-    """Search specified file in given directory.
-    
-    Args:
-        dir, directory to search, including subdirectories of it.
-        keyword, str, search keywor.
-
-    Returns:
-        list(pathlib.Path), path of files with the keyword in name, sorted in descending order.
-    """
-    return sorted(list(Path(dir).resolve().glob(f'**/*{keyword}*')), reverse=True)
-
-def get_chn(instr, channel: str):
-    """Get channel name from specific Labber.Instrument.
-    
-    Args:
-        instr, Labber.Instrument.
-        channle, str, name of instrument channel.
-        
-    Returns:
-        str, the full channel name.
-    """
-    return instr.com_config.name + ' - ' + channel
-
-def search_channel(instr, keyword:str):
-    """Search channel with given keywords among the instrument.
-    
-    Args:
-        instr, Labber.Instrument.
-        keyword, str.
-
-    Returns:
-        dict, channels containing keyword and their values.
-    """
-    return {key: value for key, value in instr.values.items() if keyword in key}
-
 def ratio_to_db(ratio):
     """Voltage ratio -> power db."""
     return 20 * np.log10(ratio)

@@ -614,6 +614,31 @@ def parse_database(path):
                 pass
     return database
 
+def get_chn(instr, channel: str):
+    """Get channel name from specific Labber.Instrument.
+    
+    Args:
+        instr, Labber.Instrument.
+        channle, str, name of instrument channel.
+        
+    Returns:
+        str, the full channel name.
+    """
+    return instr.com_config.name + ' - ' + channel
+
+def search_channel(instr, keyword:str):
+    """Search channel with given keywords among the instrument.
+    
+    Args:
+        instr, Labber.Instrument.
+        keyword, str.
+
+    Returns:
+        dict, channels containing keyword and their values.
+    """
+    return {key: value for key, value in instr.values.items() if keyword in key}
+
+
 
 if __name__ == '__main__':
     pass

@@ -93,14 +93,6 @@ class CurveFit(object):
         else:
             return x, self.result.eval(x=x)
 
-    def get_dots(self):
-        """Return dots with both fit result and fit data for saving."""
-        dots = self.params.to_frame().T
-        dots['x'] = self.xdata
-        dots['y'] = self.ydata
-        dots['f'] = self.fdata()
-        return dots
-
     def fit(self, **kwargs):
         """Perform fit with xdata and ydata.
         
@@ -303,14 +295,6 @@ class BatchFit(object):
         else:
             cfit = CurveFit(self.xbatch[index], self.ybatch[index], self.model)
         return cfit
-
-    def get_dots(self):
-        """Return dots with both fit result and fit data for saving."""
-        dots = self.params.copy()
-        dots['x'] = self.xbatch
-        dots['y'] = self.ybatch
-        dots['f'] = self.fbatch
-        return dots
 
     def plot_param(self, show_param: str):
         """Plot the fit parameter with its stderr along fit_index.
@@ -574,8 +558,7 @@ class BatchFit_withDots(BatchFit):
     __doc__ += BatchFit.__doc__
     # TODO: Rewrite replace_outliers for better trace_index compatibility.
 
-    def __init__(self, dots, x_name, y_name, stepper_name, model, verbose=True, 
-            hold=False):
+    def __init__(self, dots, x_name, y_name, stepper_name, model, hold=False):
         """Create a instant of BatchFitter directly by data in dots.
         
         Args:
@@ -590,20 +573,7 @@ class BatchFit_withDots(BatchFit):
             hold: boolean,
                 if False, try to do fit right after initialization.
         """
-
-        traces = dots.set_index(stepper_name)
-        stepper_value = traces.index.unique()  # order as it appears.
-        xbatch = []
-        ybatch = []
-        for v in stepper_value:
-            try:
-                trace = traces.loc[v, :].sort_values(by=[x_name])
-            # If traces got no more column than x_name and stepper_name,
-            # loc returns pd.Series for whom sort_values() requires no arguemnt name 'by'.
-            except TypeError as error:
-                raise KeyError(f'Column with name {y_name} not found.') from error
-            ybatch.append(trace[y_name].values)
-            xbatch.append(trace[x_name].values)
+        xbatch, ybatch, stepper_value = df_to_traces(dots, stepper_name, x_name, y_name)
         self.stepper_value = stepper_value
         self.stepper_name = stepper_name
         self.x_name = x_name
@@ -617,42 +587,6 @@ class BatchFit_withDots(BatchFit):
         params = params.set_index(self.stepper_value)
         return params
 
-    def get_dots(self):
-        dots = super().get_dots()
-        dots = dots.rename(
-            columns={'x': self.x_name, 
-                'y': self.y_name, 
-                'f': self.y_name + '_fit'}
-        )
-        dots = dots.set_index(self.stepper_value)
-        return dots
-
-    def get_data_dots(self):
-        """Return data batchs in dots, for saving fit data with LabberWrite."""
-        def get_trace(bfit, idx):
-            trace_len = len(self.ybatch[idx])
-            if len(bfit.stepper_name) > 1:  # There are more than one stepper.
-                df_index = pd.MultiIndex.from_tuples(
-                    [bfit.stepper_value[idx] for i in range(trace_len)],
-                    names=bfit.stepper_name,
-                )
-            else:  # There is only one stepper.
-                df_index = pd.Index(
-                    [bfit.stepper_value[idx] for i in range(trace_len)],
-                    name=bfit.stepper_name[0],
-                )
-            return pd.DataFrame({
-                bfit.x_name: bfit.xbatch[idx],
-                bfit.y_name: bfit.ybatch[idx],
-                bfit.y_name+'_fit': bfit.fbatch[idx],
-                },
-                index=df_index,
-            )
-        dots = get_trace(self, 0)
-        for i in range(1, self.num_of_fits):
-            dots = pd.concat([dots, get_trace(self, i)])
-        return dots
-
     def save_with_logfile(
         self,
         logfile,
@@ -661,7 +595,7 @@ class BatchFit_withDots(BatchFit):
         cover_if_exist=False,
     ):
         """Save fit parameters into Labber logfile, with metadatas from given logfile."""
-        from labcodes.fileio import labber  # Only import when used so to remove unnecessary dependence to Labber.
+        from labcodes.fileio import labber  # Import only when needed.
         logf_new = labber.LabberWrite(
             dots=self.params.reset_index(),
             path=logfile.path.with_name(logfile.path.stem + suffix),
@@ -674,6 +608,7 @@ class BatchFit_withDots(BatchFit):
             comment=f'# BatchFit\n{self.model.name}\n\n# Data from\n{logfile.path}',
         )
         return logf_new
+
 
 def bfit_check(batch_fit, name, min=-np.inf, max=np.inf, tolerance=0):
     """Returns index of fits with parameter values violating giving conditions.
@@ -708,6 +643,50 @@ def bfit_check(batch_fit, name, min=-np.inf, max=np.inf, tolerance=0):
         return np.array([])
     else:
         return idx
+
+def df_to_traces(df, index, columns, values):
+    """Split pandas.DataFrame into lists.
+
+    Args:
+        df: pandas.DataFrme to convert.
+        index, columns, values: str, name of columns. Refers to trace steppers, x_name, y_name.
+    
+    Returns:
+        Two 2d lists of xdata and ydata of the traces, as well as list of stepper values
+        by which the traces are distinguished.
+        i.e. [trace x values], [trace y values], [stepper values].
+
+    Notes:
+        Function signature mimics pandas.DataFrame.pivot. It is actually an extension to
+        pivot, in case where traces has different x values or lengths.
+    """
+    # # The old bfit style.
+    # x_name = columns
+    # y_name = values
+    # traces = df.set_index(index)
+    # stepper_value = traces.index.unique()  # order as it appears.
+    # xbatch = []
+    # ybatch = []
+    # for v in stepper_value:
+    #     try:
+    #         trace = traces.loc[v, :].sort_values(by=[x_name])
+    #     # If traces got no more column than x_name and stepper_name,
+    #     # loc returns pd.Series for whom sort_values() requires no arguemnt name 'by'.
+    #     except TypeError as error:
+    #         raise KeyError(f'Column with name {y_name} not found.') from error
+    #     ybatch.append(trace[y_name].values)
+    #     xbatch.append(trace[x_name].values)
+
+    # New method with native functions by pandas.
+    gp = df.groupby(index)
+    x_series = gp[columns].apply(lambda se: list(se))
+    y_series = gp[values].apply(lambda se: list(se))
+    xbatch = x_series.to_list()
+    ybatch = y_series.to_list()
+    stepper_value = x_series.index.values
+
+    return xbatch, ybatch, stepper_value
+
 
 if __name__ == '__main__':
     pass
