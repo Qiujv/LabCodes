@@ -7,3 +7,8 @@ try:
     from labcodes.fileio.labrad import LabradRead
 except:
     print('WARNING: Fail to import fileio.labrad.')
+
+try:
+    from labcodes.fileio.ltspice import LTSpiceRead
+except:
+    print('WARNING: Fail to import fileio.ltspice.')
