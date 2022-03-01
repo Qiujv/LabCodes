@@ -140,6 +140,9 @@ def plot_visibility(logf, axs=None, drop=True, **kwargs):
     # ax.legend()
 
     df[['s0_rot', 's1_rot']] = misc.auto_rotate(df[['s0', 's1']].values)  # Must pass np.array.
+    if df['s0_rot'].mean().real > df['s1_rot'].mean().real:
+        # Flip if 0 state cloud is on the right.
+        df[['s0_rot', 's1_rot']] *= -1
     plotter.plot_iq(df['s0_rot'], ax=ax2, label='|0>')
     plotter.plot_iq(df['s1_rot'], ax=ax2, label='|1>')
     # ax2.legend()

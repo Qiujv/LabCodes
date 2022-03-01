@@ -656,6 +656,7 @@ class TransmonModel(MyModel):
             (cfit['xmin'], cfit['fmin']),
             ha=ha2,
         )
+        note_pos = (1,0) if cfit['xmin'] < cfit['xmax'] else (1,0.9)
         ax.annotate(f'R=$S_{{jj1}}/S_{{jj2}}$={cfit["area_ratio"]:.2f}', 
-            (1,0), xycoords=ax.transAxes, va='bottom', ha='right')
+            note_pos, xycoords=ax.transAxes, va='bottom', ha='right')
         return ax
