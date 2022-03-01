@@ -592,9 +592,13 @@ class TransmonModel(MyModel):
 
         super().__init__(transmon_freq, **kwargs)
 
-        self.set_param_hint(f'{self.prefix}period', 
-            expr=f'2*abs({self.prefix}xmax - {self.prefix}xmin)')
-        
+        p = self.prefix
+        self.set_param_hint(f'{p}period', expr=f'2*abs({p}xmax - {p}xmin)')
+        # Asymmetriy d = (Ej2 - Ej1) / (Ej2 + Ej1) = (s2 - s1) / (s2 + s1)
+        self.set_param_hint(f'{p}d', expr=f'({p}fmin / {p}fmax)**2')
+        # Area ratio r = s2 / s1 = (1+d)/(1-d)
+        self.set_param_hint(f'{p}area_ratio', expr=f'(1+({p}fmin/{p}fmax)**2)/(1-({p}fmin/{p}fmax)**2)')
+
     __init__.__doc__ = 'Transmon model' + COMMON_INIT_DOC
 
     def guess(self, data, x=None, **kwargs):
@@ -652,4 +656,6 @@ class TransmonModel(MyModel):
             (cfit['xmin'], cfit['fmin']),
             ha=ha2,
         )
+        ax.annotate(f'R=$S_{{jj1}}/S_{{jj2}}$={cfit["area_ratio"]:.2f}', 
+            (1,0), xycoords=ax.transAxes, va='bottom', ha='right')
         return ax

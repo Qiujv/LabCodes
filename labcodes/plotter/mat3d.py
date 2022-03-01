@@ -145,7 +145,7 @@ def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0,
         cbar = fig.colorbar(bar_col, shrink=0.6, pad=0.1, extend=extend_cbar)
     else:
         cbar = None
-    return bar_col, cbar
+    return ax
 
 def plot_complex_mat3d(mat, axs=None, cmin=None, cmax=None, cmap='bwr', colorbar=True, **kwargs):
     """Plot 3d bar for complex matrix, both the real and imag part.
@@ -173,4 +173,4 @@ def plot_complex_mat3d(mat, axs=None, cmin=None, cmax=None, cmap='bwr', colorbar
     bar_real, _ = plot_mat3d(mat.real, ax=ax_real, **kwargs)
     bar_imag, _ = plot_mat3d(mat.imag, ax=ax_imag, **kwargs)
 
-    return bar_real, bar_imag, cbar
+    return ax_real, ax_imag
