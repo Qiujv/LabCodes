@@ -5,7 +5,7 @@ import matplotlib as mpl
 
 def cursor(ax, x=None, y=None, text=None, line_style={}, text_style={}):
     """Point out given coordinate with axhline and axvline."""
-    xline, yline = None
+    xline, yline = None, None
     ls = dict(color='k', alpha=0.3, ls='--'); ls.update(line_style)
     if x is not None: xline = ax.axvline(x, **ls)
     if y is not None: yline = ax.axhline(y, **ls)
