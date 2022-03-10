@@ -5,23 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from labcodes import misc, fitter, models, plotter, fileio
 
-from labcodes.models import GmonModel  # TODO: remove this.
-
-
-def plot_yourself(logf):
-    """Choosing plot function according to logf.name. Returns depends on input.
-    User should know exactly what they are doing."""
-    pass
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
-    """Plot 2d with data from multiple logfiles.
-    Args:
-        sid, title: str, information shown in title and file name.
-        **kwargs: passed to lf.plot2d()
-
-    Returns:
-        the axes, list of logfiles and str of file name.
-    """
     lfs = [fileio.LabradRead(dir, id) for id in ids]
     lf = lfs[0]
 
@@ -34,6 +19,7 @@ def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, a
     if isinstance(z_name, int):
         z_name = lf.deps[z_name]
 
+    # Plot with same colorbar.
     cmin = np.min([lf.df[z_name].min() for lf in lfs])
     cmax = np.max([lf.df[z_name].max() for lf in lfs])
     plot_kw = dict(x_name=x_name, y_name=y_name, z_name=z_name, cmin=cmin, cmax=cmax)
@@ -45,34 +31,47 @@ def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, a
     fname = lf.name.as_file_name(id=sid, title=title)
     return ax, lfs, fname
 
-def prep_data_one(logf, atten=0):
-    """Normalize S21 data for models.ResonatorModel_inverse."""
-    df = logf.df.rename(columns={'s21_log_mag_dB': 's21_dB', 's21_phase_rad': 's21_rad'})
-    angle = misc.remove_e_delay(df['s21_rad'].values, df['freq_GHz'].values)
-    df['s21'] = 10 ** (df['s21_dB'] / 20) * np.exp(1j*angle)
-    df['s21'] = models.ResonatorModel_inverse.normalize(df['s21'])
-    df['1_s21'] = 1/df['s21']
-    df['id'] = int(logf.name[:5])
-    # df['bw_Hz'] = float(logf.config['Parameter 2']['data'][6:-7])
-    df['bw_kHz'] = float(logf.config['Parameter 2']['data'][6:-8])
-    df['power_dBm'] = float(logf.config['Parameter 3']['data'][6:-8]) - atten
-    df['frr_GHz'] = df['freq_GHz'].mean()
-    return df
+def plot1d_multi(dir, ids, lbs=None, sid=None, title=None, ax=None, **kwargs):
+    lfs = [fileio.LabradRead(dir, id) for id in ids]
 
-def fit_resonator(logf, atten=0, fdata=500, **kwargs):
-    df = prep_data_one(logf, atten)
+    if sid is None: sid = f'{ids[0]}-{ids[-1]}'
+    if lbs is None: lbs = ids
+    if title is None: title = lf.name.title
+
+    for lf, lb in zip(lfs, lbs):
+        lf.plot1d(label=lb, ax=ax, **kwargs)
+    ax.legend()
+    ax.set_title(lf.name.as_plot_title(id=sid, title=title))
+    fname = lf.name.as_file_name(id=sid, title=title)
+    return ax, lfs, fname
+
+def fit_resonator(logf, ax=None, **kwargs):
+    freq = logf.df['freq_GHz'].values
+    s21_dB = logf.df['s21_mag_dB'].values
+    s21_rad = logf.df['s21_phase_rad'].values
+
+    s21_rad = misc.remove_e_delay(s21_rad, freq)
+    s21 = 10 ** (s21_dB / 20) * np.exp(1j*s21_rad)
     cfit = fitter.CurveFit(
-        xdata=df['freq_GHz'].values,
-        ydata=df['1_s21'].values,
+        xdata=freq,
+        ydata=None,  # fill latter.
         model=models.ResonatorModel_inverse(),
         hold=True,
     )
+    s21 = cfit.model.normalize(s21)
+    cfit.ydata = 1/s21
     cfit.fit(**kwargs)
-    ax = cfit.model.plot(cfit, fdata=fdata)
+    ax = cfit.model.plot(cfit, ax=ax)
     ax.set_title(logf.name.as_plot_title())
     return cfit, ax
     
-def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kwargs):
+def fit_coherence(logf, ax=None, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kwargs):
+    if ax is None:
+        ax = logf.plot1d(ax=ax)
+
+    fig = ax.get_figure()
+    fig.set_size_inches(5,3)
+
     if kind is None: kind = str(logf.name)
     if 'T1' in kind:
         mod = models.ExponentialModel()
@@ -99,9 +98,6 @@ def fit_coherence(logf, ax, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kw
         hold=True,
     )
     cfit.fit(**kwargs)
-
-    fig = ax.get_figure()
-    fig.set_size_inches(5,3)
 
     ax.plot(*cfit.fdata(fdata), 'r-', lw=1)
     ax.annotate(f'${symbol}\\approx {cfit["tau"]:,.2f}\\pm{cfit["tau_err"]:,.4f} {xname[-2:]}$', 
@@ -180,16 +176,20 @@ def plot_iq_vs_freq(logf, axs=None):
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
-def plot2d_ruler(logf, slope=-0.01, offset=0.0, **kwargs):
-    """Plot 2d with a guide line.
-    For xtalk data.
+def plot_xtalk(logf, slope=-0.01, offset=0.0, ax=None, **kwargs):
+    """Plot 2d with a guide line. For xtalk data.
     
     Args:
         slope, offset: float, property of the guide line.
         kwargs: passed to logf.plot2d.
-    
     """
-    ax = logf.plot2d(**kwargs)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(4,3))
+    else:
+        fig = ax.get_figure()
+        fig.set_size_inches(4,3)
+
+    logf.plot2d(ax=ax, **kwargs)
 
     xlims = ax.get_xlim()
     ylims = ax.get_ylim()

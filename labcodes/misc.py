@@ -1,83 +1,52 @@
-"""Module contains miscellaneous useful functions.
-"""
-
 import numpy as np
-from pathlib import Path
 from scipy.optimize import fsolve
 
+
 def auto_rotate(data, with_angle=False):
-    angle = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)  # Minize imag(var(data)), by Kaho
+    """Returns data with shifted phase s.t. variation of imaginary part minimized.
+    Algorithm by Kaho."""
+    angle = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)  # Minimize imag(var(data)), by Kaho
     
     if with_angle is True:
         return data * np.exp(1j*angle), angle  # counter-clockwise
     else:
         return data * np.exp(1j*angle)
 
-def remove_e_delay(angle, freq):
-    """Returns phase without linear freq dependence."""
-    angle = np.unwrap(angle)
-    e_delay = (angle[-1] - angle[0]) / (freq[-1] - freq[0])
-    angle -= e_delay * (freq - freq[0])
-    angle -= angle[0]
-    return angle
+def remove_e_delay(phase, freq, i_start=0, i_end=-1):
+    """Returns phase without linear freq dependence.
+
+    Args:
+        phase: real numbers, with linear dependence to freq.
+        freq: real numbers with same shape as phase.
+        i_start, i_end: region where linear fit applied.
+    """
+    phase = np.unwrap(phase)
+    e_delay = (phase[i_end] - phase[i_start]) / (freq[i_end] - freq[i_start])
+    phase -= e_delay * (freq - freq[i_start])
+    phase -= phase[i_start]
+    return phase
 
 def find_freq_guess(x, y):
     """Finds the dominant fft component for input (x, y) data."""
-    n = x.size
-    freqs = np.fft.rfftfreq(n, x[1]-x[0])
-    fft = np.fft.rfft(y-np.mean(y))  # TODO: use `fft` rather than `rfft` for complex data.
+    if np.iscomplexobj(y):
+        fft =  np.fft.fft(y-np.mean(y))
+        freqs = np.fft.fftfreq(x.size, x[1]-x[0])
+    else:  # usef rfft for real data.
+        fft =  np.fft.rfft(y-np.mean(y))
+        freqs = np.fft.rfftfreq(x.size, x[1]-x[0])
+
     freq_guess = freqs[np.argmax(abs(fft))]
     if freq_guess == 0:
         print('Something went wrong, freq guess was zero.')
         freq_guess = 1
+
     return freq_guess
 
-def find_freq_guess_complex(x, y):
-    """Finds the dominant fft component, handling complex data"""
-    n = x.size
-    freqs = np.fft.fftfreq(n, x[1]-x[0])
-    fft = np.fft.fft(y-np.mean(y))
-    freq_guess = freqs[np.argmax(abs(fft))]
-    return freq_guess
-
-def roundoff(x,roundto):
+def round(x, roundto):
     """Round x to given precision.
-    e.g. roundoff(3.141592653, 1e-3) = 3.142
+    e.g. round(3.141592653, 1e-3) = 3.142
     """
     return np.round(x/roundto)*roundto
-
-def split_freq(freq, side_range):
-    """Split a frequency into side band and LO part.
-    
-    Args:
-        freq: num, frequency to split.
-        side_range: tuple, (low_limit, up_limit).
-
-    Returns:
-        LO freq, side band freq (in given range).
-    """
-    low, up = side_range
-    side_freq = (freq % (up - low)) + low
-    lo_freq = freq - side_freq
-    return lo_freq, side_freq
-
-def ratio_to_db(ratio):
-    """Voltage ratio -> power db."""
-    return 20 * np.log10(ratio)
-
-def db_to_ratio(db):
-    """Power db -> voltage ratio."""
-    return 10 ** (db / 20)
-
-def amplify(v, gain):
-    """Returns voltages amplified by given value."""
-    ratio = db_to_ratio(db=gain)
-    return v * ratio
-
-def attenuate(v, atten):
-    """Returns voltage attenuated by given value."""
-    ratio = db_to_ratio(db=-atten)  # +atten = -amp.
-    return v * ratio
 
 def multiples(period, shift, vmin, vmax):
     """Returns multiples of period with shift within [vmin, vmax]."""
@@ -120,3 +89,16 @@ def inverse(func, y, x0=0, **kwargs):
     else:
         x = fsolve(lambda xi: y - func(xi, **kwargs), x0=x0)[0]
     return x
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
+    def f(x, r):
+        return x + r*np.sin(x)
+    x = np.linspace(0, 2*np.pi)
+    y = f(x, r=1)
+    plt.plot(x, y, label='original one')
+    plt.plot(inverse(f, y, r=1), y, label='inversed one')  # shold have the same shape as above.
+    plt.legend()
+    plt.show()

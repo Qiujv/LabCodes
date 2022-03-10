@@ -4,9 +4,11 @@ import operator
 
 import numpy as np
 import matplotlib.pyplot as plt
-from labcodes import misc, calc
+from matplotlib.ticker import EngFormatter
 from lmfit import CompositeModel, Model
 import lmfit.models
+
+from labcodes import misc, calc
 
 COMMON_INIT_DOC = """
     Parameters
@@ -516,57 +518,54 @@ class ResonatorModel_inverse(MyModel):
             
         return update_param_vals(pars, self.prefix, **kwargs)
     
-    def plot(self, cfit, ax=None, fdata=500, annotate=''):
+    @staticmethod
+    def plot(cfit, ax=None, fdata=500, annotate=''):
         if ax is None:
-            fig, ax = plt.subplots(tight_layout=True)
+            fig, ax = plt.subplots(tight_layout=True, figsize=(4.5,4))
         else:
             fig = ax.get_figure()
-            
-        ax.plot(
-            cfit.ydata.real, 
-            cfit.ydata.imag,
-            '.'
-        )
-        _, fdata = cfit.fdata(fdata)
-        ax.plot(
-            fdata.real,
-            fdata.imag,
-            'r-',
-        )
-        ax.annotate(
-            f'$f_0$={cfit["f0"]:.3e},\n$Q_i$={cfit["Qi"]:.3e},\n$Q_c$={cfit["Qc"]:.3e}\n'+annotate,
-            (0.5, 0.5),
-            xycoords='axes fraction',
-            ha='center',
-            va='center',
-        )
+
         ax.set(
             aspect='equal',
             xlabel='Re[$S_{21}^{-1}$]',
             ylabel='Im[$S_{21}^{-1}$]',
         )
+        ax.grid(True)
+
+        def plot(ax, x, y, sty='-'):
+            detune = np.abs(x - cfit['f0'])
+            delta = (cfit['f0'] / cfit['Qi']) / 2
+            mask1 = detune <= delta
+            mask2 = (detune <= delta * 10) & (np.logical_not(mask1))
+            mask3 = np.logical_not(mask1 | mask2)
+            ax.plot(y.real[mask1], y.imag[mask1], sty, color='C0')
+            ax.plot(y.real[mask2], y.imag[mask2], sty, color='C1')
+            ax.plot(y.real[mask3], y.imag[mask3], sty, color='C2')
+
+        plot(ax, cfit.xdata, cfit.ydata, '.')
+        plot(ax, *cfit.fdata(fdata), '-')
+
+        fmt = EngFormatter().format_eng
+        ax.annotate(
+            (f'$f_0$={fmt(cfit["f0"])},\n'
+            +f'$Q_i$={fmt(cfit["Qi"])},\n'
+            +f'$Q_c$={fmt(cfit["Qc"])},\n'
+            +annotate),
+            (0.5, 0.5),
+            xycoords='axes fraction',
+            ha='center',
+            va='center',
+        )
         return ax
 
-    @classmethod
-    def remove_electric_delay(cls, freq, phase, plot=False):
-        """Returns phases whose electric delay has been removed."""
-        phase = np.unwrap(phase)
-        lfit = fitter.CurveFit(
-            xdata=freq,
-            ydata=phase,
-            model=LinearModel(),
-        )
-        if plot is True: lfit.plot()
-        return phase - lfit.fdata()
-
-    @classmethod
-    def normalize(cls, s21):
-        """Return normalized s21 with abs(background) = 1."""
+    @staticmethod
+    def normalize(s21):
+        """Return scaled s21 with abs(off_resonance_s21) = 1."""
         amp = np.mean(np.concatenate(np.abs((s21[:9], s21[-9:]))))
         return s21 / amp
 
-    @classmethod
-    def photon_num(cls, f0, Qi, Qc, Pin, h=6.63e-34):
+    @staticmethod
+    def photon_num(f0, Qi, Qc, Pin, h=6.63e-34):
         """Returns photon number in the resonator."""
         n = Qc/(2*np.pi*f0) * (Qi/(Qi+Qc))**2 * Pin/(h*f0)
         return n
