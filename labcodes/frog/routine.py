@@ -3,8 +3,9 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import fsolve
 from labcodes import misc, fitter, models, plotter, fileio
+
+from labcodes.models import GmonModel  # TODO: remove this.
 
 
 def plot_yourself(logf):
@@ -200,114 +201,6 @@ def plot2d_ruler(logf, slope=-0.01, offset=0.0, **kwargs):
     ax.annotate(f'{slope*100:.2f}%', c, size='xx-large', ha='left', va='bottom', 
         bbox=dict(facecolor='w', alpha=0.7, edgecolor='none'))
     return ax
-
-
-class GmonModel(models.MyCompositeModel):
-    """Model fitting Gmon induced tunable coupling.
-    WARNING: The fit is sensitive to initial value, which must be provided by user."""
-
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise', 
-                 with_slope=None, **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-       
-        def coupling(x, r=0.9, period=1, shift=0):
-            delta = junc_phase(2*np.pi/period*(x-shift),r)
-            M = 1 / (r + 1/np.cos(delta))
-            return M
-
-        mod = models.AmpFeature() * models.MyModel(coupling)
-        mod.set_param_hint(name='r', max=1, min=0)  # r = L_linear / L_j0, see my notes.
-        mod.set_param_hint(name='amp', min=0)
-        mod.set_param_hint(name='zero1', expr='(pi/2+r)/(2*pi/period) + shift')
-        mod.set_param_hint(name='zero2', expr='(pi*3/2-r)/(2*pi/period) + shift')
-        mod.set_param_hint(name='max_y_shift', expr='amp/(r-1)')
-
-        def slope(x, slope=0):
-            return x*slope
-        mod2 = models.MyModel(slope)
-        if with_slope:
-            mod2.set_param_hint(name='slope', vary=True, value=with_slope)
-        else:
-            mod2.set_param_hint(name='slope', vary=False)
-        mod2 = models.OffsetFeature() + mod2
-
-        super().__init__(mod, mod2, models.operator.add, **kwargs)
-
-    __init__.__doc__ = 'Gmon model' + models.COMMON_INIT_DOC
-
-    def plot(self, cfit, ax=None, fdata=500):  # TODO: Include the slope feature.
-        """Plot fit with results parameters.
-        
-        Args:
-            cfit: fit with result.
-            ax: ax to plot, if None, create a new ax.
-            fdata: passed to cfit.fdata().
-
-        Returns:
-            ax with plot and annotations.
-        """
-        if ax is None:
-            fig, ax = plt.subplots(tight_layout=True)
-        else:
-            fig = ax.get_figure()
-
-        if fdata:
-            ax.plot(cfit.xdata, cfit.ydata, 'x')
-            ax.plot(*cfit.fdata(fdata))
-
-        gs = dict(ls='--', color='k', alpha=0.5)  # Guide line style
-        ax.axhline(y=cfit['offset'], **gs)
-        ax.annotate(f"y0={cfit['offset']:.3f}", 
-            (ax.get_xlim()[0], cfit['offset']), ha='left')
-
-        dip_x = (cfit['zero1']+cfit['zero2'])/2
-        dip_y = cfit['offset'] + cfit['max_y_shift']
-        ax.axhline(y=dip_y, **gs)
-        ax.axvline(x=dip_x, **gs)
-        ax.annotate((f"x={dip_x:.3f}\n"
-                     f"$\\Delta y_\\mathrm{{max}}={cfit['max_y_shift']:.4f}\\pm{cfit['max_y_shift_err']:.4f}$"), 
-            (dip_x, dip_y), va='bottom', ha='left')
-
-        xmin, xmax = ax.get_xlim()
-        for i in np.arange(-2,3):
-            shift = cfit['shift'] + i*cfit['period']
-            if (shift > xmin) and (shift < xmax):
-                ax.axvline(x=shift, **gs)
-                ax.annotate(f"x={shift:.3f}", 
-                    (shift, ax.get_ylim()[1]), va='top', ha='right', rotation='vertical')
-
-            zero1 = cfit['zero1'] + i*cfit['period']
-            if (zero1 > xmin) and (zero1 < xmax):
-                ax.axvline(x=zero1, **gs)
-                ax.annotate(f"x={zero1:.3f}", 
-                    (zero1, cfit['offset']), va='bottom', ha='right', rotation='vertical')
-
-            zero2 = cfit['zero2'] + i*cfit['period']
-            if (zero2 > xmin) and (zero2 < xmax):
-                ax.axvline(x=zero2, **gs)
-                ax.annotate(f"x={zero2:.3f}", 
-                    (zero2, cfit['offset']), va='bottom', ha='right', rotation='vertical')
-
-        ax.annotate(f"$R=L_\\mathrm{{linear}}/L_{{j0}}={cfit['r']:.3f}\\pm{cfit['r_err']:.4f}$", 
-            (1,0), xycoords=ax.transAxes, va='bottom', ha='right')
-
-        return ax
-
-def junc_phase(delta_ext, r):
-    # fsolve does not works with np.array.
-    if isinstance(delta_ext, np.ndarray):
-        # Solve the values one by one instead of a high-dimensional system (it is decoupled).
-        delta = [fsolve(lambda d: de - _delta_ext(d, r), 0)[0] 
-                for de in delta_ext.ravel()]
-        delta = np.array(delta).reshape(delta_ext.shape)
-    else:
-        delta = fsolve(lambda d: delta_ext - _delta_ext(d, r), 0)[0]
-    return delta
-
-def _delta_ext(delta, r):
-    return delta + np.sin(delta) * r
-
 
 def plot_cramsey(cfit0, cfit1, ax=None):
     if ax is None:

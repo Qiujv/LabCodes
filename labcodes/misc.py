@@ -111,7 +111,7 @@ def inverse(func, y, x0=0, **kwargs):
     if isinstance(y, np.ndarray) and isinstance(x0, np.ndarray):
         # Solve the values one by one instead of a high-dimensional system (it is decoupled).
         x = [fsolve(lambda xi: yi - func(xi, **kwargs), x0=x0i)[0] 
-            for yi, x0i in (y.ravel(), x0.ravel(s))]
+            for yi, x0i in (y.ravel(), x0.ravel())]
         x = np.array(x).reshape(y.shape)
     elif isinstance(y, np.ndarray):
         x = [fsolve(lambda xi: yi - func(xi, **kwargs), x0=x0)[0] 

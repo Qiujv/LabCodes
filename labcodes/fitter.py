@@ -128,6 +128,10 @@ class CurveFit(object):
         """
         if ax is None:
             fig, ax = plt.subplots()
+        ax.set(
+            title=self.model.name,
+            xlabel='x',
+        )
 
         if np.iscomplexobj(self.ydata):
             ax.set_ylabel('|y|')
@@ -147,11 +151,6 @@ class CurveFit(object):
 
         if fit_report:
             ax = self._add_fit_report(ax)
-
-        ax.set(
-            title=self.model.name,
-            xlabel='x',
-        )
         return ax
 
     def plot_complex(self, ax=None, fit_report=False, plot_init=True):
@@ -166,6 +165,12 @@ class CurveFit(object):
         """
         if ax is None:
             fig, ax = plt.subplots()
+        ax.set(
+            title=self.model.name,
+            xlabel='Re(y)',
+            ylabel='Im(y)',
+            aspect='equal',
+        )
 
         def plot_c(data, *args, **kwargs):
             ax.plot(data.real, data.imag, *args, **kwargs)
@@ -183,13 +188,6 @@ class CurveFit(object):
 
         if fit_report:
             ax = self._add_fit_report(ax)
-
-        ax.set(
-            title=self.model.name,
-            xlabel='Re(y)',
-            ylabel='Im(y)',
-            aspect='equal',
-        )
         return ax
 
 

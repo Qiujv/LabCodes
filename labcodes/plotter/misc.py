@@ -2,6 +2,8 @@
 
 import numpy as np
 import matplotlib as mpl
+import matplotlib.pyplot as plt
+
 
 def cursor(ax, x=None, y=None, text=None, line_style={}, text_style={}):
     """Point out given coordinate with axhline and axvline."""
@@ -73,3 +75,44 @@ def get_norm(data, cmin=None, cmax=None, symmetric=False):
 
     norm = mpl.colors.Normalize(cmin, cmax)
     return norm, extend_cbar
+
+# from https://stackoverflow.com/a/53586826
+def multiple_formatter(denominator=2, number=np.pi, latex='\mathrm{\pi}'):
+    def gcd(a, b):
+        while b:
+            a, b = b, a%b
+        return a
+    def _multiple_formatter(x, pos):
+        den = denominator
+        num = np.int(np.rint(den*x/number))
+        com = gcd(num,den)
+        (num,den) = (int(num/com),int(den/com))
+        if den==1:
+            if num==0:
+                return '$0$'
+            if num==1:
+                return f'${latex}$'
+            elif num==-1:
+                return f'$-{latex}$'
+            else:
+                return f'${num}{latex}$'
+        else:
+            if num==1:
+                return f'${latex}/{den}$'
+            elif num==-1:
+                return f'$-{latex}/{den}$'
+            else:
+                return f'${num}{latex}/{den}$'
+    return plt.FuncFormatter(_multiple_formatter)
+
+class Multiple:
+    def __init__(self, denominator=2, number=np.pi, latex='\pi'):
+        self.denominator = denominator
+        self.number = number
+        self.latex = latex
+
+    def locator(self):
+        return plt.MultipleLocator(self.number / self.denominator)
+
+    def formatter(self):
+        return plt.FuncFormatter(multiple_formatter(self.denominator, self.number, self.latex))
