@@ -519,7 +519,7 @@ class ResonatorModel_inverse(MyModel):
         return update_param_vals(pars, self.prefix, **kwargs)
     
     @staticmethod
-    def plot(cfit, ax=None, fdata=500, annotate=''):
+    def plot(cfit, ax=None, fdata=500, annotate='', init=False):
         if ax is None:
             fig, ax = plt.subplots(tight_layout=True, figsize=(4.5,4))
         else:
@@ -544,6 +544,8 @@ class ResonatorModel_inverse(MyModel):
 
         plot(ax, cfit.xdata, cfit.ydata, '.')
         plot(ax, *cfit.fdata(fdata), '-')
+        if init is True:
+            plot(ax, cfit.xdata, cfit.result.init_fit, '--')
 
         fmt = EngFormatter().format_eng
         ax.annotate(

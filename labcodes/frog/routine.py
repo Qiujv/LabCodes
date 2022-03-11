@@ -45,7 +45,7 @@ def plot1d_multi(dir, ids, lbs=None, sid=None, title=None, ax=None, **kwargs):
     fname = lf.name.as_file_name(id=sid, title=title)
     return ax, lfs, fname
 
-def fit_resonator(logf, axs=None, i_start=0, i_end=-1, **kwargs):
+def fit_resonator(logf, axs=None, i_start=0, i_end=-1, annotate='', init=False, **kwargs):
     if axs is None:
         fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,3.5))
     else:
@@ -80,7 +80,7 @@ def fit_resonator(logf, axs=None, i_start=0, i_end=-1, **kwargs):
     s21 = cfit.model.normalize(s21)
     cfit.ydata = 1/s21
     cfit.fit(**kwargs)
-    ax = cfit.model.plot(cfit, ax=ax)
+    ax = cfit.model.plot(cfit, ax=ax, annotate=annotate, init=init)
     return cfit, ax
     
 def fit_coherence(logf, ax=None, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kwargs):
