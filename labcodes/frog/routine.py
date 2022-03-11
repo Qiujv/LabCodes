@@ -39,18 +39,37 @@ def plot1d_multi(dir, ids, lbs=None, sid=None, title=None, ax=None, **kwargs):
     if title is None: title = lf.name.title
 
     for lf, lb in zip(lfs, lbs):
-        lf.plot1d(label=lb, ax=ax, **kwargs)
+        ax = lf.plot1d(label=lb, ax=ax, **kwargs)
     ax.legend()
     ax.set_title(lf.name.as_plot_title(id=sid, title=title))
     fname = lf.name.as_file_name(id=sid, title=title)
     return ax, lfs, fname
 
-def fit_resonator(logf, ax=None, **kwargs):
+def fit_resonator(logf, axs=None, i_start=0, i_end=-1, **kwargs):
+    if axs is None:
+        fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,3.5))
+    else:
+        ax, ax2 = axs
+        fig = ax.get_figure()
+
+    fig.suptitle(logf.name.as_plot_title())
+    ax2.set(
+        xlabel='Frequency (GHz)',
+        ylabel='phase (rad)',
+    )
+    ax2.grid()
+
     freq = logf.df['freq_GHz'].values
     s21_dB = logf.df['s21_mag_dB'].values
     s21_rad = logf.df['s21_phase_rad'].values
 
-    s21_rad = misc.remove_e_delay(s21_rad, freq)
+    s21_rad_old = np.unwrap(s21_rad)
+    s21_rad = misc.remove_e_delay(s21_rad, freq, i_start, i_end)
+    ax2.plot(freq, s21_rad_old, '.')
+    ax2.plot(freq, s21_rad_old - s21_rad, '-')
+    ihalf = int(freq.size/2)
+    plotter.cursor(ax2, x=freq[ihalf], text=f'idx={ihalf}', text_style=dict(fontsize='large'))
+
     s21 = 10 ** (s21_dB / 20) * np.exp(1j*s21_rad)
     cfit = fitter.CurveFit(
         xdata=freq,
@@ -62,7 +81,6 @@ def fit_resonator(logf, ax=None, **kwargs):
     cfit.ydata = 1/s21
     cfit.fit(**kwargs)
     ax = cfit.model.plot(cfit, ax=ax)
-    ax.set_title(logf.name.as_plot_title())
     return cfit, ax
     
 def fit_coherence(logf, ax=None, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kwargs):

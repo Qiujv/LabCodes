@@ -484,7 +484,7 @@ class ResonatorModel_inverse(MyModel):
         def linear_resonator(x, f0=5e9, Qi=1e5, Qc=1e5, phi=0):
             """Returns 1/s21."""
             Qc = Qc * np.exp(1j*phi)
-            return 1 + (Qi * Qc**-1 / (1 + 2j * Qi * (x - f0) / f0))
+            return 1 + (Qi / Qc / (1 + 2j * Qi * (x - f0) / f0))
         
         super().__init__(linear_resonator, **kwargs)
 
