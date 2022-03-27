@@ -473,7 +473,6 @@ class ResonatorModel_inverse(MyModel):
 
     Resonator fitting model fitting 1/s21 but not s21, equivelently assigning 
     more weights to those point around resonance. Hence ydata must be normalized.
-    Normalization is done implicitly when calling .fit().
     """
 
     def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',

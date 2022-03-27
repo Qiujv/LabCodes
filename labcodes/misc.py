@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import fsolve
+from functools import wraps
 
 
 def auto_rotate(data, with_angle=False):
@@ -61,7 +62,7 @@ def inverse(func, y, x0=0, **kwargs):
     Args:
         func: callable(x, **kwargs) -> y. 
             Only function of single variable is supported, i.e. no high dimensional system.
-            The function would better be monotonic, because for each y, only one x value will be returned.
+            The function should be monotonic, otherwise consider decorate it with `misc.bound`.
         y: float or np.array.
             if array, solve f^-1(y) elment by element.
         x0: the initial guess for the inverse function to search x.
@@ -89,6 +90,31 @@ def inverse(func, y, x0=0, **kwargs):
     else:
         x = fsolve(lambda xi: y - func(xi, **kwargs), x0=x0)[0]
     return x
+
+def _bound(f, x, xleft, xright, scale):
+    # f(x) = y
+    # x is scalar.
+    x1, x2 = xleft, xright
+    y1, y2 = f(x1), f(x2)
+    if (x1 <= x) and (x <= x2):
+        return f(x)
+    else:
+        return ((x-x1)*(y2-y1)/(x2-x1) + y1)*scale
+
+def bound(xleft, xright, scale=1):  # A decorator factory.
+    """Decorate f(x, *arg, **kwargs) such that f(x) with x beyond [xleft, xright] 
+    is obtained by linear extrapolation. Intended for `misc.inverse`.`"""
+    def decorator(f):
+        @wraps(f)
+        def wrapped_f(x, *args, **kwargs):
+            def fx(x): return f(x, *args, **kwargs)
+            if np.size(x) == 1:
+                return _bound(fx, x, xleft, xright, scale)
+            else:
+                ys = [_bound(fx, xi, xleft, xright, scale) for xi in x]
+                return np.array(ys)
+        return wrapped_f
+    return decorator
 
 
 if __name__ == '__main__':
