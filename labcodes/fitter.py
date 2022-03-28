@@ -677,8 +677,8 @@ def df_to_traces(df, index, columns, values):
 
     # New method with native functions by pandas.
     gp = df.groupby(index)
-    x_series = gp[columns].apply(lambda se: list(se))
-    y_series = gp[values].apply(lambda se: list(se))
+    x_series = gp[columns].apply(lambda se: se.values)  # se to np array.
+    y_series = gp[values].apply(lambda se: se.values)
     xbatch = x_series.to_list()
     ybatch = y_series.to_list()
     stepper_value = x_series.index.values
