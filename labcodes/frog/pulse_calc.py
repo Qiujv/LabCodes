@@ -1,5 +1,3 @@
-"""Helper functions adapted from LabCodes by Qiujv, dated 0327."""
-
 # %%
 import numpy as np
 import matplotlib.pyplot as plt
@@ -44,22 +42,13 @@ def inverse(func, y, x0=0, **kwargs):
 def linear(x, slope, offset):
     return x*slope + offset
 
-def fshift_with_xtalk(gpa, r, period, shift, amp, slope):
+def fshift_xtalk(gpa, r, period, shift, amp, slope, **kw):
     return fshift(gpa, r, period, shift, amp) + linear(gpa, slope, offset=0.)
 
-def fshift(gpa, r, period, shift, amp):
+def fshift(gpa, r, period, shift, amp, **kw):
     delta = junc_phase(2.*np.pi/period*(gpa-shift),r)
     M = 1. / (r + 1./np.cos(delta))
     return M*amp
-
-def gpa_by_fshift(fs, r, period, shift, amp, x0=0):
-    """Returns gpa from given freq shift.
-    Search will not got beyond one period where x0 locates at."""
-    kw = dict(r=r, period=period, shift=shift, amp=amp)
-    interval = period / 2.
-    xmin = x0 - (x0-shift)%interval  # Last mi
-    xmax = xmin + interval
-    return inverse(bound(xmin, xmax)(fshift), y=fs, x0=x0, **kw)
 
 def delta_ext(delta, r):
     return delta + np.sin(delta) * r
@@ -112,18 +101,25 @@ def soft_pulse_sample(t0, t1, w, sample_rate=1, verbose=False, pwlin=True):
     ymax = soft_pulse(xmax, **kw)
     ymin = soft_pulse(xmin, **kw)
     n_pt = int(w/2 * sample_rate)
-    y = np.linspace(ymin, ymax, n_pt)
-    x = inverse(bound(xmin, xmax)(soft_pulse), y, (ymin+ymax)/2, **kw)
+    ey = np.linspace(ymin, ymax, n_pt)  # e ~ edge.
+    ex = inverse(bound(xmin, xmax)(soft_pulse), ey, (ymin+ymax)/2, **kw)
 
     if verbose:
-        ax.plot(x, y, marker='x', label='rising edge')
-        ax.plot(x, soft_pulse(x,**kw), color='k', alpha=0.5, lw=1)  # Comparing target.
+        ax.plot(ex, ey, marker='x', label='rising edge')
+        ax.plot(ex, soft_pulse(ex,**kw), color='k', alpha=0.5, lw=1)  # Comparing target.
         print('Space between sampling points:')
-        print(np.diff(x))  # Check sample density ~< 1 Sa/ns.
+        print(np.diff(ex))  # Check sample density ~< 1 Sa/ns.
 
     # Composite rise and fall edge into a pulse. 'p' means 'pulse'.
-    px = np.hstack((x,t0+t1-x[::-1]))
-    py = np.hstack((y,y[::-1]))
+    rex = ex  # Rising edge x.
+    fex = t0+t1 - ex[::-1]  # Falling edge x.
+    # Turn off output when edges are seperated far enough (5ns).
+    if (fex[0] - rex[-1]) < 10:
+        px = np.hstack((rex, fex))
+        py = np.hstack((ey, ey[::-1]))
+    else:
+        px = np.hstack((rex, rex[-1]+5, fex[0]-5, fex))
+        py = np.hstack((ey, 0, 0, ey[::-1]))
     # shift, pad smaple points to produce parameter for pwlin.
     pxs = (px[:-1] + px[1:]) / 2  # Shift points from center to left of steps.
     pys = py[1:]
@@ -141,9 +137,10 @@ def soft_pulse_sample(t0, t1, w, sample_rate=1, verbose=False, pwlin=True):
 
     if pwlin:
         t_start = pxs[0]
-        increments = np.diff(pxs)
-        vs = pxs[:-1]
-        return t_start, increments, vs
+        vdt = np.diff(pxs)
+        vt = pxs[:-1]
+        vy = pys[:-1]
+        return t_start, vdt, vt, vy
     else:
         return pxs, pys
 
@@ -172,80 +169,40 @@ def bound(xleft, xright, scale=1):  # A decorator factory.
         return wrapped_f
     return decorator
 
-def _v_sample(t0, t1, w, gkw, gpa, n_pt=None, verbose=False, pwlin=True):
-    """DO NOT USE THIS!
+def transmon_fit(x, fmax, fmin, xmax, xmin):
+    """Frequency of transmon, following koch_charge_2007 Eq.2.18."""
+    phi = 0.5 * (x - xmax) / (xmin - xmax)  # Rescale [xmax, xmin] to [0,0.5], i.e. in Phi_0.
+    d = (fmin / fmax) ** 2
+    f = fmax * np.sqrt(np.abs(np.cos(np.pi*phi))
+                        * np.sqrt(1 + d**2 * np.tan(np.pi*phi)**2))
+    return f
 
-    Another version of soft_pulse_sample, uniformly sample on voltage axis. 
-    """
-    if verbose:
-        fig, ax = plt.subplots()
-        ax.set(
-            title='Soft pulse sampling',
-            xlabel='time (ns)',
-            ylabel='voltage (arb.)',
-            ylim=(-0.05,1.05),
-        )
-        ax.grid(True)
-
-    if n_pt is None: n_pt = int(w/2)
-    # Sampling rising edge.
-    f0, fpa = fshift(0, **gkw), fshift(gpa, **gkw)
-    def y2f(y):
-        return y*(fpa-f0) + f0
-    kw = dict(t0=t0, t1=t1, w=w)
-    tmin = t0-w
-    tmax = min((t0+t1)/2, t0+w)  # limit sampling in region where slope is large enough.
-    ymin, ymax = [soft_pulse(x, **kw) for x in (tmin, tmax)]
-    fmin, fmax = [y2f(y) for y in (ymin, ymax)]
-    vmin, vmax = [gpa_by_fshift(f, x0=0.2, **gkw) for f in (fmin, fmax)]
-    # TODO: Continue here!
-    ev = np.linspace(vmin, vmax, n_pt)
-    ef = fshift(ev, **gkw)
-    ey = inverse(y2f, ef, 0.5)
-    et = inverse(bound(tmin, tmax)(soft_pulse), ey, (ymin+ymax)/2, **kw)
-
-    if verbose:
-        ax.plot(et, ey, marker='x', label='rising edge')
-        ax.plot(et, soft_pulse(et,**kw), color='y', alpha=0.3, lw=5)  # Comparing target.
-        print('Space between sampling points:')
-        print(np.diff(et))  # Check sample density ~< 1 Sa/ns.
-
-    # Composite rise and fall edge into a pulse. 'p' means 'pulse'.
-    px = np.hstack((et,t0+t1-et[::-1]))
-    py = np.hstack((ey,ey[::-1]))
-    # shift, pad smaple points to produce parameter for pwlin.
-    pxs = (px[:-1] + px[1:]) / 2  # Shift points from center to left of steps.
-    pys = py[1:]
-    d = pxs[0] - px[0]
-    pxs = np.hstack(([pxs[0]-d], pxs, [pxs[-1]+d]))  # Pad the first and last points.
-    pys = np.hstack(([py[0]], pys, [py[0]]))
-
-    if verbose:
-        ax.step(px, py, marker='x', where='mid', color='y', alpha=0.3, lw=5)  # Comparing target.
-        ax.step(pxs[:-1], pys[:-1], marker='.', where='post', label='DAC output')
-        ax.axvline(t0, color='k', ls='--')
-        ax.axvline(t1, color='k', ls='--')
-        ax.legend()
-        plt.show()
-
-    if pwlin:
-        t_start = pxs[0]
-        increments = np.diff(pxs)
-        vs = pxs[:-1]
-        return t_start, increments, vs
-    else:
-        return pxs, pys
-
+def qbias_compensate_fshift(fs, fmax, fmin, xmax, xmin, idle=0):
+    """Return qubit zpa s.t. f(zpa) = f(idle) - fs."""
+    qkw = dict(fmin=fmin, fmax=fmax, xmin=xmin, xmax=xmax)
+    f0 = transmon_fit(idle, **qkw)
+    fc = f0 - fs  # Target qubit freq.
+    mask = (fc < fmin) | (fc > fmax)
+    if np.any(mask):
+        msg = 'WARNING: Qubit should have be bias to {} is out of range [{}, {}]'
+        print(msg.format(fc[mask], fmin, fmax))
+    vz = inverse(bound(xmin, xmax, 10)(transmon_fit), fc, **qkw)
+    return vz  # this value include zpa_idle, but not increments for fshift only.
 
 if __name__ == '__main__':
-    gpa = 0.5
-    t0, t1, w = 25, 75, 20  # Ideally w depends on gpa.
-    gkw = dict(r=0.8, period=1., shift=0., amp=0.006)
+    gkw = dict(r=0.75727153, period=1.12077479, shift=-0.42074943, amp=0.00539045, slope=0.00232655)
+    qkw = dict(fmin=3.7320274, fmax=4.55496161, xmin=-0.01332578, xmax=0.70460876)
+    # gpa = gkw['period']/2 + gkw['shift']  # Works well even with gpa=1e-4, gpa=0
+    gpa = 0.14
+    w, delay = 100, 190  # Ideally w depends on gpa.
+    t0 = w
+    t1 = t0 + delay
 
     vt, vy = soft_pulse_sample(t0, t1, w, verbose=True, pwlin=False)
     fmin, fmax = fshift(0, **gkw), fshift(gpa, **gkw)
     vf = vy*(fmax-fmin) + fmin  # Scale [0,1] to [fmin, fmax].
-    va = gpa_by_fshift(vf, x0=0.3, **gkw)
+    vgpa = inverse(bound(0,gpa)(fshift), vf, x0=gpa/2, **gkw)
+    vqpa = qbias_compensate_fshift(vf, **qkw)
 
     fig, (ax, ax2) = plt.subplots(figsize=(8,3), ncols=2, tight_layout=True)
     ax.set(
@@ -254,16 +211,19 @@ if __name__ == '__main__':
         ylabel='DAC output (arb.)',
     )
     ax.grid()
-    secax = ax.twinx()
-    secax.set_ylabel('Freq shift', color='C1')
     ax2.set(
-        title='The gmon',
         xlabel='gpa',
         ylabel='Freq shift',
     )
     ax2.grid()
+    secax2 = ax2.twiny()
+    secax2.set_xlabel('Time (ns)')
 
-    ax.step(vt, va, where='post')
-    secax.step(vt, vf, where='post', color='C1')
-    ax2.plot(va, vf, color='C1')
-# %%
+    ax.step(vt, vgpa, where='post', label='gmon bias')
+    ax.step(vt, vqpa, where='post', label='qubit bias')
+    ax.legend()
+    secax2.step(vt, vf, where='post')
+    # ax2.plot(vgpa, vf)
+    vx = np.linspace(0,gpa,200)
+    ax2.plot(vx, fshift_xtalk(vx, **gkw))
+
