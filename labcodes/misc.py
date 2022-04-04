@@ -116,6 +116,25 @@ def bound(xleft, xright, scale=1):  # A decorator factory.
         return wrapped_f
     return decorator
 
+def num2bstr(num, n_bits, base=2):
+    if num >= base**n_bits:
+        msg = 'num {} requires more than {} bits with base {} to store.'
+        raise ValueError(msg.format(num, n_bits, base))
+
+    l = []
+    while True:
+        l.append(num % base)
+        last_num = num
+        num = num // base
+        if last_num // base == 0:
+            break
+    bit_string = ''.join([str(i) for i in l[::-1]])
+    return bit_string.zfill(n_bits)
+
+def bitstrings(n_qbs, base=2):
+    """Returns ['00', '01', '10', '11'] for n_qbs=2, and etc."""
+    return [num2bstr(i, n_qbs, base=base) for i in range(base**n_qbs)]
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
