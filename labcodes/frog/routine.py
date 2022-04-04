@@ -36,10 +36,10 @@ def plot1d_multi(dir, ids, lbs=None, sid=None, title=None, ax=None, **kwargs):
 
     if sid is None: sid = f'{ids[0]}-{ids[-1]}'
     if lbs is None: lbs = ids
-    if title is None: title = lf.name.title
 
     for lf, lb in zip(lfs, lbs):
         ax = lf.plot1d(label=lb, ax=ax, **kwargs)
+    if title is None: title = lf.name.title
     ax.legend()
     ax.set_title(lf.name.as_plot_title(id=sid, title=title))
     fname = lf.name.as_file_name(id=sid, title=title)
@@ -237,34 +237,61 @@ def plot_cramsey(cfit0, cfit1, ax=None):
     ax.grid(True)
     return ax
 
-def plot_ro_mat(logf, states=('gg', 'ge', 'eg', 'ee'), ax=None, check_label=False, txt_color=('white', 'black')):
-    if ax is None:
-        _, ax = plt.subplots()
-    n_sts = np.size(states)
-    mat_vals = logf.df.mean()  # pandas.Series, with index as channel names.
-    if np.size(mat_vals) != n_sts**2:
-        mat_vals = mat_vals.iloc[1:]  # 1st column or df is #run.
-    mat = np.reshape(mat_vals.values, (n_sts, n_sts))
-    im = ax.matshow(mat)
-    
-    if check_label is True:
-        txt_mat = np.reshape(mat_vals.index.values, (n_sts, n_sts))
-        fmt = '{}'.format
+def plot_ro_mat(logf, return_all=False):
+    """Plot assignment fidelity matrix along with the labels.
+    For data produced by visibility experiment.
+    """
+    se = logf.df[logf.deps].mean()  # Remove the 'Runs' columns
+    n_qs = int(np.sqrt(se.size))
+    labels = se.index.values.reshape(n_qs,n_qs)
+    ro_mat = se.values.reshape(n_qs,n_qs)
+
+    fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,4))
+    fig.suptitle(logf.name.as_plot_title())
+    ax.set_title('assgiment matrix')
+    ax2.set_title('labels')
+    plotter.plot_mat2d(ro_mat, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
+    plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
+    if return_all:
+        return ro_mat, labels, ax, ax2
     else:
-        txt_mat = mat*100  # Percentage.
-        fmt = '{:.1f}%'.format
-    threshold = (im.norm.vmax + im.norm.vmin) / 2
-    for i in range(n_sts):
-        for j in range(n_sts):
-            color = txt_color[int(mat[i,j] > threshold)]
-            ax.annotate(fmt(txt_mat[i,j]), (i, j), ha='center', va='center', color=color)
-    ax.set(
-        title=logf.name.as_plot_title(),
-        xlabel='Prepare',
-        xticks=np.arange(n_sts),
-        xticklabels=states,
-        yticks=np.arange(n_sts),
-        ylabel='Measure',
-        yticklabels=states,
-    )
-    return ax, mat
+        return ro_mat
+
+def plot_tomo_probs(logf, ro_mat=None, n_ops_n_sts=None, return_all=False):
+    """Plot probabilities after tomo operations along with labels, 
+    For data produced by tomo experiment.
+
+    Args:
+        n_ops_n_sts: (int, int), shape for the returned matrix.
+        if None, inferred from data size.
+        ro_mat: matrix (n_sts*n_sts), assgiment fidelity matrix to correct state 
+        readout probabilities.
+    """
+    se = logf.df[logf.deps].mean()
+    if n_ops_n_sts is None:
+        # Total number of probs should be: (n_ops_1q ** n_qs) * (n_sts_1q ** n_qs)
+        n_ops_1q = 3
+        n_sts_1q = 2
+        n_qs = int(np.log(se.size) / (np.log(n_ops_1q)+np.log(n_sts_1q)))
+        n_ops = int(n_ops_1q ** n_qs)
+        n_sts = int(n_sts_1q ** n_qs)
+    else:
+        n_ops, n_sts = n_ops_n_sts
+
+    labels = se.index.values.reshape(n_ops, n_sts)  # State labels runs faster
+
+    probs = se.values.reshape(n_ops, n_sts)
+    if ro_mat is not None:
+        for i, ps in enumerate(probs):
+            probs[i] = np.dot(np.linalg.inv(ro_mat), ps)
+
+    fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,4))
+    fig.suptitle(logf.name.as_plot_title())
+    ax.set_title('probs')
+    ax2.set_title('labels')
+    plotter.plot_mat2d(probs, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
+    plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
+    if return_all:
+        return probs, labels, ax, ax2
+    else:
+        return probs
