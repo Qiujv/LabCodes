@@ -240,12 +240,19 @@ def init_qpt(As, key=None):
 def qst(diags, U, return_all=False):
     """Convert a set of diagonal measurements into a density matrix.
     
-    diags - measured probabilities (diagonal elements) after acting
-        on the state with each of the unitaries from the qst protocol
+    Args:
+        diags: 2d array with shape n_ops * n_stats = [I, X/2, Y/2]**n_qs * [0, 1]**n_qs
+        laber order in nested-loop style, i.e. 001, 010, **011** but not 001, 010, **100**.
+        
+        measured probabilities (diagonal elements) after acting on the state 
+        with each of the unitaries from the qst protocol
     
-    U - transformation matrix from init_qst for this protocol, or 
-        key passed to init_qst under which the transformation was saved
-    """
+        U: transformation matrix from init_qst for this protocol, or 
+            key passed to init_qst under which the transformation was saved
+
+    Returns:
+        Density matrix rho, with shape: n_stats * n_stats = [0, 1]**n_qs.
+    """  # TODO: Confirm if the order is in nested-loop like.
     if isinstance(U, str) and U in _qst_transforms:
         U = _qst_transforms[U][1]
     
