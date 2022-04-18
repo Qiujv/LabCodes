@@ -239,6 +239,11 @@ class Gmon(RF_SQUID):
         return 2*np.pi * g**2 / wFSR
 
     @dept
+    def tau(self, kappa):
+        """Decay time (s) related to kappa (Hz)."""
+        return 1/(2*np.pi*kappa)
+
+    @dept
     def off_bias(self, L_linear, Lj0):
         """Delta_ext where coupling off"""
         return np.pi/2 + (L_linear / Lj0)

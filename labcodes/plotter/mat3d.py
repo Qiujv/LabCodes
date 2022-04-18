@@ -6,29 +6,17 @@ import matplotlib.pyplot as plt
 from labcodes.plotter import misc
 
 
-def heatmap(data, row_labels, col_labels, ax=None,
-            cbar_kw={}, cbarlabel="", **kwargs):
-    """
-    Create a heatmap from a numpy array and two lists of labels.
+def heatmap(data, row_labels, col_labels, ax=None, cbar_kw={}, cbarlabel="", **kwargs):
+    """Create a heatmap from a numpy array and two lists of labels.
     from https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html
 
-    Parameters
-    ----------
-    data
-        A 2D numpy array of shape (M, N).
-    row_labels
-        A list or array of length M with the labels for the rows.
-    col_labels
-        A list or array of length N with the labels for the columns.
-    ax
-        A `matplotlib.axes.Axes` instance to which the heatmap is plotted.  If
-        not provided, use current axes or create a new one.  Optional.
-    cbar_kw
-        A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
-    cbarlabel
-        The label for the colorbar.  Optional.
-    **kwargs
-        All other arguments are forwarded to `imshow`.
+    Args:
+        data: A 2D numpy array of shape (M, N).
+        row_labels, col_labels: list(str), of len M, N
+        **kwargs: All other arguments are forwarded to `imshow`.
+
+    Returns:
+        im, cbar.
     """
     if ax is None:
         _, ax = plt.subplots()
