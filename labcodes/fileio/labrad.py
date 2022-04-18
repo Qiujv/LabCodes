@@ -18,6 +18,7 @@ ESCAPE_CHARS = {  # |, >, : in filename were replaced by %v, %g, %c.
     r'%v': '|',
     r'%g': '>',
     r'%c': ':',
+    r'%a': '*',
 }
 PATH_LEGAL = {
     '->': '→',
@@ -25,6 +26,7 @@ PATH_LEGAL = {
     ':': ',',
     '|': 'l',
     # '?': '？',
+    '*': '·',
 }
 ABBREV = {  # Some abbreviations.
     'pi pulse': 'pi',

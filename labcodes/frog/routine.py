@@ -4,6 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from labcodes import misc, fitter, models, plotter, fileio
+import labcodes.frog.pyle_tomo as tomo
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -237,7 +238,7 @@ def plot_cramsey(cfit0, cfit1, ax=None):
     ax.grid(True)
     return ax
 
-def plot_ro_mat(logf, return_all=False):
+def plot_ro_mat(logf, return_all=False, plot=True):
     """Plot assignment fidelity matrix along with the labels.
     For data produced by visibility experiment.
     """
@@ -246,18 +247,22 @@ def plot_ro_mat(logf, return_all=False):
     labels = se.index.values.reshape(n_qs,n_qs)
     ro_mat = se.values.reshape(n_qs,n_qs)
 
-    fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,4))
-    fig.suptitle(logf.name.as_plot_title())
-    ax.set_title('assgiment matrix')
-    ax2.set_title('labels')
-    plotter.plot_mat2d(ro_mat, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
-    plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
+    if plot:
+        fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,4))
+        fig.suptitle(logf.name.as_plot_title())
+        ax.set_title('assgiment matrix')
+        ax2.set_title('labels')
+        plotter.plot_mat2d(ro_mat, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
+        plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
+    else:
+        ax, ax2 = None
+        
     if return_all:
         return ro_mat, labels, ax, ax2
     else:
         return ro_mat
 
-def plot_tomo_probs(logf, ro_mat=None, n_ops_n_sts=None, return_all=False):
+def plot_tomo_probs(logf, ro_mat=None, n_ops_n_sts=None, return_all=False, figsize=(8,6), plot=True):
     """Plot probabilities after tomo operations along with labels, 
     For data produced by tomo experiment.
 
@@ -285,13 +290,74 @@ def plot_tomo_probs(logf, ro_mat=None, n_ops_n_sts=None, return_all=False):
         for i, ps in enumerate(probs):
             probs[i] = np.dot(np.linalg.inv(ro_mat), ps)
 
-    fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,4))
-    fig.suptitle(logf.name.as_plot_title())
-    ax.set_title('probs')
-    ax2.set_title('labels')
-    plotter.plot_mat2d(probs, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
-    plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
+    if plot:
+        fig, (ax, ax2) = plt.subplots(ncols=2, figsize=figsize)
+        fig.suptitle(logf.name.as_plot_title())
+        ax.set_title('probs')
+        ax2.set_title('labels')
+        plotter.plot_mat2d(probs, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
+        plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
+    else:
+        ax = None
+        ax2 = None
+
     if return_all:
         return probs, labels, ax, ax2
     else:
         return probs
+
+def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None, plot=True):
+    def qst(id, ro_mat):
+        lf = fileio.LabradRead(dir, id)
+        probs = plot_tomo_probs(lf, ro_mat=ro_mat, plot=False)
+        rho = tomo.qst(probs, 'tomo')
+        return rho
+    if in_ids is None:
+        rho_in = {
+            '0': np.array([
+                [1,0],
+                [0,0],
+            ]),
+            '1': np.array([
+                [0,0],
+                [0,1],
+            ]),
+            'x': np.array([
+                [.5, .5j],
+                [-.5j, .5],
+            ]),
+            'y': np.array([
+                [.5, .5],
+                [.5, .5]
+            ])
+        }
+    else:
+        rho_in = {k: qst(id, ro_mat_in) for k, id in in_ids.items()}
+    
+    rho_out = {k: qst(id, ro_mat_out) for k, id in out_ids.items()}
+
+    chi = tomo.qpt(
+        [rho_in[k] for k in ('0', 'x', 'y', '1')], 
+        [rho_out[k] for k in ('0', 'x', 'y', '1')], 
+        'sigma',
+    )
+
+    lf = fileio.LabradRead(dir, out_ids['0'])
+    if in_ids:
+        sid = (f'{min(in_ids.values())}-{max(in_ids.values())}'
+            f'-> #{min(out_ids.values())}-{max(out_ids.values())}')
+    else:
+        sid = f'ideal -> #{min(out_ids.values())}-{max(out_ids.values())}'
+    fname = lf.name.as_file_name(id=sid, qubit='')
+    ptitle = lf.name.as_plot_title(id=sid, qubit='')
+    
+    if plot:
+        ax_r, ax_i = plotter.plot_complex_mat3d(chi)
+        fid = np.abs(chi[0,0])
+        ax_r.text2D(0.1,0.9, f'abs($\\chi$), Fidelity={fid*100:.1f}%', transform=ax_r.transAxes)
+        ax_r.get_figure().suptitle(ptitle)
+    else:
+        ax_r = None
+        ax_i = None
+    
+    return chi, rho_in, rho_out, fname, ax_r, ax_i

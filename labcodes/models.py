@@ -714,7 +714,7 @@ class GmonModel(MyCompositeModel):
         else:
             fig = ax.get_figure()
 
-        if fdata:
+        if fdata is not None:
             ax.plot(cfit.xdata, cfit.ydata, 'x')
             ax.plot(*cfit.fdata(fdata))
 

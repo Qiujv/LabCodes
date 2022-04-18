@@ -3,7 +3,9 @@
 
 import copy
 from tqdm import tqdm, trange
+from pathlib import Path
 
+import lmfit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -50,6 +52,16 @@ class CurveFit(object):
         cfit._update_result(result)
         return cfit
 
+    @classmethod
+    def load(cls, path):
+        raise NotImplementedError()  # TODO: require a dict of model def functions.
+
+    def dump(self, path):
+        path = Path(path)
+        path.touch()
+        with path.open('w') as f:
+            self.result.dump()
+
     def _update_result(self, result):
         self.result = result
 
@@ -83,7 +95,7 @@ class CurveFit(object):
             y, if n_pts is None,
             x, y, np.array of values of fitted curve, if n_pts is not None.
         """
-        if not x:
+        if x is None:
             return self.result.best_fit
         elif np.size(x) == 1:
             ip = np.linspace(0, 1, num=len(self.xdata))
