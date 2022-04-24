@@ -86,7 +86,7 @@ def fit_resonator(logf, axs=None, i_start=0, i_end=-1, annotate='', init=False, 
     
 def fit_coherence(logf, ax=None, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kwargs):
     if ax is None:
-        ax = logf.plot1d(ax=ax)
+        ax = logf.plot1d(ax=ax, y_name='s1_prob')
 
     fig = ax.get_figure()
     fig.set_size_inches(5,3)
@@ -201,6 +201,8 @@ def plot_xtalk(logf, slope=-0.01, offset=0.0, ax=None, **kwargs):
     Args:
         slope, offset: float, property of the guide line.
         kwargs: passed to logf.plot2d.
+
+    Note: **slope = - xtalk**.
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(4,3))
@@ -217,7 +219,7 @@ def plot_xtalk(logf, slope=-0.01, offset=0.0, ax=None, **kwargs):
     y = slope*(x-c[0]) + c[1] + offset*(ylims[1]-ylims[0])/2
     mask = (y>ylims[0]) & (y<ylims[1])
     ax.plot(x[mask], y[mask], lw=3, color='k')
-    ax.annotate(f'{slope*100:.2f}%', c, size='xx-large', ha='left', va='bottom', 
+    ax.annotate(f'{-slope*100:.2f}%', c, size='xx-large', ha='left', va='bottom', 
         bbox=dict(facecolor='w', alpha=0.7, edgecolor='none'))
     return ax
 
