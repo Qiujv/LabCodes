@@ -176,6 +176,8 @@ class LabradRead(object):
                 e.g. 12 for file named '00012 - balabala'.
             suffix: 'csv' or 'ini'.
         """
+        if not Path(dir).exists():
+            raise FileNotFoundError(f'Directory not found: {dir}')
         prn = f'{str(id).zfill(5)} - *.{suffix}'
         all_match = list(Path(dir).glob(prn))
         if len(all_match) == 0:
