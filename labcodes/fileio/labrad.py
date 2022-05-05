@@ -56,9 +56,10 @@ class LogName(object):  # Unify self.name, new_name, _get_plot_title()
     @staticmethod
     def resolve_path(path):
         dir = str(path.parent).replace('.dir', '')
-        match = re.search(r'(\d+) - (.*)%v(.*)%g(.*)%c (.*)', path.stem)  # |, >, : in filename were replaced by %v, %g, %c.
+        match = re.search(r'(\d+) - (.*)%c (.*)', path.stem)  # |, >, : in filename were replaced by %v, %g, %c.
         if match:
-            id, qubit, title = match.group(1), match.group(3), match.group(5)  # Index starts from 1.
+            id, qubit, title = match.group(1), match.group(2), match.group(3)  # Index starts from 1.
+            qubit = ','.join([qb[2:-2] for qb in qubit.split(', ') if qb.startswith('%v')])
         else:
             id, qubit, title = path.stem[:5], '', path.stem[8:]
         id = int(id)

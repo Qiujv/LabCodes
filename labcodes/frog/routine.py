@@ -257,7 +257,7 @@ def plot_ro_mat(logf, return_all=False, plot=True):
         plotter.plot_mat2d(ro_mat, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
         plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
     else:
-        ax, ax2 = None
+        ax, ax2 = None, None
         
     if return_all:
         return ro_mat, labels, ax, ax2
@@ -308,7 +308,48 @@ def plot_tomo_probs(logf, ro_mat=None, n_ops_n_sts=None, return_all=False, figsi
     else:
         return probs
 
-def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None, plot=True):
+def plot_qst(dir, id, ro_mat=None, fid=None, normalize=False):
+    lf = fileio.LabradRead(dir, id)
+    probs = plot_tomo_probs(lf, ro_mat=ro_mat, plot=False)
+    n_ops_1q = 3
+    n_sts_1q = 2
+    n_qs = int(np.log(probs.size) / (np.log(n_ops_1q)+np.log(n_sts_1q)))
+
+    if n_qs == 1:
+        rho = tomo.qst(probs, 'tomo')
+    else:
+        rho = tomo.qst(probs, f'tomo{n_qs}')
+    labels = misc.bitstrings(n_qs)
+    rho_abs = np.abs(rho)
+    if normalize is True: rho = rho / np.trace(rho_abs)
+    ax = plotter.plot_mat3d(rho_abs)
+
+    if fid is None:
+        # Calculate fidelity with guessed state.
+        rho_sort = np.sort(rho_abs.ravel())
+        if rho_sort[-1]-rho_sort[-4] > 0.3:
+            # Guess it is a simple state.
+            fid = rho_sort[-1]
+            msg = 'highest bar'
+        else:
+            # Guess it is a bipartite entangle state.
+            fid = np.sum(rho_sort[-4:]) / 2
+            msg = 'sum(highest bars)/2'
+    else:
+        msg = 'Fidelity'
+    ax.text2D(0.0,0.9, f'abs($\\rho$), {msg}={fid*100:.1f}%', 
+        transform=ax.transAxes, fontsize='x-large')
+    cbar = ax.collections[0].colorbar
+    cbar.set_label('$|\\rho|$')
+    ax.set(
+        title=lf.name.as_plot_title(),
+        xticklabels=labels,
+        yticklabels=labels,
+    )
+    fname = lf.name.as_file_name()
+    return rho, fname, ax
+
+def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
     def qst(id, ro_mat):
         lf = fileio.LabradRead(dir, id)
         probs = plot_tomo_probs(lf, ro_mat=ro_mat, plot=False)
@@ -344,22 +385,23 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None, plot=Tr
         'sigma',
     )
 
+    # Resolve plot titles.
     lf = fileio.LabradRead(dir, out_ids['0'])
     if in_ids:
         sid = (f'{min(in_ids.values())}-{max(in_ids.values())}'
             f'-> #{min(out_ids.values())}-{max(out_ids.values())}')
     else:
-        sid = f'ideal -> #{min(out_ids.values())}-{max(out_ids.values())}'
-    fname = lf.name.as_file_name(id=sid, qubit='')
-    ptitle = lf.name.as_plot_title(id=sid, qubit='')
+        sid = f'{min(out_ids.values())}-{max(out_ids.values())} <- ideal'
+    fname = lf.name.as_file_name(id=sid)
+    ptitle = lf.name.as_plot_title(id=sid)
+
+    ax = plotter.plot_mat3d(np.abs(chi))
+    fid = np.abs(chi[0,0])
+    ax.text2D(0.0,0.9, f'abs($\\chi$), Fidelity={fid*100:.1f}%', 
+        transform=ax.transAxes, fontsize='x-large')
+    cbar = ax.collections[0].colorbar
+    cbar.set_label('$|\\chi|$')
+    ax.get_figure().suptitle(ptitle)
+
+    return chi, rho_in, rho_out, fname, ax
     
-    if plot:
-        ax_r, ax_i = plotter.plot_complex_mat3d(chi)
-        fid = np.abs(chi[0,0])
-        ax_r.text2D(0.1,0.9, f'abs($\\chi$), Fidelity={fid*100:.1f}%', transform=ax_r.transAxes)
-        ax_r.get_figure().suptitle(ptitle)
-    else:
-        ax_r = None
-        ax_i = None
-    
-    return chi, rho_in, rho_out, fname, ax_r, ax_i
