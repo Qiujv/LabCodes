@@ -120,10 +120,12 @@ def num2bstr(num, n_bits, base=2):
     if num >= base**n_bits:
         msg = 'num {} requires more than {} bits with base {} to store.'
         raise ValueError(msg.format(num, n_bits, base))
+    if base > 10:
+        print('WARNING: base > 10 is not implemented yet!')
 
     l = []
     while True:
-        l.append(num % base)
+        l.append(num % base)  # TODO: consider use np.base_repr
         last_num = num
         num = num // base
         if last_num // base == 0:
