@@ -46,6 +46,9 @@ def update_param_vals(pars, prefix, **kwargs):
     return pars
 
 
+# NOTE: When doing fit, the func_args will be filled with default values from 
+# following places: func_def, model.param_hints, model.guess, model.fit(**kwargs). 
+# The former is always replaced by the later.
 class MyModel(Model):
     def fit(self, data, params=None, weights=None, method='leastsq',
             iter_cb=None, scale_covar=True, verbose=False, fit_kws=None,
@@ -136,11 +139,7 @@ class AmpFeature(MyModel):
     Implemented for composite model which fits un-normalized data.
     """
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def const_amp(x, amp=1):
             try:
                 return amp * np.ones(x.shape)
@@ -150,8 +149,6 @@ class AmpFeature(MyModel):
         super().__init__(const_amp, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
-        """Estimate initial model parameter values from data."""
-
         pars = self.make_params(
             amp=(data.max() - data.min()) / 2,
         )
@@ -166,11 +163,7 @@ class OffsetFeature(MyModel):
     Implemented for composite model which fits data with offset from 0.
     """
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def const_offset(x, offset=1):
             try:
                 return offset * np.ones(x.shape)
@@ -193,11 +186,7 @@ class OffsetFeature(MyModel):
 class SineFeature(MyModel):
     """np.sin(2 * np.pi * freq * x + phase)"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def sine(x, freq=1, phase=0):
             return np.sin(2*np.pi*freq*x + phase)
 
@@ -222,11 +211,7 @@ class SineFeature(MyModel):
 class SineModel(MyCompositeModel):
     """amp * np.sin(2 * np.pi * freq * x + phase) + offset"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-
+    def __init__(self, **kwargs):
         model = AmpFeature() * SineFeature()
         super().__init__(model, OffsetFeature(), operator.add, **kwargs)
 
@@ -236,11 +221,7 @@ class SineModel(MyCompositeModel):
 class ExpFeature(MyModel):
     """np.exp(-x * rate)"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def exp(x, rate=1):
             return np.exp(-x * rate)
 
@@ -272,11 +253,7 @@ class ExpFeature(MyModel):
 class Exp2Feature(MyModel):
     """np.exp(-(x * rate)**2)"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def exp2(x, rate=1):
             return np.exp(-(x * rate) ** 2)
 
@@ -308,11 +285,7 @@ class Exp2Feature(MyModel):
 class ExponentialModel(MyCompositeModel):
     """amp * np.exp(-x * rate) + offset"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         model = AmpFeature() * ExpFeature()
         super().__init__(model, OffsetFeature(), operator.add, **kwargs)
         
@@ -322,25 +295,30 @@ class ExponentialModel(MyCompositeModel):
 class ExpSineModel(MyCompositeModel):
     """amp * np.exp(-x * rate) * np.sin(2 * np.pi * freq * x + phase) + offset"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-
+    def __init__(self, **kwargs):
         model = AmpFeature() * ExpFeature() * SineFeature()
         super().__init__(model, OffsetFeature(), operator.add, **kwargs)
 
     __init__.__doc__ = 'Exponential sine model' + COMMON_INIT_DOC
 
+class ExpSineTiltModel(MyCompositeModel):
+    """amp * np.exp(-x * rate) * (toffset + np.sin(2 * np.pi * freq * x + phase)) + offset"""
+
+    def __init__(self, **kwargs):
+        model = AmpFeature() * ExpFeature() * (SineFeature() + OffsetFeature(prefix='t'))
+        super().__init__(model, OffsetFeature(), operator.add, **kwargs)
+
+    __init__.__doc__ = 'Exponential sine model' + COMMON_INIT_DOC
+
+    def guess(self, data, **kwargs):
+        pars = super().guess(data, **kwargs)
+        pars['toffset'].value = 0
+        return pars
 
 class GaussianModel(MyModel):
     """amp * np.exp(-(x - center)**2 / (2 * width**2)) + offset"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def exp(x, amp=1, center=0, width=1, offset=0):
             return amp * np.exp(-(x-center)**2/(2*width**2)) + offset
 
@@ -384,11 +362,7 @@ class GaussianModel(MyModel):
 class GaussianDecayModel(MyCompositeModel):
     """amp * np.exp(-(x * rate)**2) + offset"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-
+    def __init__(self, **kwargs):
         model = AmpFeature() * Exp2Feature()
         super().__init__(model, OffsetFeature(), operator.add, **kwargs)
 
@@ -398,11 +372,7 @@ class GaussianDecayModel(MyCompositeModel):
 class GaussianDecayWithShiftModel(MyCompositeModel):
     """amp * np.exp(-(x * gau_rate)**2 - (x * exp_rate)) + offset"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-
+    def __init__(self, **kwargs):
         model = AmpFeature() * Exp2Feature(prefix='gau_') * ExpFeature(prefix='exp_')
         super().__init__(model, OffsetFeature(), operator.add, **kwargs)
 
@@ -419,11 +389,7 @@ class ResonatorModel(MyModel):
     https://lmfit.github.io/lmfit-py/examples/example_complex_resonator_model.html
     """
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def linear_resonator(x, f0, Qi, Qc, phi, amp=1):
             Qc = Qc * np.exp(1j*phi)
             return amp * (1 - (Qi * Qc**-1 / (1 + 2j * Qi * (x - f0) / f0)))
@@ -475,11 +441,7 @@ class ResonatorModel_inverse(MyModel):
     more weights to those point around resonance. Hence ydata must be normalized.
     """
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def linear_resonator(x, f0=5e9, Qi=1e5, Qc=1e5, phi=0):
             """Returns 1/s21."""
             Qc = Qc * np.exp(1j*phi)
@@ -575,11 +537,7 @@ class ResonatorModel_inverse(MyModel):
 class TransmonModel(MyModel):
     """amp * np.exp(-(x - center)**2 / (2 * width**2)) + offset"""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise',
-                 **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-        
+    def __init__(self, **kwargs):
         def transmon_freq(x, xmax=0, fmax=6e9, xmin=0.5, fmin=2e9):
             """Frequency of transmon, following koch_charge_2007 Eq.2.18.
             Paper found at https://journals.aps.org/pra/abstract/10.1103/PhysRevA.76.042319
@@ -666,11 +624,7 @@ class GmonModel(MyCompositeModel):
     """Model fitting Gmon induced tunable coupling.
     WARNING: The fit is sensitive to initial value, which must be provided by user."""
 
-    def __init__(self, independent_vars=['x'], prefix='', nan_policy='raise', 
-                 with_slope=None, **kwargs):
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars})
-       
+    def __init__(self, with_slope=None, **kwargs):
         def coupling(x, r=0.9, period=1, shift=0):
             # delta = junc_phase(2*np.pi/period*(x-shift),r)
             delta = _rf_squid.delta(delta_ext=2*np.pi/period*(x-shift), 
@@ -755,17 +709,3 @@ class GmonModel(MyCompositeModel):
             (1,0), xycoords=ax.transAxes, va='bottom', ha='right')
 
         return ax
-
-# def junc_phase(delta_ext, r):
-#     # fsolve does not works with np.array.
-#     if isinstance(delta_ext, np.ndarray):
-#         # Solve the values one by one instead of a high-dimensional system (it is decoupled).
-#         delta = [fsolve(lambda d: de - _delta_ext(d, r), 0)[0] 
-#                 for de in delta_ext.ravel()]
-#         delta = np.array(delta).reshape(delta_ext.shape)
-#     else:
-#         delta = fsolve(lambda d: delta_ext - _delta_ext(d, r), 0)[0]
-#     return delta
-
-# def _delta_ext(delta, r):
-#     return delta + np.sin(delta) * r
