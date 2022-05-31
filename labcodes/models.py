@@ -677,16 +677,19 @@ class GmonModel(MyCompositeModel):
         ax.annotate(f"y0={cfit['offset']:.3f}", 
             (ax.get_xlim()[0], cfit['offset']), ha='left')
 
-        dip_x = (cfit['zero1']+cfit['zero2'])/2
         dip_y = cfit['offset'] + cfit['max_y_shift']
         ax.axhline(y=dip_y, **gs)
-        ax.axvline(x=dip_x, **gs)
-        ax.annotate((f"x={dip_x:.3f}\n"
-                     f"$\\Delta y_\\mathrm{{max}}={cfit['max_y_shift']:.4f}\\pm{cfit['max_y_shift_err']:.4f}$"), 
-            (dip_x, dip_y), va='bottom', ha='left')
+        ax.annotate(f"$\\Delta y_\\mathrm{{max}}={cfit['max_y_shift']:.4f}\\pm{cfit['max_y_shift_err']:.4f}$", 
+            (ax.get_xlim()[0], dip_y), va='bottom', ha='left')
 
         xmin, xmax = ax.get_xlim()
         for i in np.arange(-2,3):
+            dip_x = (cfit['zero1']+cfit['zero2'])/2 + i*cfit['period']
+            if (dip_x > xmin) and (dip_x < xmax):
+                ax.axvline(x=dip_x, **gs)
+                ax.annotate(f"    x={dip_x:.3f}",  # Push space for marking dip_y.
+                    (dip_x, dip_y), va='bottom', ha='left', rotation='vertical')
+
             shift = cfit['shift'] + i*cfit['period']
             if (shift > xmin) and (shift < xmax):
                 ax.axvline(x=shift, **gs)
@@ -697,13 +700,13 @@ class GmonModel(MyCompositeModel):
             if (zero1 > xmin) and (zero1 < xmax):
                 ax.axvline(x=zero1, **gs)
                 ax.annotate(f"x={zero1:.3f}", 
-                    (zero1, cfit['offset']), va='bottom', ha='right', rotation='vertical')
+                    (zero1, cfit['offset']), va='top', ha='right', rotation='vertical')
 
             zero2 = cfit['zero2'] + i*cfit['period']
             if (zero2 > xmin) and (zero2 < xmax):
                 ax.axvline(x=zero2, **gs)
                 ax.annotate(f"x={zero2:.3f}", 
-                    (zero2, cfit['offset']), va='bottom', ha='right', rotation='vertical')
+                    (zero2, cfit['offset']), va='top', ha='left', rotation='vertical')
 
         ax.annotate(f"$R=L_\\mathrm{{linear}}/L_{{j0}}={cfit['r']:.3f}\\pm{cfit['r_err']:.4f}$", 
             (1,0), xycoords=ax.transAxes, va='bottom', ha='right')
