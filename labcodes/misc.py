@@ -92,14 +92,17 @@ def inverse(func, y, x0=0, **kwargs):
     return x
 
 def _bound(f, x, xleft, xright, scale):
-    # f(x) = y
-    # x is scalar.
+    # f(x) = y, x is scalar.
+    if xleft > xright:
+        xleft, xright = xright, xleft  # Exchange to make sure xleft <= xright.
     x1, x2 = xleft, xright
     y1, y2 = f(x1), f(x2)
-    if (x1 <= x) and (x <= x2):
-        return f(x)
+    if x <= x1:
+        return (x-x1)*(y2-y1)/(x2-x1)*scale + y1
+    elif x >= x2:
+        return (x-x2)*(y2-y1)/(x2-x1)*scale + y2
     else:
-        return ((x-x1)*(y2-y1)/(x2-x1) + y1)*scale
+        return f(x)
 
 def bound(xleft, xright, scale=1):  # A decorator factory.
     """Decorate f(x, *arg, **kwargs) such that f(x) with x beyond [xleft, xright] 

@@ -45,7 +45,7 @@ ABBREV = {  # Some abbreviations.
     ' ': '_',
 }
 
-class LogName(object):  # Unify self.name, new_name, _get_plot_title()
+class LogName(object):
     """Handle metadatas of a LabRAD logfile."""
     def __init__(self, path, **kwargs):
         path = Path(path)
@@ -126,6 +126,7 @@ class LabradRead(object):
 
         df = self.df
         ax.plot(df[x_name], df[y_name], **kw)
+
         ax.grid(True)
         ax.set(
             xlabel=x_name,
