@@ -56,7 +56,7 @@ def multiples(period, shift, vmin, vmax):
     vs = np.arange(nmin, nmax+1) * period + shift
     return vs
 
-def inverse(func, y, x0=0, **kwargs):
+def inverse(func, y, x0=0., show=None, **kwargs):
     """Returns f^-1(y).
     
     Args:
@@ -66,6 +66,7 @@ def inverse(func, y, x0=0, **kwargs):
         y: float or np.array.
             if array, solve f^-1(y) elment by element.
         x0: the initial guess for the inverse function to search x.
+        show: (xmin, xmax) of region to plot. None to not plot.
     
     Retuns:
         x for which func(x, **kwargs) is close to y.
@@ -89,19 +90,30 @@ def inverse(func, y, x0=0, **kwargs):
         x = np.array(x).reshape(y.shape)
     else:
         x = fsolve(lambda xi: y - func(xi, **kwargs), x0=x0)[0]
+    if show:
+        px = np.linspace(*show)
+        fig, ax = plt.subplots()
+        ax.plot(px, func(px, **kwargs))
+        ax.plot(x0, func(x0, **kwargs), 'o', label='init', fillstyle='none')
+        ax.plot(x, func(x, **kwargs), 'x', label='find')
+        ax.legend()
+        plt.show()
     return x
 
 def _bound(f, x, xleft, xright, scale):
-    # f(x) = y
-    # x is scalar.
+    # f(x) = y, x is scalar.  # BUG: inverse works abnormally when scale != 1.
+    if xleft > xright:
+        xleft, xright = xright, xleft  # Exchange to make sure xleft <= xright.
     x1, x2 = xleft, xright
     y1, y2 = f(x1), f(x2)
-    if (x1 <= x) and (x <= x2):
-        return f(x)
+    if x <= x1:
+        return (x-x1)*(y2-y1)/(x2-x1)*scale + y1
+    elif x >= x2:
+        return (x-x2)*(y2-y1)/(x2-x1)*scale + y2
     else:
-        return ((x-x1)*(y2-y1)/(x2-x1) + y1)*scale
+        return f(x)
 
-def bound(xleft, xright, scale=1):  # A decorator factory.
+def bound(xleft, xright, scale=1., verbose=False):  # A decorator factory.
     """Decorate f(x, *arg, **kwargs) such that f(x) with x beyond [xleft, xright] 
     is obtained by linear extrapolation. Intended for `misc.inverse`.`"""
     def decorator(f):
@@ -109,8 +121,16 @@ def bound(xleft, xright, scale=1):  # A decorator factory.
         def wrapped_f(x, *args, **kwargs):
             def fx(x): return f(x, *args, **kwargs)
             if np.size(x) == 1:
+                if verbose:
+                    if (x < xleft) or (x > xright):
+                        print('WARNING: value {} out of bound [{},{}].'.format(x, xleft, xright))
                 return _bound(fx, x, xleft, xright, scale)
             else:
+                x = np.array(x)
+                if verbose:
+                    mask = (x < xleft) | (x > xright)
+                    if np.any(mask):
+                        print('WARNING: value {} out of bound [{},{}].'.format(x[mask], xleft, xright))
                 ys = [_bound(fx, xi, xleft, xright, scale) for xi in x]
                 return np.array(ys)
         return wrapped_f
