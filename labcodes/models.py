@@ -5,6 +5,7 @@ import operator
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import EngFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from lmfit import CompositeModel, Model
 import lmfit.models
 
@@ -617,6 +618,15 @@ class TransmonModel(MyModel):
         note_pos = (1,0) if cfit['xmin'] < cfit['xmax'] else (1,0.9)
         ax.annotate(f'R=$S_{{jj1}}/S_{{jj2}}$={cfit["area_ratio"]:.2f}', 
             note_pos, xycoords=ax.transAxes, va='bottom', ha='right')
+
+        divider = make_axes_locatable(ax)
+        ax2 = divider.append_axes('bottom', size='10%', pad=0.05, sharex=ax)
+
+        ax2.plot(cfit.xdata, cfit.fdata() - cfit.ydata, 'x')
+        ax2.axhline(0, color='C0')
+        ax2.set_xticklabels([])
+        ax2.set_ylabel('residues')
+        ax2.set_xlabel(ax.get_xlabel())
         return ax
 
 _rf_squid = calc.RF_SQUID()

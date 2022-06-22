@@ -6,6 +6,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from labcodes import plotter
 
 
@@ -80,8 +81,14 @@ class LogName(object):
         title = f'{self.dir}\\\n{filled}'
         return title
 
+    def title(self, *args, **kws):  # alias.
+        return self.as_plot_title(*args, **kws)
+
     def as_file_name(self, **kwargs):
         return replace(self.to_str(**kwargs), PATH_LEGAL)
+
+    def fname(self, *args, **kws):  # alias.
+        return self.as_file_name(*args, **kws)
 
 
 class LabradRead(object):
@@ -101,7 +108,7 @@ class LabradRead(object):
         else:
             return self.plot2d(**kwargs)
 
-    def plot1d(self, x_name=0, y_name=0, ax=None, **kwargs):
+    def plot1d(self, x_name=0, y_name=0, ax=None, lbs=None, **kwargs):
         """Quick line plot.
         
         Args:
@@ -116,21 +123,40 @@ class LabradRead(object):
             fig, ax = plt.subplots(tight_layout=True)
         else:
             fig = ax.get_figure()
+
         if isinstance(x_name, int):
             x_name = self.indeps[x_name]
-        if isinstance(y_name, int):
-            y_name = self.deps[y_name]
+        
+        if np.size(y_name) > 1:
+            # If multiple y_name is given.
+            if isinstance(y_name[0], int):
+                y_name = [self.deps[i] for i in y_name]
+            else:
+                pass
+        else:
+            # If only one y_name provided.
+            if isinstance(y_name, int):
+                y_name = self.deps[y_name]
+            else:
+                pass
+            y_name = [y_name,]
+        
+        if lbs is None:
+            lbs = y_name
             
         kw = dict(marker='.')
         kw.update(kwargs)
 
         df = self.df
-        ax.plot(df[x_name], df[y_name], **kw)
+        for y, lb in zip(y_name, lbs):
+            ax.plot(df[x_name], df[y], label=lb, **kw)
+        if np.size(y_name) > 1:
+            ax.legend()
 
         ax.grid(True)
         ax.set(
             xlabel=x_name,
-            ylabel=y_name,
+            ylabel=y_name[0],
             title=self.name.as_plot_title(),
         )
         return ax

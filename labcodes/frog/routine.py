@@ -84,7 +84,7 @@ def fit_resonator(logf, axs=None, i_start=0, i_end=-1, annotate='', init=False, 
     ax = cfit.model.plot(cfit, ax=ax, annotate=annotate, init=init)
     return cfit, ax
     
-def fit_coherence(logf, ax=None, model=None, xy=(0.6,0.9), fdata=500, kind=None, **kwargs):
+def fit_coherence(logf, ax=None, model=None, fdata=500, kind=None, **kwargs):
     if ax is None:
         ax = logf.plot1d(ax=ax, y_name='s1_prob')
 
@@ -120,7 +120,9 @@ def fit_coherence(logf, ax=None, model=None, xy=(0.6,0.9), fdata=500, kind=None,
 
     ax.plot(*cfit.fdata(fdata), 'r-', lw=1)
     ax.annotate(f'${symbol}\\approx {cfit["tau"]:,.2f}\\pm{cfit["tau_err"]:,.4f} {xname[-2:]}$', 
-        xy, xycoords='axes fraction')
+        (0.6,0.9), xycoords='axes fraction')
+    # ax.annotate(f'offset={cfit["offset"]:.2f}$\\pm${cfit["offset_err"]:.2f}', 
+    #     (0.95,0.1), xycoords='axes fraction', ha='right')
     return cfit, ax
 
 
@@ -246,8 +248,8 @@ def plot_ro_mat(logf, return_all=False, plot=True):
     """
     se = logf.df[logf.deps].mean()  # Remove the 'Runs' columns
     n_qs = int(np.sqrt(se.size))
-    labels = se.index.values.reshape(n_qs,n_qs)
-    ro_mat = se.values.reshape(n_qs,n_qs)
+    labels = se.index.values.reshape(n_qs,n_qs).T  # Transpose to assignment matrix we usually use. Check Carefully.
+    ro_mat = se.values.reshape(n_qs,n_qs).T
 
     if plot:
         fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,4))
@@ -378,6 +380,7 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
         rho_in = {k: qst(id, ro_mat_in) for k, id in in_ids.items()}
     
     rho_out = {k: qst(id, ro_mat_out) for k, id in out_ids.items()}
+    rho_out['0']
 
     chi = tomo.qpt(
         [rho_in[k] for k in ('0', 'x', 'y', '1')], 
