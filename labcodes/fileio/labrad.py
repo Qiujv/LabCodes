@@ -143,6 +143,9 @@ class LabradRead(object):
         
         if lbs is None:
             lbs = y_name
+        if 'label' in kwargs:
+            prefix = kwargs.pop('label')
+            lbs = [str(prefix) + i for i in lbs]
             
         kw = dict(marker='.')
         kw.update(kwargs)
