@@ -152,9 +152,12 @@ class CurveFit(object):
 
         ax.plot(self.xdata, self.ydata, 'bo')
         if self.result is None:
-            p_guess = self.model.guess(self.ydata, x=self.xdata)
-            y_guess = self.model.eval(p_guess, x=self.xdata)
-            ax.plot(self.xdata, y_guess, 'k--', label='guess')
+            try:
+                p_guess = self.model.guess(self.ydata, x=self.xdata)
+                y_guess = self.model.eval(p_guess, x=self.xdata)
+                ax.plot(self.xdata, y_guess, 'k--', label='guess')
+            except:
+                pass
         else:
             if plot_init is True:
                 ax.plot(self.xdata, self.result.init_fit, 'k--', label='initial fit')
