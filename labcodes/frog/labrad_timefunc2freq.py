@@ -73,3 +73,47 @@ if __name__ == '__main__':
     plt.plot(fs, np.imag(ys_f))
 
 # %%
+def test_pulse(tp, fp):
+    t0 = np.min(tp)
+    t1 = np.max(tp)
+    def time_func(t):
+        return np.interp(t, tp, fp)
+
+    def freq_func(f):
+        # Pad time series for dense frequency points.
+        pad_len = 200000
+        vt = np.arange(t0-pad_len, t1+pad_len)
+        # Round size padded time series to power of 2, for sake of faster FFT.
+        n_pts = 2**int(np.ceil(np.log2(vt.size)))
+        margin = (n_pts-np.ceil(t1-t0)) / 2.
+        pre_pad_len = int(np.ceil(margin))
+        post_pad_len = int(np.floor(margin))
+        vt = np.arange(t0-pre_pad_len, t1+post_pad_len)
+        assert np.ceil(np.log2(vt.size)) == np.log2(vt.size)
+
+        # FFT and linear interpolation.
+        vy = time_func(vt)
+        freq = np.fft.fftfreq(n_pts)
+        vf = np.fft.fft(vy)*np.exp(-2j*np.pi*(t0-pre_pad_len)*freq)
+        idx = np.argsort(freq)
+        freq = freq[idx]
+        vf = vf[idx]
+        return np.interp(f,freq,vf.real) + 1j*np.interp(f,freq,vf.imag)
+        
+    # return Envelope(time_func, freq_func, start=t0, end=t1)
+    return time_func, freq_func
+
+if __name__ == '__main__':
+    tp = np.linspace(0.1,200)
+    fp = np.sin(tp/200*np.pi)
+    tp = np.hstack([tp, tp+400])
+    fp = np.hstack([fp, fp])
+    time_func, freq_func = test_pulse(tp,fp)
+    ts = np.arange(-10, 1000, 1)
+    fs = np.arange(-0.5, 0.5, 0.001)
+    ys = time_func(ts)
+    ys_f = freq_func(fs)
+    plt.plot(ts, ys)
+    plt.figure()
+    plt.plot(fs, np.real(ys_f))
+    plt.plot(fs, np.imag(ys_f))

@@ -624,9 +624,10 @@ class TransmonModel(MyModel):
 
         ax2.plot(cfit.xdata, cfit.fdata() - cfit.ydata, 'x')
         ax2.axhline(0, color='C0')
-        ax2.set_xticklabels([])
         ax2.set_ylabel('residues')
+        ax2.tick_params(axis='y', labelsize='small')
         ax2.set_xlabel(ax.get_xlabel())
+        ax.set_xlabel('')
         return ax
 
 _rf_squid = calc.RF_SQUID()
