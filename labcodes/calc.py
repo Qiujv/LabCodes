@@ -352,3 +352,42 @@ class TCoupler(Calculator):
 
 
 # TODO: resonator: c, g, chi, Q, cpl_len...
+
+class ThermalDistribution(Calculator):
+    freq = 4e9
+    temp = 50e-3
+
+    @dept
+    def E(self, freq):
+        return const.h * freq
+
+    @dept
+    def ET(self, temp):
+        return const.Boltzmann * temp
+
+    @dept
+    def boltzmann(self, E, ET):
+        return 1 / np.exp(E/ET)
+
+    @dept
+    def bose(self, E, ET):
+        return 1 / (np.exp(E/ET) - 1)
+
+    @dept
+    def fermi(self, E, ET):
+        return 1 / (np.exp(E/ET) + 1)
+
+# if __name__ == '__main__':
+#     dist = ThermalDistribution(freq=4e9)
+#     t = np.linspace(30e-3, 80e-3)
+#     fig, ax = plt.subplots()
+#     ax.plot(t, dist.boltzmann(temp=t), label='Boltzmann dist.')
+#     ax.plot(t, dist.bose(temp=t), label='Bose dist.')
+#     ax.plot(t, dist.fermi(temp=t), label='Fermi-Dirac dist.')
+#     ax.grid(True)
+#     ax.legend()
+#     ax.set(
+#         xlabel='Temperature (K)',
+#         ylabel='Thermal population',
+#         title=f'f={dist.freq/1e9:.2f} GHz',
+#     )

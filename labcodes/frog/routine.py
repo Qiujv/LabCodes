@@ -84,7 +84,7 @@ def fit_resonator(logf, axs=None, i_start=0, i_end=-1, annotate='', init=False, 
     ax = cfit.model.plot(cfit, ax=ax, annotate=annotate, init=init)
     return cfit, ax
     
-def fit_coherence(logf, ax=None, model=None, fdata=500, kind=None, **kwargs):
+def fit_coherence(logf, ax=None, model=None, kind=None, xmax=None, **kwargs):
     if ax is None:
         ax = logf.plot1d(ax=ax, y_name='s1_prob')
 
@@ -106,18 +106,25 @@ def fit_coherence(logf, ax=None, model=None, fdata=500, kind=None, **kwargs):
         symbol = '\\tau'
     if model:
         mod = model
+
     for indep in logf.indeps:
         if indep.startswith('delay'):
             xname = indep
 
+    if xmax is None:
+        mask = np.ones(logf.df.shape[0], dtype='bool')
+    else:
+        mask = logf.df[xname].values <= xmax
+
     cfit = fitter.CurveFit(
-        xdata=logf.df[xname].values,
-        ydata=logf.df['s1_prob'].values,
+        xdata=logf.df[xname].values[mask],
+        ydata=logf.df['s1_prob'].values[mask],
         model=mod,
         hold=True,
     )
     cfit.fit(**kwargs)
 
+    fdata = np.linspace(logf.df[xname].min(), logf.df[xname].max(), 5*logf.df.shape[0])
     ax.plot(*cfit.fdata(fdata), 'r-', lw=1)
     ax.annotate(f'${symbol}\\approx {cfit["tau"]:,.2f}\\pm{cfit["tau_err"]:,.4f} {xname[-2:]}$', 
         (0.6,0.9), xycoords='axes fraction')
@@ -242,7 +249,7 @@ def plot_cramsey(cfit0, cfit1, ax=None):
     ax.grid(True)
     return ax
 
-def plot_ro_mat(logf, return_all=False, plot=True):
+def plot_ro_mat(logf, ax=None, return_all=False):
     """Plot assignment fidelity matrix along with the labels.
     For data produced by visibility experiment.
     """
@@ -251,18 +258,13 @@ def plot_ro_mat(logf, return_all=False, plot=True):
     labels = se.index.values.reshape(n_qs,n_qs).T  # Transpose to assignment matrix we usually use. Check Carefully.
     ro_mat = se.values.reshape(n_qs,n_qs).T
 
-    if plot:
-        fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8,4))
-        fig.suptitle(logf.name.as_plot_title())
-        ax.set_title('assgiment matrix')
-        ax2.set_title('labels')
+    if ax:
+        ax.set_title(logf.name.as_plot_title())
         plotter.plot_mat2d(ro_mat, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
-        plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
-    else:
-        ax, ax2 = None, None
-        
+        print('Matrix labels:\n', labels)
+
     if return_all:
-        return ro_mat, labels, ax, ax2
+        return ro_mat, labels, ax
     else:
         return ro_mat
 

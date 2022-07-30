@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 from functools import wraps
 
@@ -56,48 +57,56 @@ def multiples(period, shift, vmin, vmax):
     vs = np.arange(nmin, nmax+1) * period + shift
     return vs
 
-def inverse(func, y, x0=0., show=None, **kwargs):
+def inverse(func, y, x0=None, xlim=None, fast=False, show=False):
     """Returns f^-1(y).
     
     Args:
-        func: callable(x, **kwargs) -> y. 
+        func: callable(x) -> y. 
             Only function of single variable is supported, i.e. no high dimensional system.
-            The function should be monotonic, otherwise consider decorate it with `misc.bound`.
+            The function should be monotonic within xlim.
         y: float or np.array.
             if array, solve f^-1(y) elment by element.
         x0: the initial guess for the inverse function to search x.
-        show: (xmin, xmax) of region to plot. None to not plot.
+        xlim: region where the solution cannot lay beyond. also used for guess x0 from None.
     
     Retuns:
-        x for which func(x, **kwargs) is close to y.
-
-    Examples:
-        def f(x, r):
-            return x + r*np.sin(x)
-        x = np.linspace(0, 2*np.pi)
-        y = f(x, r=1)
-        plt.plot(x, y)
-        plt.plot(inverse(f, y, r=1), y)  # shold have the same shape as above.
+        x for which func(x) is close to y.
     """
-    if isinstance(y, np.ndarray) and isinstance(x0, np.ndarray):
-        # Solve the values one by one instead of a high-dimensional system (it is decoupled).
-        x = [fsolve(lambda xi: yi - func(xi, **kwargs), x0=x0i)[0] 
-            for yi, x0i in (y.ravel(), x0.ravel())]
-        x = np.array(x).reshape(y.shape)
-    elif isinstance(y, np.ndarray):
-        x = [fsolve(lambda xi: yi - func(xi, **kwargs), x0=x0)[0] 
-            for yi in y.ravel()]
-        x = np.array(x).reshape(y.shape)
+    if xlim:
+        xlower, xupper = xlim
+        if func(xupper) < func(xlower):
+            xlower, xupper = xupper, xlower
+        func = bound(*np.sort(xlim))(func)
+    
+    if x0 is None:
+        if xlim:
+            # Find rough solution with interplotation, for fast fsolve.
+            xspace = np.linspace(xlower, xupper, 1000)
+            x0 = np.interp(y, func(xspace), xspace)
+        else:
+            x0 = 0.
+
+    if not isinstance(y, np.ndarray):
+        x = fsolve(lambda xi: y - func(xi), x0=x0)[0]
     else:
-        x = fsolve(lambda xi: y - func(xi, **kwargs), x0=x0)[0]
-    if show:
-        px = np.linspace(*show)
-        fig, ax = plt.subplots()
-        ax.plot(px, func(px, **kwargs))
-        ax.plot(x0, func(x0, **kwargs), 'o', label='init', fillstyle='none')
-        ax.plot(x, func(x, **kwargs), 'x', label='find')
+        x0 = x0 * np.ones(y.shape)
+        if fast is True:
+            x = x0
+            if xlim is None: print('WARNING: fast inverse without xlim simply returns x0.')
+        else:
+            # NOTE: Could be time-consuming when y.size is large and x0 is bad.
+            x = [fsolve(lambda xi: yi - func(xi), x0=x0i)[0] 
+                 for yi, x0i in zip(y.ravel(), x0.ravel())]
+        x = np.array(x).reshape(y.shape)
+
+    if show is True:
+        _, ax = plt.subplots()
+        ax.plot(x, y, label='y')  # Assumes right solution found.
+        ax.plot(x0, func(x0), 'o', label='init', fillstyle='none')
+        ax.plot(x, func(x), 'x', label='find')
         ax.legend()
-        plt.show()
+        plt.show(block=True)
+
     return x
 
 def _bound(f, x, xleft, xright, scale):

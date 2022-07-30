@@ -142,7 +142,10 @@ class LabradRead(object):
             y_name = [y_name,]
         
         if lbs is None:
-            lbs = y_name
+            if len(y_name) == 1:
+                lbs = ['']
+            else:
+                lbs = y_name
         if 'label' in kwargs:
             prefix = kwargs.pop('label')
             lbs = [str(prefix) + i for i in lbs]
