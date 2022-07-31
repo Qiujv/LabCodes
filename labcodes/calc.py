@@ -3,14 +3,19 @@
 import inspect
 from functools import wraps
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as const
-import matplotlib.pyplot as plt
+from matplotlib.ticker import EngFormatter
 from scipy.optimize import fsolve
+
+from labcodes import plotter
 
 Phi_0 = const.h / (2*const.e)  # Flux quantum.
 
 # NOTE: Quantities here are in SI units unless noted.
+# NOTE: Energy, angular velocity are converted into Hz.
 
 def dept(f):
     """Wrap function to be a dependent on object attrbites.
@@ -72,7 +77,7 @@ class Capacitor(Calculator):
     c = 100e-15
 
     @dept  # i.e. Ec = dept(Ec)(self, **kwargs)
-    def Ec(self, c, **kw):  # kw for passing arguments through.
+    def Ec(self, c):
         """Ec in Hz"""
         return const.e**2 / (2*c) / const.h  # in Hz instead of J.
 
@@ -83,24 +88,24 @@ class Junction(Calculator):
     rs_const = 650 * 1e-6**2
 
     @dept
-    def s(self, w, h, **kw):
+    def s(self, w, h):
         return w*h
 
     @dept
-    def rn(self, s, rs_const, **kw):
+    def rn(self, s, rs_const):
         """Junction resistance."""
         return rs_const / (s)
 
     @dept
-    def Lj0(self, rn, **kw):
+    def Lj0(self, rn):
         return 20.671 * rn/1e3 / (1.8*np.pi**2) * 1e-9  # Formula from ZYP.
 
     @dept
-    def Ic(self, Lj0, **kw):
+    def Ic(self, Lj0):
         return Phi_0 / (2*np.pi*Lj0)
 
     @dept
-    def Ej(self, Ic, **kw):
+    def Ej(self, Ic):
         """Ej in Hz."""
         return Ic*Phi_0 / (2*np.pi) / const.h  # Hz
 
@@ -119,40 +124,74 @@ class Transmon(Capacitor):
         self.jj.Ej = value
 
     @dept
-    def E10(self, Ec, Ej, **kw):
+    def E10(self, Ec, Ej):
         """E10 in Hz."""
         return np.sqrt(8*Ec*Ej) - Ec  # Hz.
 
     @dept
-    def Em(self, m, Ec, Ej, **kw):
+    def Em(self, m, Ec, Ej):
         """Energy of levels, m=0, 1, 2..., in Hz."""
-        return m*np.sqrt(8*Ec*Ej) - Ec/12 * (6*m**2 + 6*m + 3)  # Hz
+        return m*np.sqrt(8*Ec*Ej) - Ec/12 * (6*m**2 + 6*m + 3)  # Hz.
+
+    @dept
+    def Lq(self, E10, Ec):
+        return 2*Ec*const.h / (2*np.pi*E10*const.e)**2  # H.
+
+    def demo_Ej_vs_area(self, w=None):
+        if w is None: w = np.linspace(50e-9,1e-6)
+        jj = Junction(w=w)
+        qb = self.new(jj=jj)
+
+        fig, ax = plt.subplots(tight_layout=True)
+        ax.set(
+            title='Ej ~ jj area linearly',
+            xlabel='Junc area ($um^2$)',
+            ylabel='Ej (GHz)',
+        )
+        ax.grid(True)
+        ax.plot(jj.s()/1e-12, jj.Ej()/1e9)
+        def s2w(s): return s / (jj.h/1e-6)
+        def w2s(w): return (jj.h/1e-6) * w
+        secx = ax.secondary_xaxis('top', functions=(s2w, w2s))
+        secx.set_xlabel(f'Junc width (um) (jjh={jj.h/1e-6}um)')
+        # def ej2e(Ej): return qb.E10(Ej=Ej)
+        # from labcodes.misc import inverse
+        # e2ej = lambda E10: inverse(ej2e, E10, x0=qb.E10())
+        def ej2e(Ej): return np.interp(Ej, qb.E10()/1e9, qb.Ej()/1e9)
+        def e2ej(E10): return np.interp(E10, qb.Ej()/1e9, qb.E10()/1e9)
+        secy = ax.secondary_yaxis('right', functions=(ej2e, e2ej))
+        secy.set_ylabel(f'E10 (GHz) (Ec={qb.Ec()/1e6:.1f}MHz)')
+
+        return ax
+
+    @dept
+    def demo_Lq_vs_Lj0(self, Lj0=None):
+        if Lj0 is None: Lj0 = np.linspace(8e-9,13e-9)
+        qb = self.new()
+        qb.jj.Lj0 = np.linspace(8e-9,13e-9)
+
+        fig, ax = plt.subplots()
+        ax.plot(qb.jj.Lj0/1e-9, qb.jj.Lj0/1e-9, 'r-', label='$L_{j0}$')
+        norm = mpl.colors.Normalize(10, 300)
+        cm = plt.get_cmap('gray')
+        for c in np.linspace(norm.vmin,norm.vmax,11)*1e-15:
+            ax.plot(qb.jj.Lj0/1e-9, 1/(2*np.pi*qb.E10(c=c))**2 / c / 1e-9, '--', color=cm(norm(c/1e-15)))
+
+        cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cm), ax=ax, label='capacitance (fF)')
+        ax.set(
+            title='$L_q$ vs $L_{j0}$',
+            xlabel='$L_{j0}$ (nH)',
+            ylabel='$L_q=1/\\omega^2 C$ (nH)'
+        )
+        ax.legend()
+        return ax
 
 
-# if __name__ == '__main__':
-#     jj = Junction(w=np.linspace(50e-9,1e-6))
-#     qb = Transmon(jj=jj)
-
-#     fig, ax = plt.subplots(tight_layout=True)
-#     ax.set(
-#         title='Ej ~ jj area linearly',
-#         xlabel='Junc area ($um^2$)',
-#         ylabel='Ej (GHz)',
-#     )
-#     ax.grid(True)
-#     ax.plot(jj.s()/1e-12, jj.Ej()/1e9)
-#     def s2w(s): return s / (jj.h/1e-6)
-#     def w2s(w): return (jj.h/1e-6) * w
-#     secx = ax.secondary_xaxis('top', functions=(s2w, w2s))
-#     secx.set_xlabel(f'Junc width (um) (jjh={jj.h/1e-6}um)')
-#     # def ej2e(Ej): return qb.E10(Ej=Ej)
-#     # from labcodes.misc import inverse
-#     # e2ej = lambda E10: inverse(ej2e, E10, x0=qb.E10())
-#     def ej2e(Ej): return np.interp(Ej, qb.E10()/1e9, qb.Ej()/1e9)
-#     def e2ej(E10): return np.interp(E10, qb.Ej()/1e9, qb.E10()/1e9)
-#     secy = ax.secondary_yaxis('right', functions=(ej2e, e2ej))
-#     secy.set_ylabel(f'E10 (GHz) (Ec={qb.Ec()/1e6:.1f}MHz)')
-#     plt.show()
+if __name__ == '__main__':
+    qb = Transmon()
+    # qb.demo_ej_vs_area(w=np.linspace(50e-9,1e-6))
+    qb.demo_Lq_vs_Lj0()
+    plt.show()
 
 
 def _delta_ext(delta, L_linear, Lj0):
@@ -178,29 +217,32 @@ class RF_SQUID(Calculator):
         self.jj.Lj0 = value
 
     @dept
-    def delta(self, delta_ext, L_linear, Lj0, **kw):
+    def delta(self, delta_ext, L_linear, Lj0):
         """Junction phase difference in presence of external bias."""
         delta = _vsolve(delta_ext, L_linear, Lj0)
         return delta
 
-# if __name__ == '__main__':
-#     from labcodes import plotter
+    def demo(self, delta_ext=None):
+        if delta_ext is None: np.linspace(0,2*np.pi)
+        squid = self.new(delta_ext=delta_ext)
 
-#     squid = RF_SQUID(delta_ext=np.linspace(0,2*np.pi))
-#     r = squid.L_linear / squid.Lj0()
-    
-#     fig, ax = plt.subplots()
-#     ax.set(
-#         title=f'RF SQUID, r=$L_{{linear}}/L_{{j0}}$={r:.3f}',
-#         xlabel='Delta_ext (rad)',
-#         ylabel='Delta (rad)',
-#     )
-#     ax.xaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
-#     ax.xaxis.set_major_formatter(plotter.misc.multiple_formatter())
-#     ax.yaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
-#     ax.yaxis.set_major_formatter(plotter.misc.multiple_formatter())
-#     ax.grid()
-#     ax.plot(squid.delta_ext, squid.delta())
+        fig, ax = plt.subplots()
+        r = squid.L_linear / squid.Lj0()
+        ax.set(
+            title=f'RF SQUID, r=$L_{{linear}}/L_{{j0}}$={r:.3f}',
+            xlabel='Delta_ext (rad)',
+            ylabel='Delta (rad)',
+        )
+        ax.xaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
+        ax.xaxis.set_major_formatter(plotter.misc.multiple_formatter())
+        ax.yaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
+        ax.yaxis.set_major_formatter(plotter.misc.multiple_formatter())
+        ax.grid()
+        ax.plot(squid.delta_ext, squid.delta())
+
+# if __name__ == '__main__':
+#     squid = RF_SQUID()
+#     squid.demo(delta_ext=np.linspace(0,2*np.pi))
 #     plt.show()
 
 class Gmon(RF_SQUID):
@@ -208,40 +250,9 @@ class Gmon(RF_SQUID):
     Lw = 0.1e-9
     delta_ext = np.pi  # The maximal coupling point.
 
-    w1 = 4e9
-    w2 = 4e9
-    L1 = 15e-9
-    L2 = 15e-9
-
     @dept
-    def L_linear(self, Lg, Lw, **kw):  # Reloading L_linear from parent class.
+    def L_linear(self, Lg, Lw):  # Reloading L_linear from parent class.
         return 2*Lg + Lw
-
-    @dept
-    def M(self, Lj0, Lg, Lw, delta, **kw):
-        return Lg**2 / (2*Lg + Lw + Lj0/np.cos(delta))
-
-    @dept
-    def g(self, M, L1, L2, w1, w2, Lg, **kw):
-        return 0.5 * M / np.sqrt((L1+Lg)*(L2+Lg)) * np.sqrt(w1*w2)
-
-    @dept
-    def w1_shift(self, g, Lg, L1, L2, **kw):
-        return g * np.sqrt((Lg+L2) / (Lg+L1))
-
-    @dept
-    def kappa(self, g, wFSR, **kw):
-        """Decay rate to multimode resonator, by Fermi's golden rule.
-        In same unit as arguments."""
-        # No unit conversion! The 2*pi comes from intergration of sin(x)^2/x^2 
-        # filter function by sinusoidal drive signal (square wave also has this 
-        # form). For detail please refer to textbook about time-depedent perturbation.
-        return 2*np.pi * g**2 / wFSR
-
-    @dept
-    def tau(self, kappa):
-        """Decay time (s) related to kappa (Hz)."""
-        return 1/(2*np.pi*kappa)
 
     @dept
     def off_bias(self, L_linear, Lj0):
@@ -253,26 +264,59 @@ class Gmon(RF_SQUID):
         """Delta_ext where coupling is maximal (negative)."""
         return np.pi/2 - (L_linear / Lj0)
 
+    @dept
+    def M_max(self, Lj0, Lg, Lw):
+        """Maximal M (negative)."""
+        return Lg**2 / (2*Lg + Lw - Lj0)
+
+    @dept
+    def M(self, Lj0, Lg, Lw, delta):
+        return Lg**2 / (2*Lg + Lw + Lj0/np.cos(delta))
+
+    @dept
+    def w1_shift(self, g, Lg, L1, L2):
+        return g * np.sqrt((Lg+L2) / (Lg+L1))
+
+    @dept
+    def g(self, M, L1, L2, w1, w2, Lg):
+        return 0.5 * M / np.sqrt((L1+Lg)*(L2+Lg)) * np.sqrt(w1*w2)
+
+    @dept
+    def tau(self, f, M, Lq, Z):
+        """1/kappa for qubit coupling to cable. f in Hz."""
+        return Lq*Z / (2*np.pi*f*M)**2
+
+    def demo(self, delta_ext=None):
+        if delta_ext is None: delta_ext = np.linspace(0,2*np.pi,200)
+        gmon = self.new(delta_ext=delta_ext)
+
+        r = gmon.L_linear() / gmon.Lj0
+
+        fig, ax = plt.subplots()
+        ax.set(
+            title=f'Gmon, r=$L_{{linear}}/L_{{j0}}$={r:.3f}',
+            xlabel='Delta_ext (rad)',
+            ylabel='Mutual inductance L (nH)',
+        )
+        ax.grid()
+        ax.xaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
+        ax.xaxis.set_major_formatter(plotter.misc.multiple_formatter())
+
+        ax.plot(gmon.delta(), gmon.M()/1e-9, label='vs delta')
+        ax.plot(gmon.delta_ext, gmon.M()/1e-9, label='vs delta_ext')
+        ax.legend()
+        return ax
+
 # if __name__ == '__main__':
-#     from labcodes import plotter
-
-#     gmon = Gmon(delta_ext=np.linspace(0,2*np.pi,200), Lj0=0.65e-9)
-#     r = gmon.L_linear() / gmon.Lj0
-
-#     fig, ax = plt.subplots()
-#     ax.set(
-#         title=f'Gmon, r=$L_{{linear}}/L_{{j0}}$={r:.3f}',
-#         xlabel='Delta_ext (rad)',
-#         ylabel='Mutual inductance L (nH)',
-#     )
-#     ax.grid()
-#     ax.xaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
-#     ax.xaxis.set_major_formatter(plotter.misc.multiple_formatter())
-
-#     ax.plot(gmon.delta(), gmon.M()/1e-9, label='vs delta')
-#     ax.plot(gmon.delta_ext, gmon.M()/1e-9, label='vs delta_ext')
-#     ax.legend()
+#     gmon = Gmon(Lj0=0.65e-9)
+#     gmon.demo(delta_ext=np.linspace(0,2*np.pi,200))
 #     plt.show()
+
+# if __name__ == '__main__':
+#     gmon = Gmon()
+#     factor = gmon.M_max(Lj0=0.66e-9)**2 * 36  # kappa ~= 1/36 ns-1
+#     tau = factor / gmon.M_max(Lj0=0.6e-9)**2
+#     print(f'tau: {tau:.2f} ns')
 
 class TCoupler(Calculator):
     wc = 5e9
@@ -287,39 +331,54 @@ class TCoupler(Calculator):
     c12 = 0.02e-15
 
     @dept
-    def eta(self, c1c, c2c, c12, cc, **kw):
+    def eta(self, c1c, c2c, c12, cc):
         """Dimensionless ratio showing indirect coupling strength comparing to direct one."""
         return (c1c*c2c) / (c12*cc)
 
     @dept
-    def g12(self, c12, c1, c2, w1, w2, **kw):
+    def g12(self, c12, c1, c2, w1, w2):
         """Coupling by C12 only, not including the whole capacitance network."""
         return 0.5 * c12 / np.sqrt(c1*c2) * np.sqrt(w1*w2)  # by c12 only, not include C network.
 
     @dept
-    def g_in(self, wc, w1, w2, eta, g12, **kw):
+    def g_in(self, wc, w1, w2, eta, g12):
         """Indirect coupling via 010 and 111 state."""
         f_in = wc/4 * (1/(w1-wc) + 1/(w2-wc) - 1/(w1+wc) - 1/(w2+wc)) * eta
         return g12 * f_in
 
     @dept
-    def g_di(self, eta, g12, **kw):
+    def g_di(self, eta, g12):
         """Direct coupling via capatance network."""
         return g12 * (eta + 1)
 
     @dept
-    def g(self, g_di, g_in, **kw):
+    def g(self, g_di, g_in):
         """The tunable coupling with wc."""
         return g_di + g_in
 
     @dept
-    def g1c(self, w1, wc, c1, cc, c1c, **kw):
+    def g1c(self, w1, wc, c1, cc, c1c):
         return 0.5 * c1c / np.sqrt(c1*cc) * np.sqrt(w1 * wc)
+
+    def demo(self, wc=None):
+        if wc is None: wc = np.linspace(4.3e9, 7e9)
+
+        fig, ax = plt.subplots(tight_layout=True)
+        ax.set(
+            title='TCoupler',
+            xlabel='Coupler freq (Hz)',
+            ylabel='Qubits swap frequency (Hz)',
+        )
+        ax.xaxis.set_major_formatter(EngFormatter(places=1))
+        ax.yaxis.set_major_formatter(EngFormatter(places=1))
+        ax.grid()
+
+        ax.plot(wc, 2*self.g(wc=wc))
+
+        return ax
 
 
 # if __name__ == '__main__':
-#     from matplotlib.ticker import EngFormatter
-
 #     tcplr = TCoupler()
 #     # With default it should be 1.5 and -1.38, same as @yan_tunable_2018.
 #     print('The directive coupling factor is:\n', tcplr.g_di()/tcplr.g12())
@@ -327,7 +386,6 @@ class TCoupler(Calculator):
 
 #     # With another set of values, This plot should recovers fig.2(b) in @yan_tunable_2018.
 #     tcplr = TCoupler(
-#         wc=np.linspace(4.3e9, 7e9),
 #         c1=70e-15,
 #         c2=72e-15,
 #         cc=200e-15,
@@ -337,17 +395,7 @@ class TCoupler(Calculator):
 #         w1=4e9,
 #         w2=4e9,
 #     )
-
-#     fig, ax = plt.subplots(tight_layout=True)
-#     ax.set(
-#         title='TCoupler',
-#         xlabel='Coupler freq (Hz)',
-#         ylabel='Qubits swap frequency (Hz)',
-#     )
-#     ax.xaxis.set_major_formatter(EngFormatter(places=1))
-#     ax.yaxis.set_major_formatter(EngFormatter(places=1))
-#     ax.grid()
-#     ax.plot(tcplr.wc, 2*tcplr.g())
+#     ax = tcplr.demo(wc=np.linspace(4.3e9, 7e9))
 #     plt.show()
 
 
@@ -377,17 +425,111 @@ class ThermalDistribution(Calculator):
     def fermi(self, E, ET):
         return 1 / (np.exp(E/ET) + 1)
 
+    def demo(self, t=None):
+        if t is None: t = np.linspace(30e-3, 80e-3)
+        dist = self.new()
+
+        fig, ax = plt.subplots()
+        ax.plot(t, dist.boltzmann(temp=t), label='Boltzmann dist.')
+        ax.plot(t, dist.bose(temp=t), label='Bose dist.')
+        ax.plot(t, dist.fermi(temp=t), label='Fermi-Dirac dist.')
+        ax.grid(True)
+        ax.legend()
+        ax.set(
+            xlabel='Temperature (K)',
+            ylabel='Thermal population',
+            title=f'f={dist.freq/1e9:.2f} GHz',
+        )
+        return ax
+
 # if __name__ == '__main__':
-#     dist = ThermalDistribution(freq=4e9)
-#     t = np.linspace(30e-3, 80e-3)
-#     fig, ax = plt.subplots()
-#     ax.plot(t, dist.boltzmann(temp=t), label='Boltzmann dist.')
-#     ax.plot(t, dist.bose(temp=t), label='Bose dist.')
-#     ax.plot(t, dist.fermi(temp=t), label='Fermi-Dirac dist.')
-#     ax.grid(True)
-#     ax.legend()
-#     ax.set(
-#         xlabel='Temperature (K)',
-#         ylabel='Thermal population',
-#         title=f'f={dist.freq/1e9:.2f} GHz',
-#     )
+#     dist = ThermalDistribution(f=4e9)
+#     dist.demo()
+
+class Cable(Calculator):
+    fFSR = 1e6  # Hz
+    Ll = 216.25e-9  # H/m
+    Cl = 86.5e-12  # F/m
+
+    @dept
+    def wFSR(self, fFSR):
+        return 2*np.pi*fFSR
+
+    @dept
+    def Z(self, Ll, Cl):
+        return np.sqrt(Ll/Cl)
+
+    @dept
+    def vp(self, Ll, Cl):
+        return 1/np.sqrt(Ll*Cl)
+
+    @dept
+    def len(self, fFSR, vp):
+        return vp/(2*fFSR)  # m.
+
+    @dept
+    def Lm(self, fFSR, Z):
+        return Z/(4*fFSR)  # H.
+
+    @dept
+    def tau(self, g, fFSR):
+        """g in Hz, returns tau in s."""
+        return fFSR / (4*np.pi**2 * g**2)  # s.
+
+    @dept 
+    def g(self, tau, fFSR):
+        """tau in s, returns g in Hz."""
+        return np.sqrt(fFSR / (4*np.pi**2 * tau))  # Hz.
+
+    # @dept
+    # def kappa(self, g, wFSR):
+    #     """Fermi's golden rule. g, wFSR in s-1, returns kappa in s-1."""
+    #     # No unit conversion! The 2*pi comes from intergration of sin(x)^2/x^2 
+    #     # filter function by sinusoidal drive signal (square wave also has this 
+    #     # form). For detail please refer to textbook about time-depedent perturbation.
+    #     return 2*np.pi * g**2 / wFSR
+
+    def demo(self, Ll=None):
+        if Ll is None: Ll = np.linspace(200, 220)
+        cb = self.new()
+
+        fig, ax = plt.subplots()
+        ax.set(
+            title=f'$f_\\mathrm{{FSR}}={cb.fFSR/1e6:.4f} \\mathrm{{MHz}}$',
+            xlabel='$L_l$ (nH)',
+            ylabel='Cable length (m)',
+        )
+        ax2 = ax.twinx()
+        ax2.set_ylabel('Impendance ($\\Omega$)', color='C1')
+        ax2.tick_params('y', labelcolor='C1')
+
+        ax3 = ax.twinx()
+        ax3.spines.right.set_position(("axes", 1.2))
+        ax3.set_ylabel('Inductance (nH)', color='C2')
+        ax3.tick_params('y', labelcolor='C2')
+
+        Ll = np.linspace(200, 220)
+        ax.plot(Ll, cb.len(Ll=Ll*1e-9))
+        ax2.plot(Ll, cb.Z(Ll=Ll*1e-9), color='C1')
+        ax3.plot(Ll, cb.Lm(Ll=Ll*1e-9)/1e-9, color='C2', ls=':')
+
+        plotter.cursor(ax=ax, x=cb.Ll/1e-9)
+        # ax.hlines(y=cb.len(), xmin=cb.Ll, xmax=220, color='k', alpha=0.3, ls='--')
+        # ax2.hlines(y=cb.Z(), xmax=cb.Ll, xmin=200, color='k', alpha=0.3, ls='--')
+        ax.grid(True)
+        return ax, ax2, ax3
+
+# if __name__ == '__main__':
+#     qb = Transmon(c=95e-15, jj=Junction(Lj0=15e-9))
+#     print(f'Ec: {qb.Ec()/1e6:.1f} MHz, E10: {qb.E10()/1e9:.3f} GHz')
+
+#     cb = Cable(fFSR=1.8689e6)
+#     print(f'len: {cb.len():.1f} m, Lm: {cb.Lm()/1e-9:.1f} nH')
+
+#     gmon = Gmon()
+#     freq_shift = gmon.w1_shift(g=cb.g(tau=22.2e-9), L1=qb.Lq(), L2=cb.Lm())
+#     print(f'freq shift: {freq_shift/1e6:.2f} MHz')
+
+#     cb.demo()
+#     plt.show()
+
