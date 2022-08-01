@@ -8,7 +8,7 @@ from labcodes.plotter.misc import cursor
 
 
 import matplotlib as mpl
-
+# https://matplotlib.org/stable/tutorials/introductory/customizing.html#the-default-matplotlibrc-file
 mpl.rcParams['pdf.fonttype'] = 42  # Make saved pdf text editable.
 mpl.rcParams['savefig.facecolor'] = 'w'  # Make white background of saved figure, instead of transparent.
 mpl.rcParams['savefig.dpi'] = 200

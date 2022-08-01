@@ -137,6 +137,10 @@ class Transmon(Capacitor):
     def Lq(self, E10, Ec):
         return 2*Ec*const.h / (2*np.pi*E10*const.e)**2  # H.
 
+    @dept
+    def Lq_by_c(self, E10, c):
+        return 1/(2*np.pi*E10)**2 / c
+
     def demo_Ej_vs_area(self, w=None):
         if w is None: w = np.linspace(50e-9,1e-6)
         jj = Junction(w=w)
@@ -187,11 +191,11 @@ class Transmon(Capacitor):
         return ax
 
 
-if __name__ == '__main__':
-    qb = Transmon()
-    # qb.demo_ej_vs_area(w=np.linspace(50e-9,1e-6))
-    qb.demo_Lq_vs_Lj0()
-    plt.show()
+# if __name__ == '__main__':
+#     qb = Transmon()
+#     # qb.demo_ej_vs_area(w=np.linspace(50e-9,1e-6))
+#     qb.demo_Lq_vs_Lj0()
+#     plt.show()
 
 
 def _delta_ext(delta, L_linear, Lj0):
@@ -447,29 +451,36 @@ class ThermalDistribution(Calculator):
 #     dist.demo()
 
 class Cable(Calculator):
+    """Must init with Ll or Cl. The manufacturer says:
+
+        Cl = 94 pF/m (1.2mm)
+        Ll = 235 nH/m (1.2mm)
+
+        Cl = 86.5 pF/m (2.2mm)
+        Ll = 216.25 nH/m (2.2mm)
+    """
     fFSR = 1e6  # Hz
-    Ll = 216.25e-9  # H/m
-    Cl = 86.5e-12  # F/m
+    len = 100  # m
 
     @dept
-    def wFSR(self, fFSR):
-        return 2*np.pi*fFSR
+    def vp(self, fFSR, len):
+        return 2*len*fFSR
+
+    @dept
+    def Ll(self, vp, Cl):
+        return 1/vp**2/Cl
+
+    @dept
+    def Cl(self, vp, Ll):
+        return 1/vp**2/Ll
 
     @dept
     def Z(self, Ll, Cl):
         return np.sqrt(Ll/Cl)
 
     @dept
-    def vp(self, Ll, Cl):
-        return 1/np.sqrt(Ll*Cl)
-
-    @dept
-    def len(self, fFSR, vp):
-        return vp/(2*fFSR)  # m.
-
-    @dept
-    def Lm(self, fFSR, Z):
-        return Z/(4*fFSR)  # H.
+    def Lm(self, len, Ll):
+        return len*Ll/2
 
     @dept
     def tau(self, g, fFSR):
@@ -489,16 +500,17 @@ class Cable(Calculator):
     #     # form). For detail please refer to textbook about time-depedent perturbation.
     #     return 2*np.pi * g**2 / wFSR
 
-    def demo(self, Ll=None):
-        if Ll is None: Ll = np.linspace(200, 220)
+    def demo(self, len=None):
+        if len is None: len = np.linspace(0.3,1.2)
         cb = self.new()
 
         fig, ax = plt.subplots()
         ax.set(
-            title=f'$f_\\mathrm{{FSR}}={cb.fFSR/1e6:.4f} \\mathrm{{MHz}}$',
-            xlabel='$L_l$ (nH)',
-            ylabel='Cable length (m)',
+            title=f'$v_p$={cb.vp()/1e8:.3f} $\\times 10^8$ m/s',
+            xlabel='length (m)',
+            ylabel='fFSR (MHz)',
         )
+
         ax2 = ax.twinx()
         ax2.set_ylabel('Impendance ($\\Omega$)', color='C1')
         ax2.tick_params('y', labelcolor='C1')
@@ -508,28 +520,24 @@ class Cable(Calculator):
         ax3.set_ylabel('Inductance (nH)', color='C2')
         ax3.tick_params('y', labelcolor='C2')
 
-        Ll = np.linspace(200, 220)
-        ax.plot(Ll, cb.len(Ll=Ll*1e-9))
-        ax2.plot(Ll, cb.Z(Ll=Ll*1e-9), color='C1')
-        ax3.plot(Ll, cb.Lm(Ll=Ll*1e-9)/1e-9, color='C2', ls=':')
+        plotter.cursor(ax, x=cb.len, y=cb.fFSR/1e6)
+        cb.fFSR = cb.vp()/(2*len)
+        ax.plot(len, cb.fFSR / 1e6)
+        ax2.plot(len, cb.Z(len=len), color='C1')
+        ax3.plot(len, cb.Lm(len=len)/1e-9, color='C2')
+        return ax
 
-        plotter.cursor(ax=ax, x=cb.Ll/1e-9)
-        # ax.hlines(y=cb.len(), xmin=cb.Ll, xmax=220, color='k', alpha=0.3, ls='--')
-        # ax2.hlines(y=cb.Z(), xmax=cb.Ll, xmin=200, color='k', alpha=0.3, ls='--')
-        ax.grid(True)
-        return ax, ax2, ax3
+if __name__ == '__main__':
+    qb = Transmon(c=95e-15, jj=Junction(Lj0=15e-9))
+    print(f'Ec: {qb.Ec()/1e6:.1f} MHz, E10: {qb.E10()/1e9:.3f} GHz')
 
-# if __name__ == '__main__':
-#     qb = Transmon(c=95e-15, jj=Junction(Lj0=15e-9))
-#     print(f'Ec: {qb.Ec()/1e6:.1f} MHz, E10: {qb.E10()/1e9:.3f} GHz')
+    cb = Cable(fFSR=120e6, len=1, Cl=86.5e-12)
+    print(f'Ll: {cb.Ll()/1e-9:.1f} nH/m, Lm: {cb.Lm()/1e-9:.1f} nH')
 
-#     cb = Cable(fFSR=1.8689e6)
-#     print(f'len: {cb.len():.1f} m, Lm: {cb.Lm()/1e-9:.1f} nH')
+    gmon = Gmon()
+    freq_shift = gmon.w1_shift(g=cb.g(tau=22.2e-9), L1=qb.Lq(), L2=cb.Lm())
+    print(f'freq shift: {freq_shift/1e6:.2f} MHz')
 
-#     gmon = Gmon()
-#     freq_shift = gmon.w1_shift(g=cb.g(tau=22.2e-9), L1=qb.Lq(), L2=cb.Lm())
-#     print(f'freq shift: {freq_shift/1e6:.2f} MHz')
-
-#     cb.demo()
-#     plt.show()
+    cb.demo()
+    plt.show()
 
