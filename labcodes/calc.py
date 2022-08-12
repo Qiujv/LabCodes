@@ -294,7 +294,7 @@ class Gmon(RF_SQUID):
         if delta_ext is None: delta_ext = np.linspace(0,2*np.pi,200)
         gmon = self.new(delta_ext=delta_ext)
 
-        r = gmon.L_linear() / gmon.Lj0
+        r = gmon.L_linear() / gmon.Lj0()
 
         fig, ax = plt.subplots()
         ax.set(
@@ -527,17 +527,17 @@ class Cable(Calculator):
         ax3.plot(len, cb.Lm(len=len)/1e-9, color='C2')
         return ax
 
-if __name__ == '__main__':
-    qb = Transmon(c=95e-15, jj=Junction(Lj0=15e-9))
-    print(f'Ec: {qb.Ec()/1e6:.1f} MHz, E10: {qb.E10()/1e9:.3f} GHz')
+# if __name__ == '__main__':
+#     qb = Transmon(c=95e-15, jj=Junction(Lj0=15e-9))
+#     print(f'Ec: {qb.Ec()/1e6:.1f} MHz, E10: {qb.E10()/1e9:.3f} GHz')
 
-    cb = Cable(fFSR=120e6, len=1, Cl=86.5e-12)
-    print(f'Ll: {cb.Ll()/1e-9:.1f} nH/m, Lm: {cb.Lm()/1e-9:.1f} nH')
+#     cb = Cable(fFSR=120e6, len=1, Cl=86.5e-12)
+#     print(f'Ll: {cb.Ll()/1e-9:.1f} nH/m, Lm: {cb.Lm()/1e-9:.1f} nH')
 
-    gmon = Gmon()
-    freq_shift = gmon.w1_shift(g=cb.g(tau=22.2e-9), L1=qb.Lq(), L2=cb.Lm())
-    print(f'freq shift: {freq_shift/1e6:.2f} MHz')
+#     gmon = Gmon()
+#     freq_shift = gmon.w1_shift(g=cb.g(tau=22.2e-9), L1=qb.Lq(), L2=cb.Lm())
+#     print(f'freq shift: {freq_shift/1e6:.2f} MHz')
 
-    cb.demo()
-    plt.show()
+#     cb.demo()
+#     plt.show()
 
