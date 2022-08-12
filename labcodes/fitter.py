@@ -84,6 +84,11 @@ class CurveFit(object):
     def fit_report(self):
         return self.result.fit_report()
 
+    @property
+    def kws(self):
+        result = self.result
+        return {k: v.value for k, v in result.params.items() if v.expr is None}
+
     def fdata(self, x=None):
         """Return values of fitted curve.
         

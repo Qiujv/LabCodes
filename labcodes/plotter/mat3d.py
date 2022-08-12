@@ -27,7 +27,7 @@ def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwa
     return ax
 
 def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0, 
-    cmin=None, cmax=None, colorbar=True):
+    cmin=None, cmax=None, colorbar=True, label=True):
     """Plot 3d bar for matrix.
     """
     if ax is None:
@@ -55,6 +55,12 @@ def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0,
 
     bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=colors, alpha=alpha, 
                        cmap=cmap, norm=norm, edgecolor='white', linewidth=1)
+
+    if label is True:
+        for x, y, z in zip(xpos, ypos, dz):
+            msg = f'{z:.3f}'.replace('0.', '.')
+            ax.text(x+bar_width/2, y+bar_width/2, z, msg, ha='center', va='bottom',
+                    bbox=dict(fill=True, color='white', alpha=0.4))
 
     ax.set(
         xticks=np.arange(1, mat.shape[0] + 1, 1),

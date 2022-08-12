@@ -10,6 +10,21 @@ import numpy as np
 from labcodes import plotter
 
 
+def from_registry(items, **updates):
+    if isinstance(items, dict):
+        kws = items.copy()
+    else:
+        kws = {k:v for k,v in items}
+    
+    kws.update(updates)
+    return kws
+
+def to_registry(kws, **updates):
+    kws = kws.copy()
+    kws.update(updates)
+    items = tuple([(k,v) for k,v in kws.items()])
+    return items
+
 def replace(text, dict):
     for k, v in dict.items():
         text = text.replace(k, v)
@@ -67,6 +82,19 @@ class LogName(object):
         id = int(id)
         title = replace(title, ESCAPE_CHARS)
         return dict(dir=dir, id=id, qubit=qubit, title=title)
+
+    @classmethod
+    def from_meta(cls, dir, id, qubit, title):
+        fake_path = Path(dir)/r'00019 - %vQ1%g%c whatever.csv'
+        obj = cls(fake_path)
+        obj.dir = dir
+        obj.id = id
+        obj.qubit = qubit
+        obj.title = title
+        return obj
+
+    def copy(self):
+        return LogName.from_meta(dir=self.dir, id=self.id, qubit=self.qubit, title=self.title)
 
     def __repr__(self) -> str:
         return self.to_str()
