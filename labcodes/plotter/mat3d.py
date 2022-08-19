@@ -67,6 +67,8 @@ def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0,
         yticks=np.arange(1, mat.shape[1] + 1, 1),
         zticks=np.arange(0.5*(dz.max()//0.5 + 1), 0.5*(dz.min()//0.5 - 1), -0.5),
     )
+    if np.all(dz < 0.6) and np.any(dz >= 0.5):
+        ax.set_zlim(top=0.5)
 
     if colorbar is True:
         # Way to remove colorbar: ax.collections[-1].colorbar.remove()

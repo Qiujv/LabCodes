@@ -14,7 +14,7 @@ def cursor(ax, x=None, y=None, text=None, line_style={}, text_style={}):
 
     txt = None
     if (x is not None) and (y is not None):
-        if text is None: text = 'x={}, y={}'
+        if text is None: text = 'x={:.3f}, y={:.3f}'
         ts = dict(); ts.update(text_style)
         txt = ax.annotate(text.format(x, y), (x,y), **ts)
     elif x is not None:
