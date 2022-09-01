@@ -2,34 +2,31 @@
 
 # %%
 import itertools
-import pdb
+# import pdb
 import numpy as np
 from scipy import optimize
 from scipy.linalg import expm
 from functools import reduce
-
+import math
 import numpy as np
+
 
 # some helper functions for dealing with matrices and computing fidelity
 def tensor(matrices):
     """Compute the tensor product of a list (or array) of matrices"""
     return reduce(np.kron, matrices)
 
-
 def dots(matrices):
     """Compute the dot product of a list (or array) of matrices"""
     return reduce(np.dot, matrices)
-
 
 def dot3(A, B, C):
     """Compute the dot product of three matrices"""
     return np.dot(np.dot(A, B), C)
 
-
 def commutator(A, B):
     """Compute the commutator of two matrices"""
     return np.dot(A, B) - np.dot(B, A)
-
 
 def lindblad(rho, L, Ld=None):
     """Compute the contribution of one Lindblad term to the master equation""" 
@@ -37,18 +34,15 @@ def lindblad(rho, L, Ld=None):
         Ld = L.conj().T
     return dot3(L, rho, Ld) - 0.5*dot3(Ld, L, rho) - 0.5*dot3(rho, Ld, L)
 
-
 def ket2rho(ket):
     """Convert a state (ket) to a density matrix (rho)."""
     return np.outer(ket, ket.conj())
-
 
 def sqrtm(A):
     """Compute the matrix square root of a matrix"""
     d, U = np.linalg.eig(A)
     s = np.sqrt(d.astype(complex))
     return dot3(U, np.diag(s), U.conj().T)
-
 
 def trace_distance(rho, sigma):
     """Compute the trace distance between matrices rho and sigma
@@ -58,7 +52,6 @@ def trace_distance(rho, sigma):
     abs = sqrtm(np.dot(A.conj().T, A))
     return np.real(np.trace(abs)) / 2.0
 
-
 def fidelity(rho, sigma):
     """Compute the fidelity between matrices rho and sigma
     See Nielsen and Chuang, p. 409
@@ -66,12 +59,10 @@ def fidelity(rho, sigma):
     rhosqrt = sqrtm(rho)
     return np.real(np.trace(sqrtm(dot3(rhosqrt, sigma, rhosqrt))))
 
-
 def overlap(rho, sigma):
     """Trace of the product of two matrices."""
     # XXX this is only correct if at least one of rhos or sigma is a pure state
     return np.trace(np.dot(rho, sigma))
-
 
 def concurrence(rho):
     """Concurrence of a two-qubit density matrix.
@@ -86,7 +77,6 @@ def concurrence(rho):
     e = [np.sqrt(x) for x in sorted(eigs, reverse=True)]
     return max(0, e[0] - e[1] - e[2] - e[3])
 
-
 def eof(rho):
     """Entanglement of formation of a two-qubit density matrix.
     see http://qwiki.stanford.edu/wiki/Entanglement_of_Formation
@@ -98,8 +88,7 @@ def eof(rho):
     C = concurrence(rho)
     arg = max(0, np.sqrt(1-C**2))
     return h((1 + arg)/2.0)
-    
-    
+
 # define some useful matrices
 def Rmat(axis, angle):
     return expm(-1j*angle/2.0*axis)
@@ -129,120 +118,12 @@ Ympi = Rmat(sigmaY, -np.pi)
 Zmpi = Rmat(sigmaZ, -np.pi)
 
 
-# store all initialized tomography protocols
-_qst_transforms = {}
-_qpt_transforms = {}
-
-
-def init_qst(Us, key=None):
-    """Initialize quantum state tomography for a set of unitaries.
-    
-    Us - a list of unitary operations that will be applied to the
-        state before measuring the diagonal elements.  These unitaries
-        should form a 'complete' set to allow the full density matrix
-        to be determined, though this is not enforced.
-
-    key - (optional) a dictionary key under which this tomography
-        protocol will be stored so it can be referred to without
-        recomputing the transformation matrix.
-    
-    Returns a transformation matrix that should be passed to qst along
-    with measurement data to perform the state tomography.
-    """
-    
-    Us = np.asarray(Us)
-    
-    M = len(Us) # number of different measurements
-    N = len(Us[0]) # number of states (= number of diagonal elements)
-    
-    # we have to be a bit careful here, because things blow up
-    # exponentially with the number of qubits. The first method
-    # uses direct indexing to generate the entire transform matrix
-    # in one shot. This is elegant and much faster than for-loop
-    # iteration, but uses more memory and so only works for
-    # smaller qubit numbers.
-    if N <= 16:
-        # 1-4 qubits
-        def transform(K, L):
-            i, j = divmod(K, N)
-            m, n = divmod(L, N)
-            return Us[i, j, m] * Us[i, j, n].conj()
-        U = np.fromfunction(transform, (M*N, N**2), dtype=int)
-    else:
-        # 5+ qubits
-        U = np.zeros((M*N, N**2), dtype=complex)
-        for K in range(M*N):
-            for L in range(N**2):
-                i, j = divmod(K, N)
-                m, n = divmod(L, N)
-                U[K, L] = Us[i, j, m] * Us[i, j, n].conj()
-    
-    # save this transform if a key was provided
-    if key is not None:
-        _qst_transforms[key] = (Us, U)
-    
-    return U
-
-
-def init_qpt(As, key=None):
-    """Initialize quantum process tomography for an operator basis.
-    
-    As - a list of matrices giving the basis in which to compute
-        the chi matrix for process tomography.  These matrices
-        should form a 'complete' set to allow the full chi matrix
-        to be represented, though this is not enforced.
-
-    key - (optional) a dictionary key under which this tomography
-        protocol will be stored so it can be referred to without
-        recomputing the transformation matrix.
-    
-    Returns a transformation matrix that should be passed to qpt along
-    with input and output density matrices to perform the process tomography.
-    """
-    
-    As = np.asarray(As, dtype=complex)
-    
-    Dout, Din = As[0].shape
-    chiSize = Dout*Din
-    
-    # we have to be a bit careful here, because things blow up
-    # exponentially with the number of qubits.  The first method
-    # uses direct indexing to generate the entire transform matrix
-    # in one shot.  This is elegant and much faster than for-loop
-    # iteration, but uses more memory and so only works for
-    # smaller qubit numbers.
-    if chiSize <= 16:
-        # one or two qubits
-        def transform(alpha, beta):
-            L, J = divmod(alpha, chiSize)
-            M, N = divmod(beta, chiSize)
-            i, j = divmod(J, Dout)
-            k, l = divmod(L, Din)
-            return As[M, i, k] * As[N, j, l].conj()
-        T = np.fromfunction(transform, (chiSize**2, chiSize**2), dtype=int)
-    else:
-        # three or more qubits
-        T = np.zeros((chiSize**2, chiSize**2), dtype=complex)
-        for alpha in range(chiSize**2):
-            for beta in range(chiSize**2):
-                L, J = divmod(alpha, chiSize)
-                M, N = divmod(beta, chiSize)
-                i, j = divmod(J, Dout)
-                k, l = divmod(L, Din)
-                T[alpha, beta] = As[M, i, k] * As[N, j, l].conj()
-    
-    if key is not None:
-        _qpt_transforms[key] = (As, T)
-    
-    return T
-
-
 def qst(diags, U, return_all=False):
     """Convert a set of diagonal measurements into a density matrix.
     
     Args:
         diags: 2d array with shape n_ops * n_stats = [I, X/2, Y/2]**n_qs * [0, 1]**n_qs
-        laber order in nested-loop style, i.e. 001, 010, **011** but not 001, 010, **100**.
+        label order in nested-loop style, i.e. 001, 010, **011** instead of 001, 010, **100**.
         
         measured probabilities (diagonal elements) after acting on the state 
         with each of the unitaries from the qst protocol
@@ -279,6 +160,9 @@ def qst_mle(pxms, Us, F=None, rho0=None):
             the identity will be used.
         rho0: an initial guess for the density matrix, e.g. from linear tomography.
     """
+    if isinstance(Us, str) and Us in _qst_transforms:
+        Us = _qst_transforms[Us][0]
+
     N = len(Us[0]) # size of density matrix
     
     if F is None:
@@ -293,8 +177,8 @@ def qst_mle(pxms, Us, F=None, rho0=None):
                       np.hstack([list(range(k+1)) for k in range(N)]))
         indices_im = (np.hstack([[k+1]*(k+1) for k in range(N-1)]),
                       np.hstack([list(range(k+1)) for k in range(N-1)]))
-    n_re = len(indices_re[0]) # N*(N+1)/2
-    n_im = len(indices_im[0]) # N*(N-1)/2
+    n_re = len(indices_re[0])  # N*(N+1)/2
+    n_im = len(indices_im[0])  # N*(N-1)/2
     
     def make_T(tis):
         T = np.zeros((N,N), dtype=complex)
@@ -355,7 +239,7 @@ def qst_mle(pxms, Us, F=None, rho0=None):
     #tis = optimize.fmin_bfgs(unlikelihood, tis_guess)
     return make_rho(tis)
 
-def rst_mle(pxms, Us, F=None, rho0=None):
+def rst_mle(pxms, Us, F=None, rho0=None):  # for resonator state?
     """State tomography with maximum-likelihood estimation.
     Args:
         pxms: a 2D array of measured probabilites.  The first index indicates which 
@@ -480,7 +364,7 @@ def transform_chi_pointer(chi_pointer, T, return_all=False):
         T = _qpt_transforms[T][1]
 
     _Din, Dout = chi_pointer.shape
-    chi_flat, resids, rank, s = np.linalg.lstsq(T, chi_pointer.flatten())
+    chi_flat, resids, rank, s = np.linalg.lstsq(T, chi_pointer.flatten(), rcond=-1)
     chi = chi_flat.reshape((Dout, Dout))
     if return_all:
         return chi, resids, rank, s
@@ -514,15 +398,122 @@ def qpt_pointer(rhos, Erhos, return_all=False):
     rhos_mat = np.asarray(rhos).reshape((n, Din))
     Erhos_mat = np.asarray(Erhos).reshape((n, Dout))
 
-    chi, resids, rank, s = np.linalg.lstsq(rhos_mat, Erhos_mat)
+    chi, resids, rank, s = np.linalg.lstsq(rhos_mat, Erhos_mat, rcond=-1)
     if return_all:
         return chi, resids, rank, s
     else:
         return chi
 
 
+
+def init_qst(Us, key=None):
+    """Initialize quantum state tomography for a set of unitaries.
+    
+    Us - a list of unitary operations that will be applied to the
+        state before measuring the diagonal elements.  These unitaries
+        should form a 'complete' set to allow the full density matrix
+        to be determined, though this is not enforced.
+
+    key - (optional) a dictionary key under which this tomography
+        protocol will be stored so it can be referred to without
+        recomputing the transformation matrix.
+    
+    Returns a transformation matrix that should be passed to qst along
+    with measurement data to perform the state tomography.
+    """
+    
+    Us = np.asarray(Us)
+    
+    M = len(Us) # number of different measurements
+    N = len(Us[0]) # number of states (= number of diagonal elements)
+    
+    # we have to be a bit careful here, because things blow up
+    # exponentially with the number of qubits. The first method
+    # uses direct indexing to generate the entire transform matrix
+    # in one shot. This is elegant and much faster than for-loop
+    # iteration, but uses more memory and so only works for
+    # smaller qubit numbers.
+    if N <= 16:
+        # 1-4 qubits
+        def transform(K, L):
+            i, j = divmod(K, N)
+            m, n = divmod(L, N)
+            return Us[i, j, m] * Us[i, j, n].conj()
+        U = np.fromfunction(transform, (M*N, N**2), dtype=int)
+    else:
+        # 5+ qubits
+        U = np.zeros((M*N, N**2), dtype=complex)
+        for K in range(M*N):
+            for L in range(N**2):
+                i, j = divmod(K, N)
+                m, n = divmod(L, N)
+                U[K, L] = Us[i, j, m] * Us[i, j, n].conj()
+    
+    # save this transform if a key was provided
+    if key is not None:
+        _qst_transforms[key] = (Us, U)
+    
+    return U
+
+
+def init_qpt(As, key=None):
+    """Initialize quantum process tomography for an operator basis.
+    
+    As - a list of matrices giving the basis in which to compute
+        the chi matrix for process tomography.  These matrices
+        should form a 'complete' set to allow the full chi matrix
+        to be represented, though this is not enforced.
+
+    key - (optional) a dictionary key under which this tomography
+        protocol will be stored so it can be referred to without
+        recomputing the transformation matrix.
+    
+    Returns a transformation matrix that should be passed to qpt along
+    with input and output density matrices to perform the process tomography.
+    """
+    
+    As = np.asarray(As, dtype=complex)
+    
+    Dout, Din = As[0].shape
+    chiSize = Dout*Din
+    
+    # we have to be a bit careful here, because things blow up
+    # exponentially with the number of qubits.  The first method
+    # uses direct indexing to generate the entire transform matrix
+    # in one shot.  This is elegant and much faster than for-loop
+    # iteration, but uses more memory and so only works for
+    # smaller qubit numbers.
+    if chiSize <= 16:
+        # one or two qubits
+        def transform(alpha, beta):
+            L, J = divmod(alpha, chiSize)
+            M, N = divmod(beta, chiSize)
+            i, j = divmod(J, Dout)
+            k, l = divmod(L, Din)
+            return As[M, i, k] * As[N, j, l].conj()
+        T = np.fromfunction(transform, (chiSize**2, chiSize**2), dtype=int)
+    else:
+        # three or more qubits
+        T = np.zeros((chiSize**2, chiSize**2), dtype=complex)
+        for alpha in range(chiSize**2):
+            for beta in range(chiSize**2):
+                L, J = divmod(alpha, chiSize)
+                M, N = divmod(beta, chiSize)
+                i, j = divmod(J, Dout)
+                k, l = divmod(L, Din)
+                T[alpha, beta] = As[M, i, k] * As[N, j, l].conj()
+    
+    if key is not None:
+        _qpt_transforms[key] = (As, T)
+    
+    return T
+
 def tensor_combinations(matrices, repeat):
     return [tensor(ms) for ms in itertools.product(matrices, repeat=repeat)]
+
+# store all initialized tomography protocols
+_qst_transforms = {}
+_qpt_transforms = {}
 
 
 # standard single-qubit QST protocols
@@ -568,11 +559,11 @@ def test_qst(n=100):
 
     def test_qst_protocol(proto):
         Us = _qst_transforms[proto][0]
-        pdb.set_trace()
+        # pdb.set_trace()
         rho = (np.random.uniform(-1, 1, Us[0].shape) +
             1j*np.random.uniform(-1, 1, Us[0].shape))
-        diags = np.vstack(np.diag(dot3(U, rho, U.conj().T)) for U in Us)
-        pdb.set_trace()
+        diags = np.vstack([np.diag(dot3(U, rho, U.conj().T)) for U in Us])
+        # pdb.set_trace()
         rhoCalc = qst(diags, proto)
         return np.max(np.abs(rho - rhoCalc))
     
@@ -582,13 +573,13 @@ def test_qst(n=100):
     print('1 qubit max error: tomo=%g, octomo=%g' % (max(et1), max(eo1)))
      
     # 2 qubits
-    et2 = [test_qst_protocol('tomo2') for _ in range(n/2)]
-    eo2 = [test_qst_protocol('octomo2') for _ in range(n/2)]
+    et2 = [test_qst_protocol('tomo2') for _ in range(n//2)]
+    eo2 = [test_qst_protocol('octomo2') for _ in range(n//2)]
     print('2 qubits max error: tomo2=%g, octomo2=%g' % (max(et2), max(eo2)))
 
     # 3 qubits
-    et3 = [test_qst_protocol('tomo3') for _ in range(n/10)]
-    eo3 = [test_qst_protocol('octomo3') for _ in range(n/10)]
+    et3 = [test_qst_protocol('tomo3') for _ in range(n//10)]
+    eo3 = [test_qst_protocol('octomo3') for _ in range(n//10)]
     print('3 qubits max error: tomo3=%g, octomo3=%g' % (max(et3), max(eo3)))
     
     # 4 qubits
@@ -656,6 +647,7 @@ if __name__ == '__main__':
     print('Testing state tomography...')
     test_qst(10)
     
+    print()
     print('Testing process tomography...')
     test_qpt()
 

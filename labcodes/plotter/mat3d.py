@@ -29,6 +29,8 @@ def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwa
 def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0, 
     cmin=None, cmax=None, colorbar=True, label=True):
     """Plot 3d bar for matrix.
+
+    if alpha=0, plot bar frames only.
     """
     if ax is None:
         fig = plt.figure()
@@ -53,8 +55,14 @@ def plot_mat3d(mat, ax=None, view_angle=(None, None), cmap='bwr', alpha=1.0,
     cmap = plt.cm.get_cmap(cmap)
     colors = cmap(norm(dz))
 
-    bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=colors, alpha=alpha, 
-                       cmap=cmap, norm=norm, edgecolor='white', linewidth=1)
+    if alpha != 0.0:
+        # Plot filled bar.
+        bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=colors, alpha=alpha, 
+                           cmap=cmap, norm=norm, edgecolor='white', linewidth=1)
+    else:
+        # Plot frames only.
+        bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=(0,0,0,0), alpha=None, 
+                           edgecolor='black', linewidth=0.5)
 
     if label is True:
         for x, y, z in zip(xpos, ypos, dz):
@@ -81,16 +89,17 @@ def plot_complex_mat3d(mat, axs=None, cmin=None, cmax=None, cmap='bwr', colorbar
     """Plot 3d bar for complex matrix, both the real and imag part.
     """
     if axs is None:
-        fig = plt.figure(figsize=(9,4))
+        fig = plt.figure(figsize=(9,4), tight_layout=False)
         ax_real = fig.add_subplot(1,2,1,projection='3d')
         ax_imag = fig.add_subplot(1,2,2,projection='3d')
     else:
         ax_real, ax_imag = axs
+        fig = ax_real.get_figure()
 
+    norm, extend_cbar = misc.get_norm(np.hstack((mat.imag, mat.real)), cmin=cmin, cmax=cmax)
     if colorbar is True:
         fig.subplots_adjust(right=0.9)
         cax = fig.add_axes([0.95, 0.15, 0.01, 0.6])
-        norm, extend_cbar = misc.get_norm(np.hstack((mat.imag, mat.real)), cmin=cmin, cmax=cmax)
         cmap = plt.cm.get_cmap(cmap)
         cbar = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, extend=extend_cbar)
     
