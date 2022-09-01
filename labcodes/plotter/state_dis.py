@@ -16,7 +16,7 @@ def plot_iq(data, ax=None, **kwargs):
 
     data = np.ravel(data)
 
-    n_pt_max = 5000
+    n_pt_max = 6000
     if data.size <= n_pt_max:
         kw = dict(marker='.', alpha=0.3, linewidth=0)
         kw.update(kwargs)
@@ -87,9 +87,11 @@ def plot_visibility(s0v, s1v, ax=None, ax2=None, bins=50):
     visi = abs(cdf1 - cdf0)
     argmax = np.argmax(visi)
     ax2.plot(x0, visi, label='|1>-|0>')
-    text_pos = (0.35, 0.95) if visi[argmax] < 0.9 else (0.35, 0.8)
-    ax2.annotate(f'best visibility = {visi[argmax]:.3f}', (x0[argmax], visi[argmax]), 
-        text_pos, textcoords=ax2.transAxes, arrowprops=dict(arrowstyle="->"))
+    text_pos = (0.5, 0.95) if visi[argmax] < 0.9 else (0.5, 0.8)
+    ax2.annotate(
+        f'best visibility = {visi[argmax]:.3f}\np00={cdf0[argmax]:.3f}, p11={1-cdf1[argmax]:.3f}', 
+        (x0[argmax], visi[argmax]), 
+        text_pos, textcoords=ax2.transAxes, ha='center', arrowprops=dict(arrowstyle="->"))
     ax2.legend(loc='center right')
     return ax, ax2
 
