@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from labcodes import misc, fitter, models, plotter, fileio
 import labcodes.frog.pyle_tomo as tomo
+import scipy.io
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -410,3 +411,26 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
 
     return chi, rho_in, rho_out, fname, ax
     
+
+
+def df2mat(df, fname, xy_name=None):
+    """Save dataframe to .mat file. For internal communication.
+    
+    Args:
+        df: DataFrame to save.
+        fname: name of file to save.
+        xy_names: (x_name, y_name), if given, reshape df into 2d array before saving.
+    """
+    if xy_name is None:
+        mdic = df.to_dict('list')
+    else:
+        x_name, y_name = xy_name
+        df = df.sort_values(by=[x_name, y_name])
+        xuni = df[x_name].unique()
+        xsize = xuni.size
+        ysize = df.shape[0] // xsize
+        mdic = {col: df[col].values.reshape(xsize, ysize)
+                for col in df.columns}
+
+    scipy.io.savemat(fname, mdic)
+    return mdic

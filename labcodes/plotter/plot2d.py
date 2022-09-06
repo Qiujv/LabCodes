@@ -48,7 +48,7 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
     df['width'] = df[x_name].map(mapping)
     df = df.groupby(x_name).filter(lambda x: len(x) > 1)  # Filter out entry with only 1 point and hence cannot compute height.
     df['height'] = df.groupby(x_name)[y_name].transform(np.gradient)
-    rects = [Rectangle((x - w/2, y - h/2), w, h )
+    rects = [Rectangle((x - w/2, y - h/2), w, h )  # BUG: Force the rect center with data coordinate may make it overlap with other rect.
             for x, y, w, h in df[[x_name, y_name, 'width', 'height']].itertuples(index=False)]
 
     z = df[z_name]
