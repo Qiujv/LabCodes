@@ -119,10 +119,9 @@ class LogName(object):
     def fname(self, *args, **kws):  # alias.
         return self.as_file_name(*args, **kws)
 
-
 class LabradRead(object):
-    def __init__(self, dir, id, **kwargs):
-        self.path = self.find(dir, id, suffix='csv')
+    def __init__(self, dir, id, suffix='csv', **kwargs):
+        self.path = self.find(dir, id, suffix=suffix)
         self.ini = self.load_ini(self.path.with_suffix('.ini'))
         self.conf = self.ini_to_dict(self.ini)
         self.name = LogName(self.path, **kwargs)
@@ -131,7 +130,7 @@ class LabradRead(object):
         self.df = pd.read_csv(self.path, names=self.indeps + self.deps)
 
     def plot(self, **kwargs):
-        """Auto automatically choose plot1d or plot2d."""
+        """Quick data plot."""
         if len(self.indeps) == 1:
             return self.plot1d(**kwargs)
         else:

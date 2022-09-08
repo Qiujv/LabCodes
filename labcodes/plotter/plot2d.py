@@ -8,6 +8,10 @@ from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
 from labcodes.plotter import misc
 
+def _shift_left(arr):
+    arr = np.array(arr)
+    shifted = np.hstack((arr[0]*2 - arr[1], arr[:-1]))
+    return (arr + shifted) / 2
 
 def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None, 
                       colorbar=True, cmap='RdBu_r', norm=None, **kwargs):
@@ -42,14 +46,21 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
         fig = ax.get_figure()
 
     # Compute widths and heights.
-    df = df[[x_name, y_name, z_name]].sort_values([x_name, y_name])
-    indices = df[x_name].unique()
-    mapping = {idx: w for idx, w in zip(indices, np.gradient(indices))}
-    df['width'] = df[x_name].map(mapping)
+    df = df[[x_name, y_name, z_name]].sort_values([x_name, y_name])  # Returns a copy of df.
     df = df.groupby(x_name).filter(lambda x: len(x) > 1)  # Filter out entry with only 1 point and hence cannot compute height.
+    
+    xunic = df[x_name].unique()
+    mapping = {x: w for x, w in zip(xunic, np.gradient(xunic))}
+    df['width'] = df[x_name].map(mapping)
+
+    xshift = _shift_left(xunic)
+    mapping = {x: s for x, s in zip(xunic, xshift)}
+    df['xshift'] = df[x_name].map(mapping)
+    
     df['height'] = df.groupby(x_name)[y_name].transform(np.gradient)
-    rects = [Rectangle((x - w/2, y - h/2), w, h )  # BUG: Force the rect center with data coordinate may make it overlap with other rect.
-            for x, y, w, h in df[[x_name, y_name, 'width', 'height']].itertuples(index=False)]
+    df['yshift'] = df.groupby(x_name)[y_name].transform(_shift_left)
+    rects = [Rectangle((x, y), w, h)
+            for x, y, w, h in df[['xshift', 'yshift', 'width', 'height']].itertuples(index=False)]
 
     z = df[z_name]
     norm, extend_cbar = misc.get_norm(z, cmin=cmin, cmax=cmax)
@@ -122,3 +133,9 @@ def plot2d_imshow(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
     return ax
 
     
+if __name__ == '__main__':
+    from labcodes import fileio
+    lf = fileio.LabradRead('//XLD2-PC2/labRAD_data/crab.dir/220724.dir/661_0814.dir', 97)
+    ax = plot2d_collection(lf.df, 'zpa', 'drive_freq_GHz', 's1_prob')
+    plt.show()
+    print('end')
