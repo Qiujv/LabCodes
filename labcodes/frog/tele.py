@@ -48,7 +48,7 @@ def judge(lf, qubit='q2', label=None, tolerance=8):
     close_enough = (angle_diff <= tolerance) or (np.pi - angle_diff <= tolerance)
     if not close_enough:
         fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(6,3))
-        fig.suptitle(lf.name.as_plot_title(qubit=qubit))
+        fig.suptitle(lf.name.as_plot_title(qubit=qubit.upper()))
         plotter.plot_iq(df[f'cplx_{qubit}'], ax=ax)
         ax.plot(cent0.real, cent0.imag, color='C0', marker='*', markeredgecolor='w', markersize=10)
         ax.plot(cent1.real, cent1.imag, color='C1', marker='*', markeredgecolor='w', markersize=10)
@@ -79,10 +79,13 @@ def get_conditional_p1(lf):
     p1_01 = df.loc[(~df['q1_s1']) & ( df['q2_s1']), 'q5_s1'].mean()
     p1_10 = df.loc[( df['q1_s1']) & (~df['q2_s1']), 'q5_s1'].mean()
     p1_11 = df.loc[( df['q1_s1']) & ( df['q2_s1']), 'q5_s1'].mean()
-    probs = {'00':p1_00,'01':p1_01,'10':p1_10,'11':p1_11}
+    probs = {'00':p1_00, '01':p1_01, '10':p1_10, '11':p1_11}
+    for k, v in probs.copy().items():
+        if np.isnan(v):  # np.mean returns nan if array is [].
+            probs[k] = 0  # change that results to 0.
     return probs
 
-def single_shot_qst(dir, id0, idx2, idy2, select, ro_mat=None):
+def single_shot_qst(dir, id0, idx2, idy2, select, ro_mat=None, suffix='csv'):
     """Calculate density matrix from single shot tomo experiments, with tomo op: I, X/2, Y/2.
     
     Args:
@@ -92,7 +95,7 @@ def single_shot_qst(dir, id0, idx2, idy2, select, ro_mat=None):
         ro_mat: np.array, readout assignment matrix of q5. 
             if None, apply I.
     """
-    probs = [get_conditional_p1(fileio.LabradRead(dir, id))[select] 
+    probs = [get_conditional_p1(fileio.LabradRead(dir, id, suffix=suffix))[select] 
              for id in (id0, idx2, idy2)]
     probs = [[1-p1, p1] for p1 in probs]
 
