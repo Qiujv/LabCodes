@@ -1,7 +1,10 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from labcodes import misc, fileio, plotter
 import labcodes.frog.pyle_tomo as tomo
+
+JUDGE_TOL = 8
 
 
 def get_center(conf, qubit, state):
@@ -11,7 +14,7 @@ def get_center(conf, qubit, state):
     center = center[0] + 1j*center[1]
     return center
 
-def judge(lf, qubit='q2', label=None, tolerance=8):
+def judge(lf, qubit='q2', label=None, tolerance=None):
     """Do state discrimination for single shot datas. For example:
         i1, q1 -> cplx_q1, cplx_q1_rot, q1_s1
     
@@ -25,6 +28,7 @@ def judge(lf, qubit='q2', label=None, tolerance=8):
             if None, use qubit[1:].
         tolerance: angle in degree. If difference found in angle check larger than this, plot.
     """
+    if tolerance is None: tolerance = JUDGE_TOL
     if label is None: label = qubit[1:]
     df = lf.df
 
@@ -42,8 +46,8 @@ def judge(lf, qubit='q2', label=None, tolerance=8):
     df[f'{qubit}_s1'] = mask_1
 
     # Check the 0, 1 center in conf is right.
-    _, angle_indept = misc.auto_rotate(df[f'cplx_{qubit}'], True)
-    angle_diff = (angle - angle_indept) % np.pi  # in [0,pi)
+    _, angle_new = misc.auto_rotate(df[f'cplx_{qubit}'], True)
+    angle_diff = (angle - angle_new) % np.pi  # in [0,pi)
     tolerance = tolerance * np.pi/180
     close_enough = (angle_diff <= tolerance) or (np.pi - angle_diff <= tolerance)
     if not close_enough:
@@ -71,21 +75,25 @@ def get_conditional_p1(lf):
     
     Adds columns to lf.df. Returns {'00':p1_00,'01':p1_01,'10':p1_10,'11':p1_11}
     """
-    judge(lf, 'q1')
-    judge(lf, 'q2')
-    judge(lf, 'q5')
+    if 'q1_s1' in lf.df: lf.df['q1_s1'] = lf.df['q1_s1'].astype(bool)
+    else: judge(lf, 'q1')
+    if 'q2_s1' in lf.df: lf.df['q2_s1'] = lf.df['q2_s1'].astype(bool)
+    else: judge(lf, 'q2')
+    if 'q5_s1' in lf.df: lf.df['q5_s1'] = lf.df['q5_s1'].astype(bool)
+    else: judge(lf, 'q5')
     df = lf.df[['runs', 'q1_s1', 'q2_s1', 'q5_s1']]
     p1_00 = df.loc[(~df['q1_s1']) & (~df['q2_s1']), 'q5_s1'].mean()
     p1_01 = df.loc[(~df['q1_s1']) & ( df['q2_s1']), 'q5_s1'].mean()
     p1_10 = df.loc[( df['q1_s1']) & (~df['q2_s1']), 'q5_s1'].mean()
     p1_11 = df.loc[( df['q1_s1']) & ( df['q2_s1']), 'q5_s1'].mean()
-    probs = {'00':p1_00, '01':p1_01, '10':p1_10, '11':p1_11}
+    p1 = df['q5_s1'].mean()
+    probs = {'00':p1_00, '01':p1_01, '10':p1_10, '11':p1_11, '': p1}
     for k, v in probs.copy().items():
         if np.isnan(v):  # np.mean returns nan if array is [].
             probs[k] = 0  # change that results to 0.
     return probs
 
-def single_shot_qst(dir, id0, idx2, idy2, select, ro_mat=None, suffix='csv'):
+def single_shot_qst(dir, id0, idx, idy, select, ro_mat=None, suffix='csv'):
     """Calculate density matrix from single shot tomo experiments, with tomo op: I, X/2, Y/2.
     
     Args:
@@ -95,9 +103,9 @@ def single_shot_qst(dir, id0, idx2, idy2, select, ro_mat=None, suffix='csv'):
         ro_mat: np.array, readout assignment matrix of q5. 
             if None, apply I.
     """
-    probs = [get_conditional_p1(fileio.LabradRead(dir, id, suffix=suffix))[select] 
-             for id in (id0, idx2, idy2)]
-    probs = [[1-p1, p1] for p1 in probs]
+    p1_I, p1_X, p1_Y = [get_conditional_p1(fileio.LabradRead(dir, id, suffix=suffix))[select] 
+                        for id in (id0, idx, idy)]
+    probs = [[1-p1, p1] for p1 in (p1_I, p1_X, p1_Y)]
 
     if ro_mat is not None:
         for i, ps in enumerate(probs):
@@ -105,6 +113,94 @@ def single_shot_qst(dir, id0, idx2, idy2, select, ro_mat=None, suffix='csv'):
 
     rho = tomo.qst(np.array(probs), 'tomo')
     return rho
+
+def single_shot_qpt(dir, m, selects=('00','01','10','11'), verbose=True, **kw):
+    chi_all = {}
+    chi_ideal_all = {}
+    Fchi = {}
+    Frho = {}
+    for select in selects:
+        rho_out = {
+            '0': single_shot_qst(dir, m+0, m+1, m+2, select, **kw),
+            'x': single_shot_qst(dir, m+3, m+4, m+5, select, **kw),
+            'y': single_shot_qst(dir, m+6, m+7, m+8, select, **kw),
+            '1': single_shot_qst(dir, m+9, m+10, m+11, select, **kw),
+        }
+        rho_out_ideal = {
+            '0': np.array(rho_Q5(select, 1,0)),
+            'x': np.array(rho_Q5(select, 1/np.sqrt(2),-1j/np.sqrt(2))),
+            'y': np.array(rho_Q5(select, 1/np.sqrt(2),1/np.sqrt(2))),
+            '1': np.array(rho_Q5(select, 0,1)),
+        }
+    
+        # plotter.plot_complex_mat3d(rho_out['0'])
+        # plotter.plot_complex_mat3d(rho_out_ideal['0'])
+        rho_f_0 = fidelity(rho_out['0'], rho_out_ideal['0'])
+        # plotter.plot_complex_mat3d(rho_out['x'])
+        # plotter.plot_complex_mat3d(rho_out_ideal['x'])
+        rho_f_x = fidelity(rho_out['x'], rho_out_ideal['x'])
+        # plotter.plot_complex_mat3d(rho_out['y'])
+        # plotter.plot_complex_mat3d(rho_out_ideal['y'])
+        rho_f_y = fidelity(rho_out['y'], rho_out_ideal['y'])
+        # plotter.plot_complex_mat3d(rho_out['1'])
+        # plotter.plot_complex_mat3d(rho_out_ideal['1'])
+        rho_f_1 = fidelity(rho_out['1'], rho_out_ideal['1'])
+        Frho[select] = [rho_f_0, rho_f_x, rho_f_y, rho_f_1]
+
+        rho_in = {
+            '0': np.array([
+                [1,0],
+                [0,0],
+            ]),
+            '1': np.array([
+                [0,0],
+                [0,1],
+            ]),
+            'x': np.array([
+                [.5, .5j],
+                [-.5j, .5],
+            ]),
+            'y': np.array([
+                [.5, .5],
+                [.5, .5]
+            ])
+        }
+        chi = tomo.qpt(
+            [rho_in[k] for k in ('0', 'x', 'y', '1')], 
+            [rho_out[k] for k in ('0', 'x', 'y', '1')], 
+            'sigma',
+        )
+
+        chi_ideal = tomo.qpt(
+            [rho_in[k] for k in ('0', 'x', 'y', '1')], 
+            [rho_out_ideal[k] for k in ('0', 'x', 'y', '1')], 
+            'sigma',
+        )
+
+        chi_fidelity = fidelity(chi, chi_ideal)
+        chi_all[select] = chi
+        chi_ideal_all[select] = chi_ideal
+        Fchi[select] = chi_fidelity
+
+    if verbose:
+        for select, f in Fchi.items():
+            print(f'select {select}: F={f:.3f}')
+
+        ax = plotter.plot_mat2d(pd.DataFrame(Frho), fmt='{:.3f}'.format)
+        ax.set(
+            xlabel='select',
+            xticklabels=['', '00', '01', '10', '11'],
+            ylabel='state',
+            yticklabels=['', '0', 'X', 'Y', '1'],
+        )
+
+        for select in chi_all:
+            ax_r, ax_i = plotter.plot_complex_mat3d(chi_all[select])
+            fig = ax_r.get_figure()
+            fig.suptitle(f'tele ss qpt, m={m}, select={select}, F={Fchi[select]:.4f}')
+            # plotter.plot_complex_mat3d(chi_ideal_all[select])
+
+    return chi_all, Fchi, Frho, chi_ideal_all
 
 def rho_Q5(q1q2s, alpha, beta):
     """Returns theoritical density matrix of Q5 after teleport.

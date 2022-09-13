@@ -10,6 +10,7 @@ from labcodes.plotter.misc import cursor
 import matplotlib as mpl
 # https://matplotlib.org/stable/tutorials/introductory/customizing.html#the-default-matplotlibrc-file
 mpl.rcParams['pdf.fonttype'] = 42  # Make saved pdf text editable.
+mpl.rcParams['svg.fonttype'] = 'none'  # Make saved pdf text editable. Assume fonts are installed on the machine where the SVG will be viewed.
 mpl.rcParams['savefig.facecolor'] = 'w'  # Make white background of saved figure, instead of transparent.
 mpl.rcParams['savefig.dpi'] = 200
 mpl.rcParams['figure.autolayout'] = True  # Enable default tight_layout.

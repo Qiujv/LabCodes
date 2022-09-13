@@ -124,6 +124,17 @@ def qst(diags, U, return_all=False):
     Args:
         diags: 2d array with shape n_ops * n_stats = [I, X/2, Y/2]**n_qs * [0, 1]**n_qs
         label order in nested-loop style, i.e. 001, 010, **011** instead of 001, 010, **100**.
+        - for single qubit QST, diags = [
+                [p0_I, p1_I],
+                [p0_X, p1_X],
+                [p0_Y, p1_Y],
+            ]
+        - for two qubit qst, diags = [
+                [p00_II, p01_II, p10_II, p11_II],
+                [p00_IX, p01_IX, p10_IX, p11_IX],
+                ...
+                [p00_YY, p01_YY, p10_YY, p11_II],
+            ]
         
         measured probabilities (diagonal elements) after acting on the state 
         with each of the unitaries from the qst protocol
