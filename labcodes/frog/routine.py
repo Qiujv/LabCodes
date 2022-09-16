@@ -413,7 +413,7 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
     
 
 
-def df2mat(df, fname, xy_name=None):
+def df2mat(df, fname=None, xy_name=None):
     """Save dataframe to .mat file. For internal communication.
     
     Args:
@@ -432,5 +432,82 @@ def df2mat(df, fname, xy_name=None):
         mdic = {col: df[col].values.reshape(xsize, ysize)
                 for col in df.columns}
 
-    scipy.io.savemat(fname, mdic)
+    if fname: scipy.io.savemat(fname, mdic)
     return mdic
+
+
+from scipy.optimize import leastsq
+from scipy import stats
+def rb_fit(dir, id, id_ref, residue=None):
+    """Adapted from codes provided by NJJ, but remove dependence to labrad."""
+    lf = fileio.LabradRead(dir, id)
+    df2d = df2mat(lf.df, xy_name=['k', 'm'])
+    mat = df2d['prob_s0']
+    m = df2d['m'][0]
+
+    lf0 = fileio.LabradRead(dir, id_ref)
+    df2d0 = df2mat(lf0.df, xy_name=['k', 'm'])
+    mat0 = df2d0['prob_s0']
+    m0 = df2d0['m'][0]
+    gate = lf.conf['parameter']['gate']['data'][1:-1]
+
+    prob = np.nanmean(mat,axis=0)
+    prob_std = np.nanstd(mat,axis=0)
+    prob0 = np.nanmean(mat0,axis=0)
+    prob0_std = np.nanstd(mat0,axis=0)
+    if residue is None:
+        p0 = np.array([0.5,0.95,0.5])
+        def fitfunc(p,t):
+            return p[0]*p[1]**t+p[2]
+    else:
+        p0 = np.array([0.5,0.95])
+        def fitfunc(p,t):
+            return p[0]*p[1]**t+residue
+    def errfunc(p):
+        return fitfunc(p,m) - prob
+    out = leastsq(errfunc,p0,full_output=True)
+    p = out[0]
+    pgate = p[1]
+    vdsig = stats.norm.fit(errfunc(p))[1] # the sigma of the residue.
+    var = np.sqrt(out[1][1,1])*np.abs(vdsig)
+
+    def errfunc0(p):
+        return fitfunc(p,m0) - prob0
+    out0 = leastsq(errfunc0,p0,full_output=True)
+    p0 = out0[0]
+    pr = p0[1]
+    vdsig0 = stats.norm.fit(errfunc0(p))[1] # the sigma of the residue.
+    var0 = np.sqrt(out[1][1,1])*np.abs(vdsig0)
+
+    if residue is not None:
+        p0 = np.concatenate([p0,[residue]])
+        p = np.concatenate([p,[residue]])
+    rgate = (1-pgate/pr)/2.0
+    rstd = 0.5*(pgate**2/pr**2*(var**2/pgate**2+var0**2/pr**2))**0.5
+    print('pgate:%.4f\npr:%.4f'%(pgate,pr))
+    print('gate error=%.4f+-%.4f'%(rgate,rstd))
+    fig, ax = plt.subplots()
+    ax.errorbar(m,prob,yerr=prob_std,fmt='rs',label=gate+' gate',alpha=0.8,ms=3)
+    ax.plot(m,fitfunc(p,m),'r--')
+    ax.errorbar(m0,prob0,yerr=prob0_std,fmt='bo',label='reference',alpha=0.8,ms=3)
+    ax.plot(m0,fitfunc(p0,m0),'b--')
+    plt.xlabel('m - Number of Gates')
+    plt.ylabel('Sequence Fidelity')
+    plt.ylim([0.5,1])
+    # plt.xlim([min(m),max(m)])
+    plt.grid(True,which='both')
+    plt.title(gate+r' gate fidelity $%.2f\pm%.2f$%%'%(100-rgate*100,100*rstd))
+
+    ax.text(0.5, 0.75, r'$%.4f\times %.4f^m+%.4f$'%(p0[0],p0[1],p0[2]),
+        horizontalalignment='left',
+        verticalalignment='center',
+        fontsize=12, color='b',
+        transform=ax.transAxes)
+    ax.text(0.5, 0.65, r'$%.4f\times %.4f^m+%.4f$'%(p[0],p[1],p[2]),
+        horizontalalignment='left',
+        verticalalignment='center',
+        fontsize=12, color='r',
+        transform=ax.transAxes)
+    ax.legend()
+    return ax
+
