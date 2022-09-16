@@ -13,6 +13,7 @@ def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwa
         fig, ax = plt.subplots()
     else:
         fig = ax.get_figure()
+        
     mat = np.array(mat)
     if txt is None:
         txt = [fmt(i) for i in mat.ravel()]

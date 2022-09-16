@@ -2,6 +2,7 @@
 
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
@@ -62,7 +63,7 @@ def plot_pdf_cdf(data, ax=None, ax2=None, bins=50, label=None):
     )
     return bins, density, x, cumsum
 
-def plot_visibility(s0v, s1v, ax=None, ax2=None, bins=50):
+def plot_visibility(s0v, s1v, ax=None, ax2=None, bins=50, return_all=False, annotate=True):
     """Plot state visibility, two levels only.
     
     Args:
@@ -79,8 +80,9 @@ def plot_visibility(s0v, s1v, ax=None, ax2=None, bins=50):
 
     # Plot the probability density and cumulative probability density.
     bins = np.histogram_bin_edges(np.array([s0v, s1v]).real, bins=bins)
-    _, _, x0, cdf0 = plot_pdf_cdf(s0v, ax, ax2, label='|0>', bins=bins)
-    _, _, x1, cdf1 = plot_pdf_cdf(s1v, ax, ax2, label='|1>', bins=bins)
+    _, pdf0, x0, cdf0 = plot_pdf_cdf(s0v, ax, ax2, label='|0>', bins=bins)
+    _, pdf1, x1, cdf1 = plot_pdf_cdf(s1v, ax, ax2, label='|1>', bins=bins)
+    df_ret = pd.DataFrame(dict(x=x0, pdf0=pdf0, cdf0=cdf0, pdf1=pdf1, cdf1=cdf1))
     ax.legend(loc='upper left')
 
     # Plot visibility.
@@ -88,12 +90,16 @@ def plot_visibility(s0v, s1v, ax=None, ax2=None, bins=50):
     argmax = np.argmax(visi)
     ax2.plot(x0, visi, label='|1>-|0>')
     text_pos = (0.5, 0.95) if visi[argmax] < 0.9 else (0.5, 0.8)
-    ax2.annotate(
-        f'best visibility = {visi[argmax]:.3f}\np00={cdf0[argmax]:.3f}, p11={1-cdf1[argmax]:.3f}', 
-        (x0[argmax], visi[argmax]), 
-        text_pos, textcoords=ax2.transAxes, ha='center', arrowprops=dict(arrowstyle="->"))
+    if annotate:
+        ax2.annotate(
+            f'best visibility = {visi[argmax]:.3f}\np00={cdf0[argmax]:.3f}, p11={1-cdf1[argmax]:.3f}', 
+            (x0[argmax], visi[argmax]), 
+            text_pos, textcoords=ax2.transAxes, ha='center', arrowprops=dict(arrowstyle="->"))
     ax2.legend(loc='center right')
-    return ax, ax2
+    if return_all:
+        return ax, ax2, df_ret
+    else:
+        return ax, ax2
 
 
 if __name__ == '__main__':

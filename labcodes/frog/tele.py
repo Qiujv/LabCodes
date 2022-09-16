@@ -14,7 +14,7 @@ def get_center(conf, qubit, state):
     center = center[0] + 1j*center[1]
     return center
 
-def judge(lf, qubit='q2', label=None, tolerance=None):
+def judge(df, conf, qubit='q2', label=None, tolerance=None, return_all=False):
     """Do state discrimination for single shot datas. For example:
         i1, q1 -> cplx_q1, cplx_q1_rot, q1_s1
     
@@ -22,7 +22,8 @@ def judge(lf, qubit='q2', label=None, tolerance=None):
     no returns.
 
     Args:
-        lf: logfile with df and conf.
+        df: DataFrame with single Is and Qs.
+        conf: lf.conf from which the |0> and |1> center are obtained.
         qubit: str, which qubit to use.
         label: use column i{label}, q{label} as single shot.
             if None, use qubit[1:].
@@ -30,11 +31,11 @@ def judge(lf, qubit='q2', label=None, tolerance=None):
     """
     if tolerance is None: tolerance = JUDGE_TOL
     if label is None: label = qubit[1:]
-    df = lf.df
+    df = df.copy()
 
     df[f'cplx_{qubit}'] = df[f'i{label}'] + 1j*df[f'q{label}']
-    cent0 = get_center(lf.conf, qubit, 0)
-    cent1 = get_center(lf.conf, qubit, 1)
+    cent0 = get_center(conf, qubit, 0)
+    cent1 = get_center(conf, qubit, 1)
 
     angle = -np.angle(cent1 - cent0)
     df[f'cplx_{qubit}_rot'] = df[f'cplx_{qubit}'] * np.exp(1j*angle)
@@ -52,7 +53,7 @@ def judge(lf, qubit='q2', label=None, tolerance=None):
     close_enough = (angle_diff <= tolerance) or (np.pi - angle_diff <= tolerance)
     if not close_enough:
         fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(6,3))
-        fig.suptitle(lf.name.as_plot_title(qubit=qubit.upper()))
+        # fig.suptitle(lf.name.as_plot_title(qubit=qubit.upper()))
         plotter.plot_iq(df[f'cplx_{qubit}'], ax=ax)
         ax.plot(cent0.real, cent0.imag, color='C0', marker='*', markeredgecolor='w', markersize=10)
         ax.plot(cent1.real, cent1.imag, color='C1', marker='*', markeredgecolor='w', markersize=10)
@@ -68,30 +69,40 @@ def judge(lf, qubit='q2', label=None, tolerance=None):
         ax2.plot(x,y,'k--')
         ax2.plot(x,np.ones(x.shape)*y[0], 'k-')
         ax2.annotate('{:.1f} deg.'.format(angle_diff * 180/np.pi), (x[1], (y[0]+y[-1])/2), va='center')
+    if return_all:
+        return df, thres
+    else:
+        return df
 
 
 def get_conditional_p1(lf):
     """Get q5 s1_prob condition to q1q2=00, 01, 10, 11 from single shot logfile.
     
-    Adds columns to lf.df. Returns {'00':p1_00,'01':p1_01,'10':p1_10,'11':p1_11}
+    Returns {'00':p1_00,'01':p1_01,'10':p1_10,'11':p1_11}
     """
-    if 'q1_s1' in lf.df: lf.df['q1_s1'] = lf.df['q1_s1'].astype(bool)
-    else: judge(lf, 'q1')
-    if 'q2_s1' in lf.df: lf.df['q2_s1'] = lf.df['q2_s1'].astype(bool)
-    else: judge(lf, 'q2')
-    if 'q5_s1' in lf.df: lf.df['q5_s1'] = lf.df['q5_s1'].astype(bool)
-    else: judge(lf, 'q5')
-    df = lf.df[['runs', 'q1_s1', 'q2_s1', 'q5_s1']]
-    p1_00 = df.loc[(~df['q1_s1']) & (~df['q2_s1']), 'q5_s1'].mean()
-    p1_01 = df.loc[(~df['q1_s1']) & ( df['q2_s1']), 'q5_s1'].mean()
-    p1_10 = df.loc[( df['q1_s1']) & (~df['q2_s1']), 'q5_s1'].mean()
-    p1_11 = df.loc[( df['q1_s1']) & ( df['q2_s1']), 'q5_s1'].mean()
-    p1 = df['q5_s1'].mean()
-    probs = {'00':p1_00, '01':p1_01, '10':p1_10, '11':p1_11, '': p1}
-    for k, v in probs.copy().items():
-        if np.isnan(v):  # np.mean returns nan if array is [].
-            probs[k] = 0  # change that results to 0.
-    return probs
+    df = lf.df.copy()
+
+    if 'q1_s1' in df: df['q1_s1'] = df['q1_s1'].astype(bool)
+    else: df = judge(df, lf.conf, 'q1')
+    if 'q2_s1' in df: df['q2_s1'] = df['q2_s1'].astype(bool)
+    else: df = judge(df, lf.conf, 'q2')
+    if 'q5_s1' in df: df['q5_s1'] = df['q5_s1'].astype(bool)
+    else: df = judge(df, lf.conf, 'q5')
+
+    df = df[['runs', 'q1_s1', 'q2_s1', 'q5_s1']]
+    masks = {
+        '00': (~df['q1_s1']) & (~df['q2_s1']),
+        '01': (~df['q1_s1']) & ( df['q2_s1']),
+        '10': ( df['q1_s1']) & (~df['q2_s1']),
+        '11': ( df['q1_s1']) & ( df['q2_s1']),
+        'all': np.ones(df.shape[0], dtype=bool),
+    }
+    # Appearance probability, q5_s1_prob of certain select.
+    df_out = {k: [mask.mean(), df.loc[mask, 'q5_s1'].mean(), 1-df.loc[mask, 'q5_s1'].mean()]
+          for k, mask in masks.items()}
+    df_out = pd.DataFrame.from_dict(df_out, orient='index', columns=['weight', 'q5_s1_prob', 'q5_s0_prob'])
+    df_out.fillna(0)  # np.mean returns nan if array is [], change that results to 0.
+    return df_out
 
 def single_shot_qst(dir, id0, idx, idy, select, ro_mat=None, suffix='csv'):
     """Calculate density matrix from single shot tomo experiments, with tomo op: I, X/2, Y/2.
@@ -103,9 +114,8 @@ def single_shot_qst(dir, id0, idx, idy, select, ro_mat=None, suffix='csv'):
         ro_mat: np.array, readout assignment matrix of q5. 
             if None, apply I.
     """
-    p1_I, p1_X, p1_Y = [get_conditional_p1(fileio.LabradRead(dir, id, suffix=suffix))[select] 
-                        for id in (id0, idx, idy)]
-    probs = [[1-p1, p1] for p1 in (p1_I, p1_X, p1_Y)]
+    dfs = [get_conditional_p1(fileio.LabradRead(dir, id, suffix=suffix)) for id in (id0, idx, idy)]
+    probs = [[df.loc[select, 'q5_s0_prob'], df.loc[select, 'q5_s1_prob']] for df in dfs]
 
     if ro_mat is not None:
         for i, ps in enumerate(probs):
@@ -115,6 +125,16 @@ def single_shot_qst(dir, id0, idx, idy, select, ro_mat=None, suffix='csv'):
     return rho
 
 def single_shot_qpt(dir, m, selects=('00','01','10','11'), verbose=True, **kw):
+    """Calculate process matrix from single shot tomo experiments, with:
+        init_state x tomo_op: (0, X, Y, 1) x (0, X, Y) = 00, 0X, ...
+        12 logfiles with id from m on.
+    
+    Returns: 
+        chi_all: {'00': chi}, chi is 4x4 complex matrix.
+        Fchi: {'00': Fid(chi, chi_ideal)}.
+        Frho: {'00': [Fid(rho_0), Fid(rho_x), Fid(rho_y), Fid(rho_1)]}.
+        chi_ideal_all: {'00': chi_ideal}.
+    """
     chi_all = {}
     chi_ideal_all = {}
     Fchi = {}
@@ -177,30 +197,44 @@ def single_shot_qpt(dir, m, selects=('00','01','10','11'), verbose=True, **kw):
             'sigma',
         )
 
-        chi_fidelity = fidelity(chi, chi_ideal)
+        # chi_fidelity = fidelity(chi, chi_ideal)
+        chi_fidelity = np.abs(chi).max()
         chi_all[select] = chi
         chi_ideal_all[select] = chi_ideal
         Fchi[select] = chi_fidelity
 
     if verbose:
-        for select, f in Fchi.items():
-            print(f'select {select}: F={f:.3f}')
+        # for select, f in Fchi.items():
+        #     print(f'select {select}: F={f:.3f}')
 
         ax = plotter.plot_mat2d(pd.DataFrame(Frho), fmt='{:.3f}'.format)
         ax.set(
+            title='rho_fidelitys',
             xlabel='select',
             xticklabels=['', '00', '01', '10', '11'],
             ylabel='state',
             yticklabels=['', '0', 'X', 'Y', '1'],
         )
 
-        for select in chi_all:
-            ax_r, ax_i = plotter.plot_complex_mat3d(chi_all[select])
-            fig = ax_r.get_figure()
-            fig.suptitle(f'tele ss qpt, m={m}, select={select}, F={Fchi[select]:.4f}')
-            # plotter.plot_complex_mat3d(chi_ideal_all[select])
+        fig, _ = plot_chi_all(chi_all, f'tele ss qpt, m={m}')
+        # plot_chi_all(chi_ideal_all, f'tele ss qpt, m={m}')
+    else:
+        fig = None
 
-    return chi_all, Fchi, Frho, chi_ideal_all
+    return chi_all, Fchi, Frho, chi_ideal_all, fig
+
+def plot_chi_all(chi_all, figtitle=None):
+    fig = plt.figure(figsize=(14,8), tight_layout=False)
+    axs = [fig.add_subplot(2,4,i, projection='3d') for i in range(1,9)]
+    iis = {'00': (0,1), '01': (2,3), '10': (4,5), '11': (6,7)}
+    colorbar = True  # Only for the first plot
+    for select, chi in chi_all.items():
+        ii, sii = iis[select]
+        plotter.plot_complex_mat3d(chi, axs[ii:sii+1], cmin=-1, cmax=1, colorbar=colorbar)
+        colorbar = False
+        axs[sii].set_title(f'select={select}')
+    if figtitle: fig.suptitle(figtitle)
+    return fig, axs
 
 def rho_Q5(q1q2s, alpha, beta):
     """Returns theoritical density matrix of Q5 after teleport.
@@ -235,3 +269,4 @@ def rho_Q5(q1q2s, alpha, beta):
 
 def fidelity(rho, sigma):
     return np.real(np.trace(np.dot(rho, sigma)))
+
