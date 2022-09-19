@@ -35,6 +35,7 @@ ESCAPE_CHARS = {  # |, >, : in filename were replaced by %v, %g, %c.
     r'%g': '>',
     r'%c': ':',
     r'%a': '*',
+    r'%f': '/',
 }
 PATH_LEGAL = {
     '->': '→',
@@ -243,7 +244,7 @@ class LabradRead(object):
         prn = f'{str(id).zfill(5)} - *.{suffix}'
         all_match = list(Path(dir).glob(prn))
         if len(all_match) == 0:
-            raise ValueError(f'Data file not found at given dir: {dir}')
+            raise ValueError(f'Data file with id={id}, suffix={suffix} not found at given dir: {dir}')
         return all_match[0]
 
     @staticmethod
@@ -278,6 +279,23 @@ class LabradRead(object):
         if sect.get('units'):
             name += f'_{sect["units"]}'
         return name
+
+def browse(dir, do_print=False):
+    dir = Path(dir)
+    conf = eval(LabradRead.load_ini(dir/'session.ini')['Tags']['datasets'])
+    conf = {k[:5]: v for k,v in conf.items()}
+    ret = []
+    for i, p in enumerate(dir.glob('*.csv')):
+        msg = p.stem
+        msg = replace(msg, ESCAPE_CHARS)
+        tags = conf.get(msg[:5], [])
+        if 'trash' in tags: msg = '_' + msg
+        elif 'star' in tags: msg = '*' + msg
+        else: msg = ' ' + msg
+        if do_print: print(msg)
+        ret.append(msg)
+    return ret
+
 
 if __name__ == '__main__':
     test_dir = 'C:/Users/qiujv/Downloads'

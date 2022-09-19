@@ -124,7 +124,25 @@ def single_shot_qst(dir, id0, idx, idy, select, ro_mat=None, suffix='csv'):
     rho = tomo.qst(np.array(probs), 'tomo')
     return rho
 
-def single_shot_qpt(dir, m, selects=('00','01','10','11'), verbose=True, **kw):
+rho_in = {
+    '0': np.array([
+        [1,0],
+        [0,0],
+    ]),
+    '1': np.array([
+        [0,0],
+        [0,1],
+    ]),
+    'x': np.array([
+        [.5, .5j],
+        [-.5j, .5],
+    ]),
+    'y': np.array([
+        [.5, .5],
+        [.5, .5]
+    ])
+}
+def single_shot_qpt(dir, m, selects=('00','01','10','11'), apply_ff=None, **kw):
     """Calculate process matrix from single shot tomo experiments, with:
         init_state x tomo_op: (0, X, Y, 1) x (0, X, Y) = 00, 0X, ...
         12 logfiles with id from m on.
@@ -135,6 +153,15 @@ def single_shot_qpt(dir, m, selects=('00','01','10','11'), verbose=True, **kw):
         Frho: {'00': [Fid(rho_0), Fid(rho_x), Fid(rho_y), Fid(rho_1)]}.
         chi_ideal_all: {'00': chi_ideal}.
     """
+    if apply_ff is None:
+        name = fileio.LabradRead(dir, m).name.title.lower()
+        if 'tele_ss_fb' in name:
+            apply_ff = False
+        elif 'tele_ss_ps' in name and ('ff' not in name):
+            apply_ff = True
+        else:
+            apply_ff = False
+
     chi_all = {}
     chi_ideal_all = {}
     Fchi = {}
@@ -146,45 +173,42 @@ def single_shot_qpt(dir, m, selects=('00','01','10','11'), verbose=True, **kw):
             'y': single_shot_qst(dir, m+6, m+7, m+8, select, **kw),
             '1': single_shot_qst(dir, m+9, m+10, m+11, select, **kw),
         }
-        rho_out_ideal = {
-            '0': np.array(rho_Q5(select, 1,0)),
-            'x': np.array(rho_Q5(select, 1/np.sqrt(2),-1j/np.sqrt(2))),
-            'y': np.array(rho_Q5(select, 1/np.sqrt(2),1/np.sqrt(2))),
-            '1': np.array(rho_Q5(select, 0,1)),
-        }
-    
-        # plotter.plot_complex_mat3d(rho_out['0'])
-        # plotter.plot_complex_mat3d(rho_out_ideal['0'])
-        rho_f_0 = fidelity(rho_out['0'], rho_out_ideal['0'])
-        # plotter.plot_complex_mat3d(rho_out['x'])
-        # plotter.plot_complex_mat3d(rho_out_ideal['x'])
-        rho_f_x = fidelity(rho_out['x'], rho_out_ideal['x'])
-        # plotter.plot_complex_mat3d(rho_out['y'])
-        # plotter.plot_complex_mat3d(rho_out_ideal['y'])
-        rho_f_y = fidelity(rho_out['y'], rho_out_ideal['y'])
-        # plotter.plot_complex_mat3d(rho_out['1'])
-        # plotter.plot_complex_mat3d(rho_out_ideal['1'])
-        rho_f_1 = fidelity(rho_out['1'], rho_out_ideal['1'])
-        Frho[select] = [rho_f_0, rho_f_x, rho_f_y, rho_f_1]
+        if apply_ff:
+            if select == '00':
+                rho_out_ideal = rho_in
+                # rho_out_ideal = {  # after Ypi, for 01
+                #     '0': rho(1,0),
+                #     'x': rho(1/np.sqrt(2),-1j/np.sqrt(2)),
+                #     'y': rho(1/np.sqrt(2), 1/np.sqrt(2)),
+                #     '1': rho(0,1),
+                # }
+            elif select == '01':
+                rho_out_ideal = {  # after Ypi, for 01
+                    '0': rho(0,1),
+                    'x': rho(1/np.sqrt(2), 1j/np.sqrt(2)),
+                    'y': rho(1/np.sqrt(2), 1/np.sqrt(2)),
+                    '1': rho(1,0),
+                }
+            elif select == '10':
+                rho_out_ideal = {  # after YpiXpi, for 10
+                    '0': rho(1,0),
+                    'x': rho(1/np.sqrt(2), 1j/np.sqrt(2)),
+                    'y': rho(1/np.sqrt(2),-1/np.sqrt(2)),
+                    '1': rho(0,1),
+                }
+            elif select == '11':
+                rho_out_ideal = {  # after Xpi, for 11
+                    '0': rho(0,1),
+                    'x': rho(1/np.sqrt(2), -1j/np.sqrt(2)),
+                    'y': rho(1/np.sqrt(2), -1/np.sqrt(2)),
+                    '1': rho(1,0),
+                }
+        else:
+            rho_out_ideal = rho_in
 
-        rho_in = {
-            '0': np.array([
-                [1,0],
-                [0,0],
-            ]),
-            '1': np.array([
-                [0,0],
-                [0,1],
-            ]),
-            'x': np.array([
-                [.5, .5j],
-                [-.5j, .5],
-            ]),
-            'y': np.array([
-                [.5, .5],
-                [.5, .5]
-            ])
-        }
+        Frho[select] = {k: fidelity(rho_out[k], rho_out_ideal[k]) 
+                        for k in ('0', 'x', 'y', '1')}
+
         chi = tomo.qpt(
             [rho_in[k] for k in ('0', 'x', 'y', '1')], 
             [rho_out[k] for k in ('0', 'x', 'y', '1')], 
@@ -197,36 +221,25 @@ def single_shot_qpt(dir, m, selects=('00','01','10','11'), verbose=True, **kw):
             'sigma',
         )
 
-        # chi_fidelity = fidelity(chi, chi_ideal)
-        chi_fidelity = np.abs(chi).max()
         chi_all[select] = chi
         chi_ideal_all[select] = chi_ideal
-        Fchi[select] = chi_fidelity
+        # Fchi[select] = fidelity(chi, chi_ideal)
+        Fchi[select] = np.abs(chi).max()
 
-    if verbose:
-        # for select, f in Fchi.items():
-        #     print(f'select {select}: F={f:.3f}')
+    Frho = pd.DataFrame(Frho)
+    if np.any(Frho.values < 0.5) and np.all([v > 0.7 for v in Fchi.values()]):
+        print('WARNING: rho_fidelity is abnormally low, maybe you should use apply_ff=True.')
+    Frho['id'] = m
+    Fchi['id'] = m
+    return chi_all, Fchi, Frho, chi_ideal_all
 
-        ax = plotter.plot_mat2d(pd.DataFrame(Frho), fmt='{:.3f}'.format)
-        ax.set(
-            title='rho_fidelitys',
-            xlabel='select',
-            xticklabels=['', '00', '01', '10', '11'],
-            ylabel='state',
-            yticklabels=['', '0', 'X', 'Y', '1'],
-        )
-
-        fig, _ = plot_chi_all(chi_all, f'tele ss qpt, m={m}')
-        # plot_chi_all(chi_ideal_all, f'tele ss qpt, m={m}')
-    else:
-        fig = None
-
-    return chi_all, Fchi, Frho, chi_ideal_all, fig
-
-def plot_chi_all(chi_all, figtitle=None):
+def plot_chi_all(chi_all, figtitle=None, is_rho=False):
     fig = plt.figure(figsize=(14,8), tight_layout=False)
     axs = [fig.add_subplot(2,4,i, projection='3d') for i in range(1,9)]
-    iis = {'00': (0,1), '01': (2,3), '10': (4,5), '11': (6,7)}
+    if is_rho:
+        iis = {'0': (0,1), 'x': (2,3), 'y': (4,5), '1': (6,7)}
+    else:
+        iis = {'00': (0,1), '01': (2,3), '10': (4,5), '11': (6,7)}
     colorbar = True  # Only for the first plot
     for select, chi in chi_all.items():
         ii, sii = iis[select]
@@ -265,7 +278,13 @@ def rho_Q5(q1q2s, alpha, beta):
         raise ValueError(q1q2s)
 
     q3s = np.matrix(q3s)
-    return np.dot(q3s, q3s.H)
+    return np.array(np.dot(q3s, q3s.H))
+
+def rho(alpha, beta):
+    """Returns density matrix of qubit state alpha*|0> + beta*|1>"""
+    state = alpha*np.array([[1],[0]]) + beta*np.array([[0],[1]])
+    state = np.matrix(state)
+    return np.array(np.dot(state, state.H))
 
 def fidelity(rho, sigma):
     return np.real(np.trace(np.dot(rho, sigma)))
