@@ -96,7 +96,7 @@ def fit_coherence(logf, ax=None, model=None, kind=None, xmax=None, **kwargs):
     if 'T1' in kind:
         mod = models.ExponentialModel()
         symbol = 'T_1'
-    elif 'Ramsey' in kind:
+    elif ('Ramsey' in kind) or ('T2' in kind):
         mod = models.ExpSineModel()
         symbol = 'T_2^*'
     elif 'Echo' in kind:
