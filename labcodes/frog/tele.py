@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from labcodes import misc, fileio, plotter
 import labcodes.frog.pyle_tomo as tomo
@@ -142,7 +143,7 @@ rho_in = {
         [.5, .5]
     ])
 }
-def single_shot_qpt(dir, m, selects=('00','01','10','11'), apply_ff=None, **kw):
+def single_shot_qpt(dir, m, selects=('00','01','10','11'), apply_ff=None, return_rho=False, **kw):
     """Calculate process matrix from single shot tomo experiments, with:
         init_state x tomo_op: (0, X, Y, 1) x (0, X, Y) = 00, 0X, ...
         12 logfiles with id from m on.
@@ -164,6 +165,7 @@ def single_shot_qpt(dir, m, selects=('00','01','10','11'), apply_ff=None, **kw):
 
     chi_all = {}
     chi_ideal_all = {}
+    rho_all = {}
     Fchi = {}
     Frho = {}
     for select in selects:
@@ -221,6 +223,7 @@ def single_shot_qpt(dir, m, selects=('00','01','10','11'), apply_ff=None, **kw):
             'sigma',
         )
 
+        rho_all[select] = rho_out
         chi_all[select] = chi
         chi_ideal_all[select] = chi_ideal
         # Fchi[select] = fidelity(chi, chi_ideal)
@@ -231,7 +234,10 @@ def single_shot_qpt(dir, m, selects=('00','01','10','11'), apply_ff=None, **kw):
         print('WARNING: rho_fidelity is abnormally low, maybe you should use apply_ff=True.')
     Frho['id'] = m
     Fchi['id'] = m
-    return chi_all, Fchi, Frho, chi_ideal_all
+    if return_rho:
+        return chi_all, Fchi, Frho, chi_ideal_all, rho_all
+    else:
+        return chi_all, Fchi, Frho, chi_ideal_all
 
 def plot_chi_all(chi_all, figtitle=None, is_rho=False):
     fig = plt.figure(figsize=(14,8), tight_layout=False)
@@ -240,12 +246,15 @@ def plot_chi_all(chi_all, figtitle=None, is_rho=False):
         iis = {'0': (0,1), 'x': (2,3), 'y': (4,5), '1': (6,7)}
     else:
         iis = {'00': (0,1), '01': (2,3), '10': (4,5), '11': (6,7)}
-    colorbar = True  # Only for the first plot
     for select, chi in chi_all.items():
         ii, sii = iis[select]
-        plotter.plot_complex_mat3d(chi, axs[ii:sii+1], cmin=-1, cmax=1, colorbar=colorbar)
-        colorbar = False
+        plotter.plot_complex_mat3d(chi, axs[ii:sii+1], cmin=-1, cmax=1, colorbar=False)
         axs[sii].set_title(f'select={select}')
+    fig.subplots_adjust(top=0.9)
+    cax = fig.add_axes([0.4, 0.53, 0.2, 0.01])
+    cmap = plt.cm.get_cmap('RdBu_r')
+    cbar = fig.colorbar(plt.cm.ScalarMappable(norm=mpl.colors.Normalize(-1, 1), cmap=cmap),
+                        cax=cax, orientation='horizontal')
     if figtitle: fig.suptitle(figtitle)
     return fig, axs
 
