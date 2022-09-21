@@ -44,6 +44,8 @@ PATH_LEGAL = {
     '|': 'l',
     # '?': '？',
     '*': '·',
+    '/': '',
+    '\\': '',
 }
 ABBREV = {  # Some abbreviations.
     'pi pulse': 'pi',
