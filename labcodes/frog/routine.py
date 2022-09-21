@@ -522,15 +522,15 @@ def plot_rb(dir, id, id_ref, residue=None):
     lf_name = lf.name.copy()
     lf_name.id = f'{lf.name.id} ref {lf0.name.id}'
     df = pd.concat([
-        lf.df.groupby(by='m').apply(np.mean)[['m', 'prob_s0', 'prob_s1']],
-        lf.df.groupby(by='m').apply(np.std)[['prob_s0', 'prob_s1']
+        lf.df.groupby(by='m').mean()[['prob_s0', 'prob_s1']],
+        lf.df.groupby(by='m').std()[['prob_s0', 'prob_s1']
             ].rename(columns={'prob_s0': 'prob_s0_std', 'prob_s1': 'prob_s1_std'}),
-    ], axis=1)
+    ], axis=1).reset_index()
     df0 = pd.concat([
-        lf0.df.groupby(by='m').apply(np.mean)[['m', 'prob_s0', 'prob_s1']],
-        lf0.df.groupby(by='m').apply(np.std)[['prob_s0', 'prob_s1']
+        lf0.df.groupby(by='m').mean()[['prob_s0', 'prob_s1']],
+        lf0.df.groupby(by='m').std()[['prob_s0', 'prob_s1']
             ].rename(columns={'prob_s0': 'prob_s0_std', 'prob_s1': 'prob_s1_std'}),
-    ], axis=1)
+    ], axis=1).reset_index()
 
     def rb_decay(x, amp=0.5, fid=0.99, residue=0.5):
         return amp * fid**x + residue
@@ -583,15 +583,15 @@ def plot_rb_multi(dir, ids, id_ref, residue=None):
     lf_name = lfs[0].name.copy()
     lf_name.id = ', '.join([str(lf.name.id) for lf in lfs] + [f'ref {lf0.name.id}'])
     dfs = [pd.concat([
-        lf.df.groupby(by='m').apply(np.mean)[['m', 'prob_s0', 'prob_s1']],
-        lf.df.groupby(by='m').apply(np.std)[['prob_s0', 'prob_s1']
+        lf.df.groupby(by='m').mean()[['prob_s0', 'prob_s1']],
+        lf.df.groupby(by='m').std()[['prob_s0', 'prob_s1']
             ].rename(columns={'prob_s0': 'prob_s0_std', 'prob_s1': 'prob_s1_std'}),
-    ], axis=1) for lf in lfs]
+    ], axis=1).reset_index() for lf in lfs]
     df0 = pd.concat([
-        lf0.df.groupby(by='m').apply(np.mean)[['m', 'prob_s0', 'prob_s1']],
-        lf0.df.groupby(by='m').apply(np.std)[['prob_s0', 'prob_s1']
+        lf0.df.groupby(by='m').mean()[['prob_s0', 'prob_s1']],
+        lf0.df.groupby(by='m').std()[['prob_s0', 'prob_s1']
             ].rename(columns={'prob_s0': 'prob_s0_std', 'prob_s1': 'prob_s1_std'}),
-    ], axis=1)
+    ], axis=1).reset_index()
 
     def rb_decay(x, amp=0.5, fid=0.99, residue=0.5):
         return amp * fid**x + residue
