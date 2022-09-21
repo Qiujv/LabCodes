@@ -1,11 +1,13 @@
 """Script provides functions dealing with routine experiment datas."""
 
 
-import numpy as np
 import matplotlib.pyplot as plt
-from labcodes import misc, fitter, models, plotter, fileio
-import labcodes.frog.pyle_tomo as tomo
+import numpy as np
+import pandas as pd
 import scipy.io
+import labcodes.frog.pyle_tomo as tomo
+from labcodes import fileio, fitter, misc, models, plotter
+from labcodes.frog import tele
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -436,8 +438,10 @@ def df2mat(df, fname=None, xy_name=None):
     return mdic
 
 
-from scipy.optimize import leastsq
 from scipy import stats
+from scipy.optimize import leastsq
+
+
 def rb_fit(dir, id, id_ref, residue=None):
     """Adapted from codes provided by NJJ, but remove dependence to labrad."""
     lf = fileio.LabradRead(dir, id)
@@ -496,7 +500,7 @@ def rb_fit(dir, id, id_ref, residue=None):
     plt.ylim([0.5,1])
     # plt.xlim([min(m),max(m)])
     plt.grid(True,which='both')
-    plt.title(gate+r' gate fidelity $%.2f\pm%.2f$%%'%(100-rgate*100,100*rstd))
+    plt.title(f'id={id}, ref={id_ref}, {lf.name.qubit.lower()}, '+gate+r' gate fidelity $%.2f\pm%.2f$%%'%(100-rgate*100,100*rstd))
 
     ax.text(0.5, 0.75, r'$%.4f\times %.4f^m+%.4f$'%(p0[0],p0[1],p0[2]),
         horizontalalignment='left',
@@ -511,3 +515,61 @@ def rb_fit(dir, id, id_ref, residue=None):
     ax.legend()
     return ax
 
+def plot_iq_2q(dir, id00, id01=None, id10=None, id11=None):
+    """Plot two qubit joint readout IQ scatter, for single_shot_2q."""
+    def load_one(lf, qb):
+        df, thres = tele.judge(lf.df, lf.conf, qubit=qb, return_all=True, tolerance=np.inf)
+        df = df[[f'cplx_{qb}_rot', f'{qb}_s1']
+            ].rename(columns={f'cplx_{qb}_rot': 'cplx_rot', f'{qb}_s1': 's1'})
+        return df, thres  # thres get from experiment parameters.
+
+    if id01 is None: id01 = id00 + 1
+    if id10 is None: id10 = id00 + 2
+    if id11 is None: id11 = id00 + 3
+
+    lf00 = fileio.LabradRead(dir, id00, suffix='csv_complete')
+    df00q1, thres1 = load_one(lf00, 'q1')
+    df00q2, thres2 = load_one(lf00, 'q2')
+    lf01 = fileio.LabradRead(dir, id01, suffix='csv_complete')
+    df01q1, _ = load_one(lf01, 'q1')
+    df01q2, _ = load_one(lf01, 'q2')
+    lf10 = fileio.LabradRead(dir, id10, suffix='csv_complete')
+    df10q1, _ = load_one(lf10, 'q1')
+    df10q2, _ = load_one(lf10, 'q2')
+    lf11 = fileio.LabradRead(dir, id11, suffix='csv_complete')
+    df11q1, _ = load_one(lf11, 'q1')
+    df11q2, _ = load_one(lf11, 'q2')
+
+    lf_names = lf00.name.copy()
+    lf_names.id = ','.join([str(lf.name.id) for lf in [lf00, lf01, lf10, lf11]])
+    df = pd.DataFrame({
+        'c00': df00q1['cplx_rot'].values.real + 1j*df00q2['cplx_rot'].values.real,
+        'c01': df01q1['cplx_rot'].values.real + 1j*df01q2['cplx_rot'].values.real,
+        'c10': df10q1['cplx_rot'].values.real + 1j*df10q2['cplx_rot'].values.real,
+        'c11': df11q1['cplx_rot'].values.real + 1j*df11q2['cplx_rot'].values.real,
+        's00': (~df00q1['s1'].values) & (~df00q2['s1'].values),
+        's01': (~df01q1['s1'].values) & ( df01q2['s1'].values),
+        's10': ( df10q1['s1'].values) & (~df10q2['s1'].values),
+        's11': ( df11q1['s1'].values) & ( df11q2['s1'].values),
+    })
+
+    fig, ax = plt.subplots()
+    plotter.plot_iq(df['c00'], ax=ax, label='|00>')
+    plotter.plot_iq(df['c01'], ax=ax, label='|01>')
+    plotter.plot_iq(df['c10'], ax=ax, label='|10>')
+    plotter.plot_iq(df['c11'], ax=ax, label='|11>')
+    ax.annotate(f'p00_s00={df["s00"].mean():.3f}', (0.05,0.05), xycoords='axes fraction')
+    ax.annotate(f'p01_s01={df["s01"].mean():.3f}', (0.05,0.95), xycoords='axes fraction')
+    ax.annotate(f'p10_s10={df["s10"].mean():.3f}', (0.55,0.05), xycoords='axes fraction')
+    ax.annotate(f'p11_s11={df["s11"].mean():.3f}', (0.55,0.95), xycoords='axes fraction')
+    ax.axvline(x=thres1, color='k', ls='--')
+    ax.axhline(y=thres2, color='k', ls='--')
+    ax.legend(bbox_to_anchor=(1,1))
+    ax.tick_params(direction='in')
+    ax.set(
+        title=lf_names.as_plot_title(),
+        xlabel='Q1 projection position',
+        ylabel='Q2 projection position',
+    )
+
+    return ax, lf_names
