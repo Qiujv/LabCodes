@@ -576,6 +576,68 @@ def plot_rb(dir, id, id_ref, residue=None):
     ax.legend()
     return ax, lf_name
 
+def plot_rb_multi(dir, ids, id_ref, residue=None):
+    lfs = [fileio.LabradRead(dir, id) for id in ids]
+    lf0 = fileio.LabradRead(dir, id_ref)
+    gates = [lf.conf['parameter']['gate']['data'][1:-1] for lf in lfs]
+    lf_name = lfs[0].name.copy()
+    lf_name.id = ', '.join([str(lf.name.id) for lf in lfs] + [f'ref {lf0.name.id}'])
+    dfs = [pd.concat([
+        lf.df.groupby(by='m').apply(np.mean)[['m', 'prob_s0', 'prob_s1']],
+        lf.df.groupby(by='m').apply(np.std)[['prob_s0', 'prob_s1']
+            ].rename(columns={'prob_s0': 'prob_s0_std', 'prob_s1': 'prob_s1_std'}),
+    ], axis=1) for lf in lfs]
+    df0 = pd.concat([
+        lf0.df.groupby(by='m').apply(np.mean)[['m', 'prob_s0', 'prob_s1']],
+        lf0.df.groupby(by='m').apply(np.std)[['prob_s0', 'prob_s1']
+            ].rename(columns={'prob_s0': 'prob_s0_std', 'prob_s1': 'prob_s1_std'}),
+    ], axis=1)
+
+    def rb_decay(x, amp=0.5, fid=0.99, residue=0.5):
+        return amp * fid**x + residue
+
+    mod = models.MyModel(rb_decay)
+    if residue: mod.set_param_hint('residue', vary=False, value=residue)
+
+    cfits = [fitter.CurveFit(
+        xdata=df['m'].values,
+        ydata=df['prob_s0'].values,
+        model=mod,
+    ) for df in dfs]
+    cfit0 = fitter.CurveFit(
+        xdata=df0['m'].values,
+        ydata=df0['prob_s0'].values,
+        model=mod,
+    )
+    gates_err = [(1 - cfit['fid']/cfit0['fid']) / 2 for cfit in cfits]
+    gates_err_std = [0.5 * cfit['fid']*cfit0['fid'] \
+                    * abs(cfit['fid_err']/cfit['fid'] + 1j*cfit0['fid_err']/cfit0['fid'])
+                    for cfit in cfits]
+    lf_name.title = lf_name.title.replace(' Randomized Benchmarking', 'RB'
+                    ).replace(gates[0], '')\
+                    + f'ave fidelity {(1-np.mean(gates_err))*100:.2f}%'
+
+    fig, ax = plt.subplots()
+    [ax.errorbar('m', 'prob_s0', 'prob_s0_std', data=df, fmt='s', label=f'{gate} {(1-gate_err)*100:.2f}%±{gate_err_std*100:.3f}%', 
+                alpha=0.8, markersize=3)
+        for df, gate, gate_err, gate_err_std in zip(dfs, gates, gates_err, gates_err_std)]
+    ax.errorbar('m', 'prob_s0', 'prob_s0_std', data=df0, fmt='ko', label='reference', 
+                alpha=0.8, markersize=3)
+    ax.set_prop_cycle(None)
+    [ax.plot(*cfit.fdata(500), '--') for cfit in cfits]
+    ax.plot(*cfit0.fdata(500), 'k--')
+
+    ax.grid(True)
+    ax.set(
+        title=lf_name.as_plot_title(),
+        xlabel='m - Number of Gates',
+        xlim=(0, max([df['m'].max() for df in dfs])+10),
+        ylabel='Sequence Fidelity',
+        ylim=(0.5,1),
+    )
+    ax.legend()
+    return ax, lf_name
+
 def plot_iq_2q(dir, id00, id01=None, id10=None, id11=None):
     """Plot two qubit joint readout IQ scatter, for single_shot_2q."""
     def load_one(lf, qb):
