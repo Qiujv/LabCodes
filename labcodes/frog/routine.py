@@ -696,3 +696,51 @@ def plot_iq_2q(dir, id00, id01=None, id10=None, id11=None):
     )
 
     return ax, lf_names
+
+def plot_2q_qpt(dir, start, ro_mat=None, plot_all=False):
+    """Process two-qubit QPT datas.
+    
+    Log files of state tomography with prepared state: [0,x,y,1]**2 = 00, 0x, ... 11 (16 in total).
+    starts from `start` in `dir`.
+    """
+    rho_out = []
+    for i in np.arange(16)+start:
+        rho, _, ax = plot_qst(dir, i, ro_mat=ro_mat)
+        ax.set_zlim(0,1)
+        rho_out += [rho]
+        if not plot_all: plt.close(ax.get_figure())
+
+    rho_1q = [
+        np.array([
+            [1,0],
+            [0,0],
+        ]),
+        np.array([
+            [.5, .5j],
+            [-.5j, .5],
+        ]),
+        np.array([
+            [.5, .5],
+            [.5, .5]
+        ]),
+        np.array([
+            [0,0],
+            [0,1],
+        ]),
+    ]
+    rho_in = tomo.tensor_combinations(rho_1q, 2)
+
+    cz = np.diag([1,1,1,-1])
+    rho_ideal = [np.dot(np.dot(cz, x), cz.conj().transpose()) for x in rho_in]
+    chi_ideal = tomo.qpt(rho_in, rho_ideal, 'sigma2')
+    chi_out = tomo.qpt(rho_in, rho_out, 'sigma2')
+
+    ax, _ = plotter.plot_complex_mat3d(chi_out, label=False)
+
+    fid = tele.fidelity(chi_ideal, chi_out)
+    lf_name = fileio.LabradRead(dir, start).name
+    lf_name.id = f'{start}-{start+15}'
+    lf_name.title += f', F={fid*100:.2f}%'
+    ax.get_figure().suptitle(lf_name.as_plot_title())
+
+    return ax, lf_name
