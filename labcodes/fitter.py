@@ -701,7 +701,7 @@ def df_to_traces(df, index, columns, values):
     y_series = gp[values].apply(lambda se: se.values)
     xbatch = x_series.to_list()
     ybatch = y_series.to_list()
-    stepper_value = x_series.index.values
+    stepper_value = x_series.index
 
     return xbatch, ybatch, stepper_value
 
