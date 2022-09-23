@@ -79,7 +79,7 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
     )
     if colorbar is True:
         # Way to remove colorbar: ax.collections[-1].colorbar.remove()
-        cbar = fig.colorbar(col, ax=ax, label=z_name, extend=extend_cbar)
+        cbar = fig.colorbar(col, ax=ax, label=z_name, extend=extend_cbar, fraction=0.05)
     return ax
 
 def plot2d_imshow(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None, 
@@ -129,7 +129,7 @@ def plot2d_imshow(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
     )
     if colorbar is True:
         # Way to remove colorbar: ax.images[-1].colorbar.remove()
-        cbar = fig.colorbar(img, ax=ax, label=z_name, extend=extend_cbar)
+        cbar = fig.colorbar(img, ax=ax, label=z_name, extend=extend_cbar, fraction=0.05)
     return ax
 
     
