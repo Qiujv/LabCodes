@@ -52,12 +52,19 @@ def trace_distance(rho, sigma):
     abs = sqrtm(np.dot(A.conj().T, A))
     return np.real(np.trace(abs)) / 2.0
 
+# def fidelity(rho, sigma):
+#     """Compute the fidelity between matrices rho and sigma
+#     See Nielsen and Chuang, p. 409
+#     """
+#     rhosqrt = sqrtm(rho)
+#     return np.real(np.trace(sqrtm(dot3(rhosqrt, sigma, rhosqrt))))
+
 def fidelity(rho, sigma):
-    """Compute the fidelity between matrices rho and sigma
-    See Nielsen and Chuang, p. 409
+    """Compute fidelity between matrices.
+    
+    Actually square of Nielsen and Chuang's defination, as admitted in most journal articles.
     """
-    rhosqrt = sqrtm(rho)
-    return np.real(np.trace(sqrtm(dot3(rhosqrt, sigma, rhosqrt))))
+    return np.real(np.trace(np.dot(rho, sigma)))
 
 def overlap(rho, sigma):
     """Trace of the product of two matrices."""
