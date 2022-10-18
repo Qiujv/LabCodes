@@ -21,5 +21,6 @@ setup(
         'tqdm',
         # 'dpath',
         # 'PyQt5',  # requirements of Labber API here and below.
+        'json-numpy',
     ],
 )
