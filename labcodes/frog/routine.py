@@ -697,7 +697,7 @@ def plot_iq_2q(dir, id00, id01=None, id10=None, id11=None):
 
     return ax, lf_names
 
-def plot_2q_qpt(dir, start, ro_mat=None, plot_all=False):
+def plot_2q_qpt(dir, start, ref_start=None, ro_mat=None, plot_all=False):
     """Process two-qubit QPT datas.
     
     Log files of state tomography with prepared state: [0,x,y,1]**2 = 00, 0x, ... 11 (16 in total).
@@ -728,13 +728,23 @@ def plot_2q_qpt(dir, start, ro_mat=None, plot_all=False):
             [0,1],
         ]),
     ]
-    rho_in = tomo.tensor_combinations(rho_1q, 2)
+    rho_i = tomo.tensor_combinations(rho_1q, 2)  # Ideal input.
+    if ref_start is None: 
+        rho_in = rho_i
+    else:
+        rho_in = []
+        for i in np.arange(16)+ref_start:
+            rho, _, ax = plot_qst(dir, i, ro_mat=ro_mat)
+            ax.set_zlim(0,1)
+            rho_in += [rho]
+            if not plot_all: plt.close(ax.get_figure())
 
     cz = np.diag([1,1,1,-1])
-    rho_ideal = [np.dot(np.dot(cz, x), cz.conj().transpose()) for x in rho_in]
-    chi_ideal = tomo.qpt(rho_in, rho_ideal, 'sigma2')
+    rho_ideal = [np.dot(np.dot(cz, x), cz.conj().transpose()) for x in rho_i]
+    chi_ideal = tomo.qpt(rho_i, rho_ideal, 'sigma2')  # After an ideal CZ gate.
     chi_out = tomo.qpt(rho_in, rho_out, 'sigma2')
 
+    # ax, _ = plotter.plot_complex_mat3d(chi_ideal, label=False)
     ax, _ = plotter.plot_complex_mat3d(chi_out, label=False)
 
     fid = tele.fidelity(chi_ideal, chi_out)

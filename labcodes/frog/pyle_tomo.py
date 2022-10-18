@@ -140,7 +140,7 @@ def qst(diags, U, return_all=False):
                 [p00_II, p01_II, p10_II, p11_II],
                 [p00_IX, p01_IX, p10_IX, p11_IX],
                 ...
-                [p00_YY, p01_YY, p10_YY, p11_II],
+                [p00_YY, p01_YY, p10_YY, p11_YY],
             ]
         
         measured probabilities (diagonal elements) after acting on the state 
