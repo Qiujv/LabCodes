@@ -34,13 +34,16 @@ class single_shot_data:
             self.df = None
             self.probs = None
 
-    def construct(self):
+    def construct(self, tolerance=None):
         df = self.lf.df.copy()
         for qn in self.qubits:
             if f'{qn}_s1' in df:
                 df[f'{qn}_s1'] = df[f'{qn}_s1'].astype(bool)
             else:
                 df = self.judge(df, qn, drop=True)
+                if tolerance is not None:
+                    if not self.close_enouth(qn, tolerance=tolerance):
+                        self.plot_1q(qn)
         self.df = df
         self.probs = self.get_probs()
 
@@ -80,7 +83,7 @@ class single_shot_data:
     def get_probs(self, c_qubits=None, p_qubits=None, df=None):
         """df[q1_s1, q2_s1, q3_s1] 
         ---c12, p3---> 
-        df: columns[p0, p1], index=[c00, c01, c10, c11].
+        df: columns=[p0, p1], index=[c00, c01, c10, c11].
         """
         if df is None: df = self.df
         if c_qubits is None: c_qubits = self.c_qubits
@@ -102,6 +105,9 @@ class single_shot_data:
                         mask = mask & ( df[f'{qn}_s1'])
                 probs[f'{c_prefix}_{c_state}'][f'{p_prefix}_{p_state}'] = mask.mean()
         probs = pd.DataFrame.from_records(probs).T
+        c_weights = probs.sum(axis='columns')
+        probs = probs.divide(c_weights, axis='index')
+        probs['weight'] = c_weights
         return probs
 
     @cache
@@ -119,7 +125,7 @@ class single_shot_data:
 
     def plot_1q(self, qubit, ax=None):
         df = self.df
-        if ax is None: _, ax = plt.subplots()
+        if ax is None: _, ax = plt.subplots(figsize=(3,3))
 
         plotter.plot_iq(df[f'cplx_{qubit}_rot'][~df[f'{qubit}_s1']], ax=ax)
         plotter.plot_iq(df[f'cplx_{qubit}_rot'][ df[f'{qubit}_s1']], ax=ax)
@@ -135,6 +141,7 @@ class single_shot_data:
         ax.plot(x,np.ones(x.shape)*y[0], 'k-')
         ax.annotate('{:.1f} deg.'.format(angle_diff * 180/np.pi), 
                     (x[1], (y[0]+y[-1])/2), va='center')
+        ax.set_title(self.lf.name.as_plot_title(qubit=qubit))
 
     def plot(self):
         """Plot judge for all qubits."""
@@ -292,6 +299,11 @@ class qpt_1q:
         Fchi = {select: np.abs(chi[select]).max() for select in selects}
         self.Fchi = Fchi
 
+        fchi_mean = np.mean(list(Fchi.values()))
+        fname = fileio.LabradRead(folder, m).name
+        fname.title = fname.title + f', Fchi_mean={fchi_mean:.2%}'
+        self.fname = fname
+
     def empty_rho_dict(self):
         return {select: {init: None for init in '0xy1'} for select in self.selects}
         
@@ -301,8 +313,48 @@ class qpt_1q:
             for init in d.keys():
                 yield select, init
 
-    def plot_chi(self):
-        pass
+    def plot_chi(self, chi=None, title=None):
+        """Plot process matrices for all selects.
+        
+        Note:
+            - try `fig.savefig(fname.as_file_name()+'.png', bbox_inches='tight')`
+        """
+        if chi is None: chi = self.chi
+        if title is None: title = self.fname.as_plot_title(width=100)
+
+        fig = plt.figure(figsize=(15,4), tight_layout=False)
+        for i, (select, mat) in enumerate(chi.items()):
+            ax = fig.add_subplot(1, 4, i+1, projection='3d')
+            plotter.plot_mat3d(mat, ax=ax, colorbar=False)
+            ax.set_title(f'select={select}')
+
+        # Add colorbar.
+        fig.subplots_adjust(left=0.1)
+        cax = fig.add_axes([0.05, 0.15, 0.008, 0.6])
+        cbar = fig.colorbar(ax.collections[0], cax=cax, orientation='vertical')
+        cbar.set_ticks(np.linspace(-np.pi, np.pi, 5))
+        cbar.set_ticklabels((r'$-\pi$', r'$-\pi/2$', r'$0$', r'$\pi/2$', r'$\pi$'))
+        
+        fig.suptitle(title)
+        return fig
+
+    def plot_chi_4x2(self, chi=None, title=None):
+        if chi is None: chi = self.chi
+        if title is None: title = self.fname.as_plot_title(width=100)
+
+        fig = plt.figure(figsize=(14,8), tight_layout=False)
+        for i, (select, mat) in enumerate(chi.items()):
+            ax_r = fig.add_subplot(2, 4, 2*i+1, projection='3d')
+            ax_i = fig.add_subplot(2, 4, 2*i+2, projection='3d')
+            plotter.plot_complex_mat3d(mat, [ax_r, ax_i], cmin=-1, cmax=1, colorbar=False)
+            ax_i.set_title(f'select={select}')
+
+        fig.subplots_adjust(top=0.9)
+        cax = fig.add_axes([0.4, 0.53, 0.2, 0.01])
+        cbar = fig.colorbar(ax_r.collections[0], cax=cax, orientation='horizontal')
+        
+        fig.suptitle(title)
+        return fig
 
 def rho(alpha, beta):
     """Returns density matrix of qubit state alpha*|0> + beta*|1>"""
