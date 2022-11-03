@@ -113,7 +113,7 @@ class LogName(object):
         title = f'{self.dir}\\\n{filled}'
         return title
 
-    def title(self, *args, **kws):  # alias.
+    def ptitle(self, *args, **kws):  # alias.
         return self.as_plot_title(*args, **kws)
 
     def as_file_name(self, **kwargs):
