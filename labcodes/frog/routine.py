@@ -329,7 +329,7 @@ def plot_qst(dir, id, ro_mat=None, fid=None, normalize=False):
     labels = misc.bitstrings(n_qs)
     rho_abs = np.abs(rho)
     if normalize is True: rho = rho / np.trace(rho_abs)
-    ax = plotter.plot_mat3d(rho_abs)
+    ax = plotter.plot_mat3d(rho)
 
     if fid is None:
         # Calculate fidelity with guessed state.
@@ -347,7 +347,6 @@ def plot_qst(dir, id, ro_mat=None, fid=None, normalize=False):
     ax.text2D(0.0,0.9, f'abs($\\rho$), {msg}={fid*100:.1f}%', 
         transform=ax.transAxes, fontsize='x-large')
     cbar = ax.collections[0].colorbar
-    cbar.set_label('$|\\rho|$')
     ax.set(
         title=lf.name.as_plot_title(),
         xticklabels=labels,
