@@ -6,6 +6,25 @@ import matplotlib.pyplot as plt
 from labcodes.plotter import misc
 from matplotlib.ticker import EngFormatter
 
+qutip_cmap = mpl.colors.LinearSegmentedColormap(
+    'phase_colormap', 
+    {'blue': ((0.00, 0.0, 0.0),
+            (0.25, 0.0, 0.0),
+            (0.50, 1.0, 1.0),
+            (0.75, 1.0, 1.0),
+            (1.00, 0.0, 0.0)),
+    'green': ((0.00, 0.0, 0.0),
+            (0.25, 1.0, 1.0),
+            (0.50, 0.0, 0.0),
+            (0.75, 1.0, 1.0),
+            (1.00, 0.0, 0.0)),
+    'red': ((0.00, 1.0, 1.0),
+            (0.25, 0.5, 0.5),
+            (0.50, 0.0, 0.0),
+            (0.75, 0.0, 0.0),
+            (1.00, 1.0, 1.0))}, 
+    256,
+)
 
 def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwargs):
     """Plot matrix values in a 2d grid."""
@@ -29,6 +48,7 @@ def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwa
 
 def _plot_mat3d(ax, mat, cval, cmin=None, cmax=None, cmap='bwr', alpha=1.0, label=True, fmt=None):
     if fmt is None: fmt = lambda v: f'{v:.3f}'.replace('0.', '.')
+    if cmap == 'qutip': cmap = qutip_cmap
 
     bar_width = 0.6
     xpos, ypos = np.meshgrid(
