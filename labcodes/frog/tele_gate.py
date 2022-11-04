@@ -95,42 +95,50 @@ class qpt_2q:
         self.init_states = init_states
 
         # Construct density matrices.
-        qst_out = {  # Slow, but cannot merge with jobs below.
-            '00': qst_2q(folder, m+0, suffix=suffix),
-            '0x': qst_2q(folder, m+9, suffix=suffix),
-            '0y': qst_2q(folder, m+18, suffix=suffix),
-            '01': qst_2q(folder, m+27, suffix=suffix),
+        init_idx = {
+            '00': m+0,
+            '0x': m+9,
+            '0y': m+18,
+            '01': m+27,
 
-            'x0': qst_2q(folder, m+36, suffix=suffix),
-            'xx': qst_2q(folder, m+45, suffix=suffix),
-            'xy': qst_2q(folder, m+54, suffix=suffix),
-            'x1': qst_2q(folder, m+63, suffix=suffix),
+            'x0': m+36,
+            'xx': m+45,
+            'xy': m+54,
+            'x1': m+63,
 
-            'y0': qst_2q(folder, m+72, suffix=suffix),
-            'yx': qst_2q(folder, m+81, suffix=suffix),
-            'yy': qst_2q(folder, m+90, suffix=suffix),
-            'y1': qst_2q(folder, m+99, suffix=suffix),
+            'y0': m+72,
+            'yx': m+81,
+            'yy': m+90,
+            'y1': m+99,
 
-            '10': qst_2q(folder, m+108, suffix=suffix),
-            '1x': qst_2q(folder, m+117, suffix=suffix),
-            '1y': qst_2q(folder, m+126, suffix=suffix),
-            '11': qst_2q(folder, m+135, suffix=suffix),
+            '10': m+108,
+            '1x': m+117,
+            '1y': m+126,
+            '11': m+135,
         }
-        self.qst_out = qst_out
 
         rho_out = self.empty_rho_dict()
+        qst_out = {init: None for init in init_idx.keys()}
         if parallel:
-            def job(select, init):
-                return select, init, qst_out[init].rho(select)
+            def job(init):
+                qst = qst_2q(folder, init_idx[init], suffix=suffix)
+                select_rhos = {select: qst.rho(select) 
+                               for select in rho_out.keys()}
+                return init, qst, select_rhos
             res = Parallel(n_jobs=8, verbose=10)(
-                delayed(job)(select, init)
-                for select, init in self.iter_rho_dict(rho_out)
+                delayed(job)(init)
+                for init in init_idx.keys()
             )
-            for select, init, rho_one in res:
-                rho_out[select][init] = rho_one
+            for init, qst, select_rhos in res:
+                qst_out[init] = qst
+                for select in rho_out.keys():
+                    rho_out[select][init] = select_rhos[select]
         else:
+            qst_out = {init: qst_2q(folder, i, suffix=suffix) 
+                       for init, i in init_idx.items()}
             for select, init in self.iter_rho_dict(rho_out):
                 rho_out[select][init] = qst_out[init].rho(select)
+        self.qst_out = qst_out
         self.rho_out = rho_out
         
 
