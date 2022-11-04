@@ -88,8 +88,45 @@ class qpt_2q:
     """Process single shot datas in gate teleportation experiments.
     
     Basically a function, but store returns in an object and provides some plot functions.
+
+    Note:
+    What the attributes looks like. Do replace & DO NOT modify them!
+    ```
+        .rho_in = {'0': np.array, 'x': np.array, 'y': np.array, '1': np.array}
+        .qst_out = {'0': qst_2q, 'x': qst_2q, 'y': qst_2q, '1': qst_2q}
+
+        .rho_out/.rho_out_ideal = {
+            '00': {'0': np.array, 'x': np.array, 'y': np.array, '1': np.array},
+            '01': {'0': np.array, 'x': np.array, 'y': np.array, '1': np.array},
+            '10': {'0': np.array, 'x': np.array, 'y': np.array, '1': np.array},
+            '11': {'0': np.array, 'x': np.array, 'y': np.array, '1': np.array},
+        }
+
+        .Frho = {
+            '00': {'0': float, 'x': float, 'y': float, '1': float},
+            '01': {'0': float, 'x': float, 'y': float, '1': float},
+            '10': {'0': float, 'x': float, 'y': float, '1': float},
+            '11': {'0': float, 'x': float, 'y': float, '1': float},
+        }
+
+        .chi/.chi_ideal = {
+            '00': np.array,
+            '01': np.array,
+            '10': np.array,
+            '11': np.array,
+        }
+
+        .Fchi = {
+            '00': float,
+            '01': float,
+            '10': float,
+            '11': float,
+        }
+    ```
     """
-    def __init__(self, folder, m, suffix='csv_complete', parallel=True):
+    def __init__(self, folder, m, suffix='csv_complete', parallel=True, is_fb=None):
+        if is_fb is None:
+            is_fb = '_FB' in fname.title.lower()
         fname = fileio.LabradRead(folder, m).name
         self.selects = selects
         self.init_states = init_states
@@ -142,7 +179,7 @@ class qpt_2q:
         self.rho_out = rho_out
         
 
-        if '_FB' in fname.title.lower():  # TODO: fix this.
+        if is_fb:
             rho_out_ideal = rho_out_ideal_fb
             chi_ideal = chi_ideal_fb
         else:
