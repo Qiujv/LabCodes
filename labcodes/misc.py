@@ -1,7 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.optimize import fsolve
+import math
 from functools import wraps
+
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.optimize import fsolve
 
 
 def auto_rotate(data, with_angle=False):
@@ -166,6 +168,105 @@ def bitstrings(n_qbs, base=2):
     """Returns ['00', '01', '10', '11'] for n_qbs=2, and etc."""
     return [num2bstr(i, n_qbs, base=base) for i in range(base**n_qbs)]
 
+
+ENG_PREFIXES = {
+    -24: "y",
+    -21: "z",
+    -18: "a",
+    -15: "f",
+    -12: "p",
+    -9: "n",
+    -6: "\N{MICRO SIGN}",
+    -3: "m",
+    0: "",
+    3: "k",
+    6: "M",
+    9: "G",
+    12: "T",
+    15: "P",
+    18: "E",
+    21: "Z",
+    24: "Y"
+}
+
+def estr(num, places=None, sep=' '):
+    """Format a number in engineering notation, appending a letter
+    representing the power of 1000 of the original number.
+
+    Adapted from `matplotlib.ticker.EngFormatter`
+
+    Examples:
+        >>> eng_string(0, places=0)
+        '0'
+
+        >>> eng_string(1000000, places=1)
+        '1.0 M'
+
+        >>> eng_string("-1e-6", places=2)
+        '-1.00 \N{MICRO SIGN}'
+
+    Args: 
+        places : int, default: None
+            Precision with which to display the number, specified in
+            digits after the decimal point (there will be between one
+            and three digits before the decimal point). If it is None,
+            the formatting falls back to the floating point format '%g',
+            which displays up to 6 *significant* digits, i.e. the equivalent
+            value for *places* varies between 0 and 5 (inclusive).
+
+        sep : str, default: " "
+            Separator used between the value and the prefix/unit. For
+            example, one get '3.14 mV' if ``sep`` is " " (default) and
+            '3.14mV' if ``sep`` is "". Besides the default behavior, some
+            other useful options may be:
+
+            * ``sep=""`` to append directly the prefix/unit to the value;
+            * ``sep="\N{THIN SPACE}"`` (``U+2009``);
+            * ``sep="\N{NARROW NO-BREAK SPACE}"`` (``U+202F``);
+            * ``sep="\N{NO-BREAK SPACE}"`` (``U+00A0``).
+
+    Returns: 
+        String of the formatted num.
+
+    Notes:
+        To use this in axis ticks,
+        ```python
+        from matplotlib.ticker import EngFormatter
+        ax.xaxis.set_major_formatter(EngFormatter(unit='Hz'))
+        ```
+    """
+    sign = 1
+    fmt = "g" if places is None else ".{:d}f".format(places)
+
+    if num < 0:
+        sign = -1
+        num = -num
+
+    if num != 0:
+        pow10 = int(math.floor(math.log10(num) / 3) * 3)
+    else:
+        pow10 = 0
+        # Force num to zero, to avoid inconsistencies like
+        # format_eng(-0) = "0" and format_eng(0.0) = "0"
+        # but format_eng(-0.0) = "-0.0"
+        num = 0.0
+
+    pow10 = np.clip(pow10, min(ENG_PREFIXES), max(ENG_PREFIXES))
+
+    mant = sign * num / (10.0 ** pow10)
+    # Taking care of the cases like 999.9..., which may be rounded to 1000
+    # instead of 1 k.  Beware of the corner case of values that are beyond
+    # the range of SI prefixes (i.e. > 'Y').
+    if (abs(float(format(mant, fmt))) >= 1000
+            and pow10 < max(ENG_PREFIXES)):
+        mant /= 1000
+        pow10 += 3
+
+    prefix = ENG_PREFIXES[int(pow10)]
+    formatted = "{mant:{fmt}}{sep}{prefix}".format(
+        mant=mant, sep=sep, prefix=prefix, fmt=fmt)
+
+    return formatted
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

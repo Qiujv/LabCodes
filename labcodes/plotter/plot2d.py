@@ -20,17 +20,16 @@ def plot2d_collection(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
     Data points are plotted as rectangular scatters with proper width and height 
     to fill the space. Inspired by https://stackoverflow.com/a/16240370
 
-    Note: Data points are plotted column by column, try exchange x_name and y_name
+    Note: 
+        Data points are plotted column by column, try exchange x_name and y_name
         if found the plot strange.
     
     Args:
-        df: pandas.DataFrame, container of data.
+        df: pandas.DataFrame.
         x_name, y_name, z_name: str, column name of data to plot.
         ax: matplotlib.axes, where to plot the figure.
-        cmin, cmax: float, used to set colorbar range.
-            Can also be achieved by `collection.set_clim()`.
+        cmin, cmax: float, used to set colorbar range. Also be accessed by `collection.set_clim()`.
         colorbar: boolean, whether or not to plot colorbar.
-            True by default.
         cmap: str or Colormap.
         norm: mpl.colors.Normalize or subsclasses. Scale of z axis, overriding 
             cmin, cmax.
