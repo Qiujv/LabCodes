@@ -51,6 +51,9 @@ class qst_2q:
         rho = tomo.qst(np.array(probs), 'tomo2')
         return rho
 
+    def plot_rho(self, select='00', **kwargs):
+        pass
+
 selects = ['00', '01', '10', '11']
 init_states = [''.join(init) for init in product('0xy1', repeat=2)]
 
@@ -89,9 +92,9 @@ class qpt_2q:
     
     Basically a function, but store returns in an object and provides some plot functions.
 
-    Note:
-    What the attributes looks like. Do replace & DO NOT modify them!
+    Attributes:
     ```
+        .fname = fileio.LabradRead(folder, m).name
         .rho_in = {'0': np.array, 'x': np.array, 'y': np.array, '1': np.array}
         .qst_out = {'0': qst_2q, 'x': qst_2q, 'y': qst_2q, '1': qst_2q}
 
@@ -125,9 +128,9 @@ class qpt_2q:
     ```
     """
     def __init__(self, folder, m, suffix='csv_complete', parallel=True, is_fb=None):
+        fname = fileio.LabradRead(folder, m).name
         if is_fb is None:
             is_fb = '_FB' in fname.title.lower()
-        fname = fileio.LabradRead(folder, m).name
         self.selects = selects
         self.init_states = init_states
 
@@ -229,7 +232,12 @@ class qpt_2q:
         Note:
             - try `fig.savefig(fname.as_file_name()+'.png', bbox_inches='tight')`
         """
-        if chi is None: chi = self.chi
+        if chi is None: 
+            chi = self.chi
+            Fchi = self.Fchi
+        else:
+            Fchi = {select: fidelity(chi[select], self.chi_ideal[select])
+                    for select in selects}
         if title is None: title = self.fname.as_plot_title(width=100)
         lbs = [''.join([op1, op2]) for op1, op2 in product('IXYZ', repeat=2)]
 
@@ -237,7 +245,7 @@ class qpt_2q:
         for i, (select, mat) in enumerate(chi.items()):
             ax = fig.add_subplot(2, 2, i+1, projection='3d')
             plotter.plot_mat3d(mat, ax=ax, colorbar=False, label=False, cmap='qutip')
-            ax.set_title(f'select={select}, Fchi={self.Fchi[select]:.2%}')
+            ax.set_title(f'select={select}, Fchi={Fchi[select]:.2%}')
             ax.collections[0].set_linewidth(0.2)
             ax.set_zlim(0,0.25)
             ax.tick_params('both', pad=0, labelsize='small')

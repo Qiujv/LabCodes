@@ -18,7 +18,8 @@ def rho(alpha, beta):
     return np.array(np.dot(state, state.H))
 
 def fidelity(rho, sigma):
-    return np.real(np.trace(np.dot(rho, sigma)))
+    # return np.real(np.trace(np.dot(rho, sigma)))
+    return np.real(np.trace(rho @ sigma))  # Preferred according to 
 
 class single_shot_data:
     """Load a single shot data lf, judge it with 0, 1 center stored in lf.conf.
