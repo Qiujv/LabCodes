@@ -18,6 +18,7 @@ class qst_2q:
         # self.ops = list('ixy')
         # self.ids = [id0, idx, idy]
         self.suffix = suffix
+        self.fname = fileio.LabradRead(folder, m).name.copy()
 
         # Do NOT keep ss datas to save memory.
         datas = [
