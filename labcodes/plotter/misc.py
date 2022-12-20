@@ -78,6 +78,15 @@ def get_norm(data, cmin=None, cmax=None, symmetric=False):
 
 # from https://stackoverflow.com/a/53586826
 def multiple_formatter(denominator=2, number=np.pi, latex='\mathrm{\pi}'):
+    """Format axis tick labels like: 1/2pi, pi, 3/2pi.
+    
+    Usage:
+    ```
+        ax.xaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
+        ax.xaxis.set_minor_locator(plt.MultipleLocator(np.pi / 12))
+        ax.xaxis.set_major_formatter(multiple_formatter(2, np.pi))
+    ```
+    """
     def gcd(a, b):
         while b:
             a, b = b, a%b
@@ -106,6 +115,17 @@ def multiple_formatter(denominator=2, number=np.pi, latex='\mathrm{\pi}'):
     return plt.FuncFormatter(_multiple_formatter)
 
 class Multiple:
+    """Provide locator and formatter for axis ticks.
+    
+    Usage:
+    ```
+        major = Multiple(60, np.pi*2)
+        minor = Multiple(60*4, np.pi*2)
+        ax.xaxis.set_major_locator(major.locator())
+        ax.xaxis.set_minor_locator(minor.locator())
+        ax.xaxis.set_major_formatter(major.formatter())
+    ```
+    """
     def __init__(self, denominator=2, number=np.pi, latex='\pi'):
         self.denominator = denominator
         self.number = number

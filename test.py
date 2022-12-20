@@ -10,7 +10,8 @@ class A:
     def f(self):
         return self.b
 
-    def __attrs_post_init__(self):
-        raise Exception('error')
+    # def __attrs_post_init__(self):
+    #     raise Exception('error')
 
 a = A()
+a.test = 1

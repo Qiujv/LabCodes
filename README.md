@@ -1,5 +1,5 @@
 # LabCodes
-Codes shared in SUSTech lab.
+Codes shared in SUSTech superconducting quantum computing lab.
 
 # Contents
 `fitter`: CurveFit and BatchFit handling fitting and fit datas.
@@ -20,13 +20,3 @@ To use LabCodes, clone this repository, go to the directory where you clone the 
 ```powershell
 pip install --editable .
 ```
-
-### If you are using Conda
-
-A .yml file is contained for creating an environment with all needed dependencies. First run
-
-```powershell
-conda env create --file conda_env.yml
-```
-
-and then install LabCodes with pip.

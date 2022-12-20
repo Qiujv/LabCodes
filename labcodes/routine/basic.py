@@ -6,11 +6,11 @@ from attrs import define, field
 from labcodes import fileio, fitter, models, misc, plotter
 
 
-@define
+@define(slots=False)
 class IQScatter:
+    name: field()
     lf: field()
     df: field()
-    name: field()
     
     @classmethod
     def from_logfile(cls, lf):
@@ -54,4 +54,3 @@ DIR = '//XLD2-PC2/labRAD_data/crab.dir/221203.dir/1203_bup.dir'
 lf = fileio.LabradRead(DIR, 226)
 lr = rt.IQScatter.from_logfile(lf)
 lr.plot()
-

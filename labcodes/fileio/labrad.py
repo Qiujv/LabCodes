@@ -113,14 +113,12 @@ class LogName(object):
         title = f'{self.dir}\\\n{filled}'
         return title
 
-    def ptitle(self, *args, **kws):  # alias.
-        return self.as_plot_title(*args, **kws)
+    ptitle = as_plot_title  # alias.
 
     def as_file_name(self, **kwargs):
         return replace(self.to_str(**kwargs), PATH_LEGAL)
 
-    def fname(self, *args, **kws):  # alias.
-        return self.as_file_name(*args, **kws)
+    fname = as_file_name  # alias.
 
 class LabradRead(object):
     def __init__(self, dir, id, suffix='csv', **kwargs):
