@@ -1,5 +1,5 @@
-import textwrap
 import json
+import textwrap
 from copy import copy
 from pathlib import Path
 
@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from attrs import define, field
-
 from labcodes import plotter
 
 PATH_LEGAL = {
@@ -31,70 +30,6 @@ class LogFile:
 
     def __repr__(self):
         return f'<LogFile at {self.name}>'
-
-    @staticmethod
-    def find(folder, id='*', suffix='.feather', return_all=False):
-        """Returns the full path of datafile by given data ID."""
-        folder = Path(folder)
-        assert folder.exists()
-
-        if suffix.startswith('.'): suffix = suffix[1:]
-        prn = f'#{id}, *.{suffix}'
-        all_match = list(folder.glob(prn))
-        if len(all_match) == 0:
-            raise ValueError(f'Files like "{prn}" not found in {folder}')
-
-        if return_all is True:
-            return all_match
-        else:
-            return all_match[0]
-
-    @classmethod
-    def load(cls, folder, id):
-        folder = Path(folder)
-        path = cls.find(folder, id, '.feather')
-        df = pd.read_feather(path)
-        conf = json.load(path.with_suffix('.json'))
-        name = LogName.from_path(path)
-        indeps = conf['indeps']
-        deps = conf['deps']
-        return cls(df=df, conf=conf, name=name, indeps=indeps, deps=deps)
-
-    def save(self, folder):
-        folder = Path(folder).resolve()
-        p = folder / self.name.fname()
-        self.df.to_feather(p.with_suffix('.feather'))
-
-        conf = self.conf.copy()
-        if 'deps' not in conf:
-            conf['deps'] = self.deps
-        if 'indeps' not in conf:
-            conf['indeps'] = self.indeps
-        json.dump(conf, p.with_suffix('.json'))
-        return p
-
-    @classmethod
-    def new(cls, folder, id=None, title=''):
-        folder = Path(folder).resolve()
-
-        if id is None:
-            all_match = cls.find(folder, id='*', suffix='*', return_all=True)
-            max_id = 0
-            for p in all_match:
-                id = p.stem[1:].split(', ')[0]
-                if ',' in id:
-                    id = max([int(i) for i in id.split(',')])
-                elif '-' in id:
-                    id = max([int(i) for i in id.split('-')])
-                else:
-                    id = int(id)
-                if id > max_id:
-                    max_id = id
-
-        name = LogName(folder=folder, id=max_id+1, title=title)
-        p = folder / name.as_file_name()
-        p.with_suffix('.json').touch(exist_ok=False)  # Make a placeholder.
-        return cls(df=None, conf=dict(), name=name, indeps=[], deps=[])
 
     def plot(self, **kwargs):
         """Quick data plot."""
@@ -166,7 +101,77 @@ class LogFile:
         )
         return ax
 
-    # def to_labrad(self, folder):
+    @classmethod
+    def load(cls, dir, id):
+        """Load a logfile from a .feather and a .json files."""
+        dir = Path(dir)
+        path = cls.find(dir, id, '.feather')
+        df = pd.read_feather(path)
+        conf = json.load(path.with_suffix('.json'))
+        name = LogName.from_path(path)
+        indeps = conf['indeps']
+        deps = conf['deps']
+        return cls(df=df, conf=conf, name=name, indeps=indeps, deps=deps)
+
+    def save(self, dir):
+        """Save a logfile into a .feather file and a .json files."""
+        dir = Path(dir).resolve()
+        p = dir / self.name.fname()
+        self.df.to_feather(p.with_suffix('.feather'))
+
+        conf = self.conf.copy()
+        if 'deps' not in conf:
+            conf['deps'] = self.deps
+        if 'indeps' not in conf:
+            conf['indeps'] = self.indeps
+        json.dump(conf, p.with_suffix('.json'))
+        return p
+
+    @staticmethod
+    def find(dir, id='*', suffix='.feather', return_all=False):
+        """Returns the full path of logfile by given ID."""
+        dir = Path(dir)
+        assert dir.exists()
+
+        if suffix.startswith('.'): suffix = suffix[1:]
+        prn = f'#{id}, *.{suffix}'
+        all_match = list(dir.glob(prn))
+        if len(all_match) == 0:
+            raise ValueError(f'Files like "{prn}" not found in {dir}')
+
+        if return_all is True:
+            return all_match
+        else:
+            return all_match[0]
+            
+    @classmethod
+    def new(cls, dir, id=None, title=''):
+        """Create an empty logfile at given dir.
+        
+        An empty .json file is created with the function call.
+        """
+        dir = Path(dir).resolve()
+
+        if id is None:
+            all_match = cls.find(dir, id='*', suffix='*', return_all=True)
+            max_id = 0
+            for p in all_match:
+                id = p.stem[1:].split(', ')[0]
+                if ',' in id:
+                    id = max([int(i) for i in id.split(',')])
+                elif '-' in id:
+                    id = max([int(i) for i in id.split('-')])
+                else:
+                    id = int(id)
+                if id > max_id:
+                    max_id = id
+
+        name = LogName(dir=dir, id=max_id+1, title=title)
+        p = dir / name.as_file_name()
+        p.with_suffix('.json').touch(exist_ok=False)  # Make a placeholder.
+        return cls(df=None, conf=dict(), name=name, indeps=[], deps=[])
+
+    # def to_labrad(self, dir):
     #     """Save data mimic labrad. Not guaranteeing readibility by labrad.
 
     #     It risks damaging program files in saving files by this function instead
@@ -181,18 +186,18 @@ class LogName:
     suffix could be csv, ini, json, feather, png, jpg, svg...
     id could be '12' or '1,2,3' or '1-4'.
     """
-    folder: field()
+    dir: field()
     id: field()
     title: str
 
     def __repr__(self):
-        return f'#{self.id}: {self.title}'
+        return f'#{self.id}, {self.title}'
 
     def as_plot_title(self, width=60):
-        s = f'#{self.id}: {self.title}'
+        s = f'#{self.id}, {self.title}'
         s = textwrap.fill(s, width=width)
 
-        f = str(self.folder).replace('.dir', '')
+        f = str(self.dir).replace('.dir', '')
         # f = textwrap.fill(f, width=width)
 
         s = f'{f}\\\n{s}'
@@ -211,9 +216,9 @@ class LogName:
     @classmethod
     def from_path(cls, p):
         p = Path(p)
-        folder = p.parent
+        dir = p.parent
         id, title = p.stem[1:].split(', ', 1)
-        return cls(folder=folder, id=id, title=title)
+        return cls(dir=dir, id=id, title=title)
 
     def copy(self):
         return copy(self)

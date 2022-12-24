@@ -10,10 +10,10 @@ try:
 except:
     print('WARNING: Fail to import fileio.labrad.')
 
-try:
-    from labcodes.fileio.ltspice import LTSpiceRead
-except:
-    print('WARNING: Fail to import fileio.ltspice.')
+# try:
+#     from labcodes.fileio.ltspice import LTSpiceRead
+# except:
+#     print('WARNING: Fail to import fileio.ltspice.')
 
 try:
     from labcodes.fileio.misc import data_to_json, data_from_json

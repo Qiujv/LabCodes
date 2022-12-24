@@ -39,8 +39,8 @@ def replace(text, dict):
     return text
 
 
-def read_labrad(folder, id, suffix='csv'):
-    path = find(folder, id)
+def read_labrad(dir, id, suffix='csv'):
+    path = find(dir, id)
 
     ini = ConfigParser()
     ini.read(path.with_suffix('.ini'))
@@ -55,15 +55,15 @@ def read_labrad(folder, id, suffix='csv'):
 
 LabradRead = read_labrad  # for back compatibility.
 
-def find(folder, id, return_all=False):
+def find(dir, id, return_all=False):
     """Returns the full path of Labrad datafile by given data ID."""
-    folder = Path(folder)
-    assert folder.exists()
+    dir = Path(dir)
+    assert dir.exists()
 
     prn = f'{str(id).zfill(5)} - *'
-    all_match = list(folder.glob(prn))
+    all_match = list(dir.glob(prn))
     if len(all_match) == 0:
-        raise ValueError(f'Files like "{prn}" not found in {folder}')
+        raise ValueError(f'Files like "{prn}" not found in {dir}')
 
     if return_all is True:
         return all_match
@@ -96,7 +96,7 @@ def ini_to_dict(ini):
     return d
 
 def logname_from_path(path):
-    folder = path.parent
+    dir = path.parent
     match = re.search(r'(\d+) - (.*)%c (.*)', path.stem)
     if match:
         id, qubit, title = match.group(1), match.group(2), match.group(3)  # Index starts from 1.
@@ -106,19 +106,19 @@ def logname_from_path(path):
     id = int(id)
     title = replace(title, ESCAPE_CHARS)
     title = f'{qubit} {title}' if qubit else title
-    return LogName(folder=folder, id=id, title=title)
+    return LogName(dir=dir, id=id, title=title)
 
-def browse(folder, do_print=False):
-    folder = Path(folder)
+def browse(dir, do_print=False):
+    dir = Path(dir)
     ini = ConfigParser()
-    read = ini.read(folder/'session.ini')
+    read = ini.read(dir/'session.ini')
     if read:
         conf = eval(ini['Tags']['datasets'])
         conf = {k[:5]: v for k,v in conf.items()}
     else:
         conf = {}
     ret = []
-    for i, p in enumerate(folder.glob('*.csv')):
+    for i, p in enumerate(dir.glob('*.csv')):
         msg = p.stem
         msg = replace(msg, ESCAPE_CHARS)
         tags = conf.get(msg[:5], [])
@@ -146,6 +146,6 @@ def to_registry(kws, **updates):
     return items
 
 if __name__ == '__main__':
-    folder = 'C:/Users/qiujv/OneDrive/Documents/My_DataFiles/LabRAD_test/220111 dpi test'
-    lf = read_labrad(folder, 68)
+    DIR = 'C:/Users/qiujv/OneDrive/Documents/My_DataFiles/LabRAD_test/220111 dpi test'
+    lf = read_labrad(DIR, 68)
     lf.plot1d()
