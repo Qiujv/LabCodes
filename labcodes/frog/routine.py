@@ -145,7 +145,7 @@ def fit_spec(spec_map, ax=None, **kwargs):
     ax = cfit.model.plot(cfit, ax=ax, **kwargs)
     return cfit, ax
 
-def plot_visibility(logf, axs=None, drop=True, **kwargs):
+def plot_visibility(logf, axs=None, **kwargs):
     """Plot visibility, for iq_scatter experiments only."""
     if axs is None:
         fig = plt.figure(figsize=(5,5), tight_layout=True)
@@ -156,27 +156,26 @@ def plot_visibility(logf, axs=None, drop=True, **kwargs):
         fig = ax.get_figure()
 
     # Make up single shot datas.
-    df = logf.df
-    df['s0'] = df['i0'] + 1j*df['q0']
-    df['s1'] = df['i1'] + 1j*df['q1']
-    if drop is True:
-        df.drop(columns=['runs', 'i0', 'q0', 'i1', 'q1'], inplace=True)
+    df = logf.df.copy()
+    df['c0'] = df['i0'] + 1j*df['q0']
+    df['c1'] = df['i1'] + 1j*df['q1']
 
     fig.suptitle(logf.name.as_plot_title())
-    plotter.plot_iq(df['s0'], ax=ax, label='|0>')  # The best plot maybe PDF contour plot with colored line.
-    plotter.plot_iq(df['s1'], ax=ax, label='|1>')
-    # ax.legend()
+    # plotter.plot_iq(df['c0'], ax=ax, label='|0>')  # The best plot maybe PDF contour plot with colored line.
+    # plotter.plot_iq(df['c1'], ax=ax, label='|1>')
 
-    df[['s0_rot', 's1_rot']] = misc.auto_rotate(df[['s0', 's1']].values)  # Must pass np.array.
-    if df['s0_rot'].mean().real > df['s1_rot'].mean().real:
+    df[['c0_rot', 'c1_rot']] = misc.auto_rotate(df[['c0', 'c1']].values)  # Must pass np.array.
+    if df['c0_rot'].mean().real > df['c1_rot'].mean().real:
         # Flip if 0 state cloud is on the right.
-        df[['s0_rot', 's1_rot']] *= -1
-    plotter.plot_iq(df['s0_rot'], ax=ax2, label='|0>')
-    plotter.plot_iq(df['s1_rot'], ax=ax2, label='|1>')
-    # ax2.legend()
+        df[['c0_rot', 'c1_rot']] *= -1
+    plotter.plot_iq(df['c0_rot'], ax=ax , label='|0>', color='C0')
+    plotter.plot_iq(df['c1_rot'], ax=ax2, label='|1>', color='C1')
+    ax.sharex(ax2)
+    ax.sharey(ax2)
 
-    plotter.plot_visibility(np.real(df['s0_rot']), np.real(df['s1_rot']), ax3, ax4)
+    plotter.plot_visibility(np.real(df['c0_rot']), np.real(df['c1_rot']), ax3, ax4)
 
+    logf.df = df[['runs', 'c0', 'c1', 'c0_rot', 'c1_rot', 'i0', 'q0', 'i1', 'q1']]
     return ax, ax2, ax3, ax4
 
 def plot_iq_vs_freq(logf, axs=None):

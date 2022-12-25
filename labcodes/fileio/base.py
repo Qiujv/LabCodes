@@ -77,7 +77,7 @@ class LogFile:
         )
         return ax
 
-    def plot2d(self, x_name=0, y_name=1, z_name=1, ax=None, kind='collection', **kwargs):
+    def plot2d(self, x_name=0, y_name=1, z_name=0, ax=None, kind='collection', **kwargs):
         """Quick 2d plot with plotter.plot2d_[kind]."""
         if ax is None:
             fig, ax = plt.subplots()

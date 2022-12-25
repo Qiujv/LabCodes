@@ -39,8 +39,15 @@ def replace(text, dict):
     return text
 
 
-def read_labrad(dir, id, suffix='csv'):
+def read_labrad(dir, id, suffix=None):
     path = find(dir, id)
+    if suffix is None:
+        if path.with_suffix('.csv_complete').exists():
+            suffix = '.csv_complete'
+        else:
+            suffix = '.csv'
+    if not suffix.startswith('.'):
+        suffix = '.' + suffix
 
     ini = ConfigParser()
     ini.read(path.with_suffix('.ini'))
@@ -48,7 +55,7 @@ def read_labrad(dir, id, suffix='csv'):
     indeps = list(conf['independent'].keys())
     deps = list(conf['dependent'].keys())
 
-    df = pd.read_csv(path.with_suffix(f'.{suffix}'), names=indeps + deps)
+    df = pd.read_csv(path.with_suffix(suffix), names=indeps + deps)
     name = logname_from_path(path)
 
     return LogFile(df=df, conf=conf, name=name, indeps=indeps, deps=deps)
