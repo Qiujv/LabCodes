@@ -172,6 +172,8 @@ def plot_visibility(logf, axs=None, **kwargs):
     plotter.plot_iq(df['c1_rot'], ax=ax2, label='|1>', color='C1')
     ax.sharex(ax2)
     ax.sharey(ax2)
+    ax.set(xlabel='', ylabel='')
+    ax2.set(xlabel='', ylabel='')
 
     plotter.plot_visibility(np.real(df['c0_rot']), np.real(df['c1_rot']), ax3, ax4)
 
