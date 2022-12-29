@@ -3,8 +3,7 @@
 
 from labcodes.plotter.plot2d import plot2d_collection, plot2d_imshow
 from labcodes.plotter.mat3d import plot_mat3d, plot_complex_mat3d, plot_mat2d
-from labcodes.plotter.state_dis import plot_iq, plot_visibility
-from labcodes.plotter.misc import cursor
+from labcodes.plotter.misc import plot_iq, cursor
 
 
 import matplotlib as mpl

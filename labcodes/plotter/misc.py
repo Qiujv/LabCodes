@@ -1,9 +1,34 @@
 """Functions not fitting elsewhere."""
 
-import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 
+def plot_iq(data, ax=None, n_pt_max=6000, **kwargs):
+    """Plot data on complex plane. 
+    Scatter when points is few, otherwise hist2d."""
+    if ax is None:
+        fig, ax = plt.subplots(tight_layout=True)
+    else:
+        fig = ax.get_figure()
+
+    data = np.ravel(data)
+
+    if data.size <= n_pt_max:
+        kw = dict(marker='.', alpha=0.3, linewidth=0)
+        kw.update(kwargs)
+        col = ax.scatter(np.real(data), np.imag(data), **kw)
+        if data.size >= 100: col.set_rasterized(True)
+    else:
+        kw = dict(bins=100, norm=mpl.colors.PowerNorm(0.5))
+        kw.update(kwargs)
+        ax.hist2d(np.real(data), np.imag(data), **kw)
+    ax.set(
+        aspect='equal',
+        xlabel='Real',
+        ylabel='Imag',
+    )
+    return ax
 
 def cursor(ax, x=None, y=None, text=None, line_style={}, text_style={}):
     """Point out given coordinate with axhline and axvline."""

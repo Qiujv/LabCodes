@@ -6,15 +6,17 @@ import numpy as np
 from scipy.optimize import fsolve
 
 
-def auto_rotate(data, with_angle=False):
+def auto_rotate(data, return_rad=False):
     """Returns data with shifted phase s.t. variation of imaginary part minimized.
-    Algorithm by Kaho."""
-    angle = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)  # Minimize imag(var(data)), by Kaho
     
-    if with_angle is True:
-        return data * np.exp(1j*angle), angle  # counter-clockwise
+    Algorithm by Kaho.
+    """
+    rad = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)  # Minimize imag(var(data)), by Kaho
+    
+    if return_rad is True:
+        return data * np.exp(1j*rad), rad  # counter-clockwise
     else:
-        return data * np.exp(1j*angle)
+        return data * np.exp(1j*rad)
 
 def remove_e_delay(phase, freq, i_start=0, i_end=-1):
     """Returns phase without linear freq dependence.

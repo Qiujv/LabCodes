@@ -65,7 +65,8 @@ LabradRead = read_labrad  # for back compatibility.
 def find(dir, id, return_all=False):
     """Returns the full path of Labrad datafile by given data ID."""
     dir = Path(dir)
-    assert dir.exists()
+    if not dir.exists():
+        raise FileNotFoundError(f'{dir} not exist.')
 
     prn = f'{str(id).zfill(5)} - *'
     all_match = list(dir.glob(prn))

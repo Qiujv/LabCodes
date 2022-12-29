@@ -8,6 +8,7 @@ import scipy.io
 import labcodes.frog.pyle_tomo as tomo
 from labcodes import fileio, fitter, misc, models, plotter
 from labcodes.frog import tele
+import labcodes.routine as rt
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -145,40 +146,9 @@ def fit_spec(spec_map, ax=None, **kwargs):
     ax = cfit.model.plot(cfit, ax=ax, **kwargs)
     return cfit, ax
 
-def plot_visibility(logf, axs=None, **kwargs):
+def plot_visibility(logf, **kwargs):
     """Plot visibility, for iq_scatter experiments only."""
-    if axs is None:
-        fig = plt.figure(figsize=(5,5), tight_layout=True)
-        ax, ax2, ax3 = fig.add_subplot(221), fig.add_subplot(222), fig.add_subplot(212)
-        ax4 = ax3.twinx()
-    else:
-        ax, ax2, ax3, ax4 = axs
-        fig = ax.get_figure()
-
-    # Make up single shot datas.
-    df = logf.df.copy()
-    df['c0'] = df['i0'] + 1j*df['q0']
-    df['c1'] = df['i1'] + 1j*df['q1']
-
-    fig.suptitle(logf.name.as_plot_title())
-    # plotter.plot_iq(df['c0'], ax=ax, label='|0>')  # The best plot maybe PDF contour plot with colored line.
-    # plotter.plot_iq(df['c1'], ax=ax, label='|1>')
-
-    df[['c0_rot', 'c1_rot']] = misc.auto_rotate(df[['c0', 'c1']].values)  # Must pass np.array.
-    if df['c0_rot'].mean().real > df['c1_rot'].mean().real:
-        # Flip if 0 state cloud is on the right.
-        df[['c0_rot', 'c1_rot']] *= -1
-    plotter.plot_iq(df['c0_rot'], ax=ax , label='|0>', color='C0')
-    plotter.plot_iq(df['c1_rot'], ax=ax2, label='|1>', color='C1')
-    ax.sharex(ax2)
-    ax.sharey(ax2)
-    ax.set(xlabel='', ylabel='')
-    ax2.set(xlabel='', ylabel='')
-
-    plotter.plot_visibility(np.real(df['c0_rot']), np.real(df['c1_rot']), ax3, ax4)
-
-    logf.df = df[['runs', 'c0', 'c1', 'c0_rot', 'c1_rot', 'i0', 'q0', 'i1', 'q1']]
-    return ax, ax2, ax3, ax4
+    return rt.basic.IQScatter.from_logfile(logf).plot()
 
 def plot_iq_vs_freq(logf, axs=None):
     if axs is None:
