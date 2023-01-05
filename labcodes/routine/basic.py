@@ -23,6 +23,7 @@ class IQScatter:
         i0 = self.df['c0_rot'].values.real
         i1 = self.df['c1_rot'].values.real
 
+        # Calc histograms.
         bins = np.histogram_bin_edges(np.array([i0, i1]).real, bins=self.bins)
         pdf0, _ = np.histogram(i0, bins, density=True)
         pdf1, _ = np.histogram(i1, bins, density=True)
@@ -39,6 +40,7 @@ class IQScatter:
         self.p00 = cdf0[argmax]
         self.p11 = 1 - cdf1[argmax]
 
+        # Fit histogram with Gaussian model & extract seperation error.
         mod = models.GaussianModel()
         mod.set_param_hint('amp', expr='1/(width*sqrt(2*pi))')
         mod.set_param_hint('offset', vary=False)
