@@ -82,8 +82,7 @@ class Calculator(object):
 
     new = copy  # alias.
 
-    @property
-    def snapshot(self):
+    def snapshot(self, scalar_only=True):
         d = {}
         for k in dir(self):
             if k.startswith('_'): continue
@@ -97,6 +96,8 @@ class Calculator(object):
                 continue
             else:
                 d[k] = v
+            if scalar_only and not np.isscalar(d[k]):
+                del d[k]
         return d
 
 
