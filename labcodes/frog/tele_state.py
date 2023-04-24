@@ -65,7 +65,7 @@ class single_shot_data:
 
     def get_center(self, qubit, state):
         """Get |0> center or |1> center fron logf.conf, return in a complex number."""
-        center = self.lf.conf['parameter'][f'Device.{qubit.upper()}.|{state}> center']['data'][20:-2].split(', ')
+        center = self.lf.conf['parameter'][f'Device.{qubit.upper()}.|{state}> center'][20:-2].split(', ')
         center = [float(i) for i in center]
         center = center[0] + 1j*center[1]
         return center
