@@ -25,6 +25,11 @@ qutip_cmap = mpl.colors.LinearSegmentedColormap(
             (1.00, 1.0, 1.0))}, 
     256,
 )
+try:
+    import cmocean
+    cmap_phase = cmocean.cm.phase
+except ImportError:
+    cmap_phase = None
 
 def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwargs):
     """Plot matrix values in a 2d grid."""
@@ -122,7 +127,7 @@ def plot_mat3d(mat, ax=None, alpha=1.0, label=True, fmt=None,
             cbar = None
     else:
         # Plot complex matrix.
-        if cmap is None: cmap = 'twilight'
+        if cmap is None: cmap = cmap_phase or 'twilight'
         if cmin is None: cmin = -np.pi
         if cmax is None: cmax = np.pi
         bar_col, extend_cbar = _plot_mat3d(ax, np.abs(mat), cval=np.angle(mat), 
