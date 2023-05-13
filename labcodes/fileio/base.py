@@ -220,5 +220,10 @@ class LogName:
         id, title = p.stem[1:].split(', ', 1)
         return cls(dir=dir, id=id, title=title)
 
-    def copy(self):
-        return copy(self)
+    def copy(self, id=None, title=None):
+        name = copy(self)
+        if id is not None:
+            name.id = id
+        if title is not None:
+            name.title = title
+        return name

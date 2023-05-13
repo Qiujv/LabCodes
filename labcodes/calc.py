@@ -62,6 +62,7 @@ class Calculator(object):
     snapshot for a calculator.
 
     Note: Controdicts with attrs.
+    Note: Don't try to optimize the performance, it is not for that.
     """
     def __init__(self, **kwargs):  # TODO: __init__(self, a=2, b=3, ...)
         """Kwargs provided will be set to object attributes."""
