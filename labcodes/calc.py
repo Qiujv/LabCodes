@@ -62,6 +62,7 @@ class Calculator(object):
     snapshot for a calculator.
 
     Note: Controdicts with attrs.
+    Note: Don't try to optimize the performance, it is not for that.
     """
     def __init__(self, **kwargs):  # TODO: __init__(self, a=2, b=3, ...)
         """Kwargs provided will be set to object attributes."""
@@ -82,8 +83,7 @@ class Calculator(object):
 
     new = copy  # alias.
 
-    @property
-    def snapshot(self):
+    def snapshot(self, scalar_only=True):
         d = {}
         for k in dir(self):
             if k.startswith('_'): continue
@@ -97,6 +97,8 @@ class Calculator(object):
                 continue
             else:
                 d[k] = v
+            if scalar_only and not np.isscalar(d[k]):
+                del d[k]
         return d
 
 

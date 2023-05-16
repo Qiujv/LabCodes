@@ -14,9 +14,10 @@ import labcodes.routine as rt
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
     lfs = [fileio.LabradRead(dir, id) for id in ids]
     lf = lfs[0]
+    name = lf.name.copy()
 
-    if sid is None: sid = f'{ids[0]}-{ids[-1]}'
-    if title is None: title = lf.name.title
+    name.id = sid or f'{ids[0]}-{ids[-1]}'
+    name.title = title or lf.name.title
     if isinstance(x_name, int):
         x_name = lf.indeps[x_name]
     if isinstance(y_name, int):
@@ -32,23 +33,22 @@ def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, a
     ax = lf.plot2d(ax=ax, **plot_kw)
     for lf in lfs[1:]:
         lf.plot2d(ax=ax, colorbar=False, **plot_kw)
-    ax.set_title(lf.name.as_plot_title(id=sid, title=title))
-    fname = lf.name.as_file_name(id=sid, title=title)
-    return ax, lfs, fname
+    ax.set_title(name.as_plot_title())
+    return ax, lfs, name
 
 def plot1d_multi(dir, ids, lbs=None, sid=None, title=None, ax=None, **kwargs):
     lfs = [fileio.LabradRead(dir, id) for id in ids]
 
-    if sid is None: sid = f'{ids[0]}-{ids[-1]}'
     if lbs is None: lbs = ids
 
     for lf, lb in zip(lfs, lbs):
         ax = lf.plot1d(label=lb, ax=ax, **kwargs)
-    if title is None: title = lf.name.title
     ax.legend()
-    ax.set_title(lf.name.as_plot_title(id=sid, title=title))
-    fname = lf.name.as_file_name(id=sid, title=title)
-    return ax, lfs, fname
+    name = lf.name.copy()
+    name.title = title or lf.name.title
+    name.id = sid or f'{ids[0]}-{ids[-1]}'
+    ax.set_title(name.as_plot_title())
+    return ax, lfs, name
 
 def fit_resonator(logf, axs=None, i_start=0, i_end=-1, annotate='', init=False, **kwargs):
     if axs is None:
@@ -323,8 +323,8 @@ def plot_qst(dir, id, ro_mat=None, fid=None, normalize=False):
         xticklabels=labels,
         yticklabels=labels,
     )
-    fname = lf.name.as_file_name()
-    return rho, fname, ax
+    name = lf.name.copy()
+    return rho, name, ax
 
 def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
     def qst(id, ro_mat):
@@ -365,13 +365,13 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
 
     # Resolve plot titles.
     lf = fileio.LabradRead(dir, out_ids['0'])
+    name = lf.name.copy()
     if in_ids:
         sid = (f'{min(in_ids.values())}-{max(in_ids.values())}'
             f'-> #{min(out_ids.values())}-{max(out_ids.values())}')
     else:
         sid = f'{min(out_ids.values())}-{max(out_ids.values())} <- ideal'
-    fname = lf.name.as_file_name(id=sid)
-    ptitle = lf.name.as_plot_title(id=sid)
+    name.id = sid
 
     ax = plotter.plot_mat3d(np.abs(chi))
     fid = np.abs(chi[0,0])
@@ -379,9 +379,9 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
         transform=ax.transAxes, fontsize='x-large')
     cbar = ax.collections[0].colorbar
     cbar.set_label('$|\\chi|$')
-    ax.get_figure().suptitle(ptitle)
+    ax.get_figure().suptitle(name.as_plot_title())
 
-    return chi, rho_in, rho_out, fname, ax
+    return chi, rho_in, rho_out, name, ax
     
 
 
@@ -406,84 +406,6 @@ def df2mat(df, fname=None, xy_name=None):
 
     if fname: scipy.io.savemat(fname, mdic)
     return mdic
-
-
-from scipy import stats
-from scipy.optimize import leastsq
-
-
-def rb_fit(dir, id, id_ref, residue=None):
-    """Adapted from codes provided by NJJ, but remove dependence to labrad."""
-    lf = fileio.LabradRead(dir, id)
-    df2d = df2mat(lf.df, xy_name=['k', 'm'])
-    mat = df2d['prob_s0']
-    m = df2d['m'][0]
-
-    lf0 = fileio.LabradRead(dir, id_ref)
-    df2d0 = df2mat(lf0.df, xy_name=['k', 'm'])
-    mat0 = df2d0['prob_s0']
-    m0 = df2d0['m'][0]
-    gate = lf.conf['parameter']['gate']['data'][1:-1]
-
-    prob = np.nanmean(mat,axis=0)
-    prob_std = np.nanstd(mat,axis=0)
-    prob0 = np.nanmean(mat0,axis=0)
-    prob0_std = np.nanstd(mat0,axis=0)
-    if residue is None:
-        p0 = np.array([0.5,0.95,0.5])
-        def fitfunc(p,t):
-            return p[0]*p[1]**t+p[2]
-    else:
-        p0 = np.array([0.5,0.95])
-        def fitfunc(p,t):
-            return p[0]*p[1]**t+residue
-    def errfunc(p):
-        return fitfunc(p,m) - prob
-    out = leastsq(errfunc,p0,full_output=True)
-    p = out[0]
-    pgate = p[1]
-    vdsig = stats.norm.fit(errfunc(p))[1] # the sigma of the residue.
-    var = np.sqrt(out[1][1,1])*np.abs(vdsig)
-
-    def errfunc0(p):
-        return fitfunc(p,m0) - prob0
-    out0 = leastsq(errfunc0,p0,full_output=True)
-    p0 = out0[0]
-    pr = p0[1]
-    vdsig0 = stats.norm.fit(errfunc0(p))[1] # the sigma of the residue.
-    var0 = np.sqrt(out[1][1,1])*np.abs(vdsig0)
-
-    if residue is not None:
-        p0 = np.concatenate([p0,[residue]])
-        p = np.concatenate([p,[residue]])
-    rgate = (1-pgate/pr)/2.0
-    rstd = 0.5*(pgate**2/pr**2*(var**2/pgate**2+var0**2/pr**2))**0.5
-    print('pgate:%.4f\npr:%.4f'%(pgate,pr))
-    print('gate error=%.4f+-%.4f'%(rgate,rstd))
-    fig, ax = plt.subplots()
-    ax.errorbar(m,prob,yerr=prob_std,fmt='rs',label=gate+' gate',alpha=0.8,ms=3)
-    ax.plot(m,fitfunc(p,m),'r--')
-    ax.errorbar(m0,prob0,yerr=prob0_std,fmt='bo',label='reference',alpha=0.8,ms=3)
-    ax.plot(m0,fitfunc(p0,m0),'b--')
-    plt.xlabel('m - Number of Gates')
-    plt.ylabel('Sequence Fidelity')
-    plt.ylim([0.5,1])
-    # plt.xlim([min(m),max(m)])
-    plt.grid(True,which='both')
-    plt.title(f'id={id}, ref={id_ref}, {lf.name.qubit.lower()}, '+gate+r' gate fidelity $%.2f\pm%.2f$%%'%(100-rgate*100,100*rstd))
-
-    ax.text(0.5, 0.75, r'$%.4f\times %.4f^m+%.4f$'%(p0[0],p0[1],p0[2]),
-        horizontalalignment='left',
-        verticalalignment='center',
-        fontsize=12, color='b',
-        transform=ax.transAxes)
-    ax.text(0.5, 0.65, r'$%.4f\times %.4f^m+%.4f$'%(p[0],p[1],p[2]),
-        horizontalalignment='left',
-        verticalalignment='center',
-        fontsize=12, color='r',
-        transform=ax.transAxes)
-    ax.legend()
-    return ax
 
 def plot_rb(dir, id, id_ref, residue=None):
     lf = fileio.LabradRead(dir, id)

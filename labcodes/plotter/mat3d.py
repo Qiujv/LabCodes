@@ -51,6 +51,91 @@ def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwa
 
     return ax
 
+class MatEditor:
+    """For conveniently viewing and editing matrix.
+    
+    Intended for ztalk matrix manipulation.
+    
+    Examples:
+    view = MatEditor(s['ztalk'], s['zspace'])
+    view.show()
+
+    view['Q1_by_C12'] = 0.01
+    view.show()
+    s['ztalk'] = view.mat
+    view.close()
+    """
+    def __init__(self, mat, xlabels, ylabels=None):
+        self.mat = np.array(mat)
+        self.xlabels = list(xlabels)
+        if ylabels is None:
+            self.ylabels = list(xlabels).copy()
+        else:
+            self.ylabels = list(ylabels)
+        self.fig = None
+        self._interactive = plt.isinteractive()
+
+    def __getitem__(self, key:str):
+        xl, yl = key.split('_by_')
+        xi = self.xlabels.index(xl)
+        yi = self.ylabels.index(yl)
+        return self.mat[xi,yi]
+    
+    def __setitem__(self, key:str, val):
+        xl, yl = key.split('_by_')
+        xi = self.xlabels.index(xl)
+        yi = self.ylabels.index(yl)
+        self.mat[xi,yi] = val
+
+    def show(self, omit_diag=True, fs_scale=0.8):
+        """Show the matrix in a figure. Diagonal terms are omitted by default."""
+        vals = self.mat.copy()
+        xlabels, ylabels = self.xlabels, self.ylabels
+
+        xdim, ydim = vals.shape
+        if omit_diag is True:
+            for i in range(min(xdim, ydim)):
+                vals[i,i] = 0
+        vmax = np.max(np.abs(vals))
+        xax = np.arange(xdim)
+        yax = np.arange(ydim)*-1
+        xgrid, ygrid = np.meshgrid(xax, yax)
+
+        if self.fig is None:
+            fig, ax = plt.subplots(figsize=(xdim*fs_scale, ydim*fs_scale))
+            self.fig = fig
+            self._interactive = plt.isinteractive()
+            plt.ion()
+        else:
+            fig = self.fig
+            ax = fig.gca()
+            ax.clear()
+        ax.grid(lw=1, alpha=0.5)
+        ax.set_xticks(xax)
+        ax.set_yticks(yax)
+        ax.set_xticklabels(xlabels)
+        ax.set_yticklabels(ylabels)
+        ax.tick_params(labelbottom=False, labeltop=True, direction='in')
+        ax.set_aspect('equal')
+        # ax.plot(xax, yax, lw=5, alpha=0.5, color='k', ls=':')
+        ax.scatter(xgrid, ygrid, np.abs(vals)*3e4, vals, 
+                cmap='bwr', vmin=-vmax, vmax=vmax, marker='s')
+        for x, y, v in zip(xgrid.ravel(), ygrid.ravel(), vals.ravel()):
+            if v == 0: continue
+            ax.annotate(f'{v:.1%}\n{ylabels[y]} by {xlabels[x]}', (x,y), 
+                        size='small', ha='center', va='center')
+        return ax
+    
+    def close(self):
+        """Close the figure and restore the interactive state."""
+        if self.fig is None: return
+        plt.close(self.fig)
+        self.fig = None
+        if self._interactive is False:
+            plt.ioff()
+        elif self._interactive is True:
+            plt.ion()
+
 def _plot_mat3d(ax, mat, cval, cmin=None, cmax=None, cmap='bwr', alpha=1.0, label=True, fmt=None):
     if fmt is None: fmt = lambda v: f'{v:.3f}'.replace('0.', '.')
     if cmap == 'qutip': cmap = qutip_cmap
@@ -115,6 +200,7 @@ def plot_mat3d(mat, ax=None, alpha=1.0, label=True, fmt=None,
         fig = ax.get_figure()
 
     if np.all(np.imag(mat) == 0):
+        mat = mat.real
         # Plot real matrix.
         if cmap is None: cmap = 'bwr'
         bar_col, extend_cbar = _plot_mat3d(ax, mat, cval=mat, cmin=cmin, cmax=cmax, 
