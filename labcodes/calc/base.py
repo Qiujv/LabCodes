@@ -65,6 +65,7 @@ class Calculator(object):
             return v
 
     def copy(self, **kwargs):
+        """Returns a copy with updated attributes."""
         kw = self.__dict__.copy()
         kw.update(kwargs)
         return self.__class__(**kw)

@@ -61,6 +61,15 @@ def multiples(period, shift, vmin, vmax):
     vs = np.arange(nmin, nmax+1) * period + shift
     return vs
 
+def simple_interp(x, xp, yp, **kwargs):
+    """Wrapper for np.interp but check monoliraty of xp."""
+    if np.all(np.diff(xp) > 0):
+        return np.interp(x, xp, yp, **kwargs)
+    elif np.all(np.diff(xp) < 0):
+        return np.interp(x, xp[::-1], yp[::-1], **kwargs)
+    else:
+        raise ValueError("xp must be monotonic")
+
 def inverse(func, y, x0=None, xlim=None, fast=False, show=False):
     """Returns f^-1(y).
     
