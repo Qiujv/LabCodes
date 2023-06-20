@@ -76,8 +76,8 @@ def probs_from_flags(
         n_qbs: Number of qubits.
 
     Returns:
-        np.ndarray: Probabilities.
-        list(str): Labels for each probability, if return_labels is True.
+        probs (np.ndarray): Probabilities.
+        labels (list[str], optional): Labels for each probability, if return_labels is True.
 
     See also:
         flags_mq_from_1q: Convert flags from 1 qubit to multi-qubit.
@@ -100,7 +100,7 @@ def probs_from_flags(
     if not return_labels:
         return probs
 
-    labels = [np.base_repr(i, base=nlevels).zfill(n_qbs) for i in range(len(counts))]
+    labels = [np.base_repr(i, base=nlevels).zfill(n_qbs) for i in range(len(probs))]
     return probs, labels
 
 
@@ -145,7 +145,10 @@ class KMeans:
         Args:
             centers: list of complex numbers, looks like `[cplx0, cplx1, cplx2, ...]`.
         """
-        self.centers = np.array(centers)
+        centers = np.array(centers)
+        if len(centers.shape) == 2:
+            centers = self._xy_to_cplx(centers)
+        self.centers = centers
 
     @classmethod
     def fit(cls, list_points: list, plot: bool = False):
@@ -251,3 +254,15 @@ class KMeans:
         )
         for i, center in enumerate(self.centers):
             ax.annotate(str(i), (center.real, center.imag))
+
+    @staticmethod
+    def _xy_to_cplx(arr):
+        """[[1,2],[3,4],...] -> [1+2j, 3+4j, ...]"""
+        arr = np.array(arr)
+        return arr[:,0] + 1j*arr[:,1]
+    
+    @staticmethod
+    def _cplx_to_xy(arr):
+        """[1+2j, 3+4j, ...] -> [[1,2],[3,4],...]"""
+        arr = np.array(arr)
+        return np.c_[arr.real, arr.imag]

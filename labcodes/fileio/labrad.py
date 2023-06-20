@@ -4,6 +4,7 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 from labcodes.fileio.base import LogFile, LogName
 
 
@@ -78,16 +79,30 @@ def find(dir, id, return_all=False):
     else:
         return all_match[0]
 
+def just_return_args(*args):
+    return args
+
+LABRAD_REG_GLOBLES = {
+    'DimensionlessArray': np.array,
+    'Value': just_return_args,
+}
+
 def ini_to_dict(ini):
     d = dict()
     d['general'] = dict(ini['General'])
-    d['general']['parameter'] = d['general'].pop('parameters')
-    d['comments'] = dict(ini['Comments'])
+    d['general']['independent'] = int(d['general']['independent'])
+    d['general']['dependent'] = int(d['general']['dependent'])
+    d['general']['parameters'] = int(d['general']['parameters'])
+    d['general']['comments'] = int(d['general']['comments'])
+    d['comments'] = dict(ini['Comments'])  # Maybe it should not be dict, but i have no test example now.
 
     d['parameter'] = dict()
-    for i in range(int(d['general']['parameter'])):
+    for i in range(int(d['general']['parameters'])):
         sect = ini[f'Parameter {i+1}']
-        d['parameter'].update({sect['label']: sect['data']})
+        data = sect['data']
+        # TODO: Maybe catch NameError?
+        data = eval(data, LABRAD_REG_GLOBLES)  # Parse string to proper objects.
+        d['parameter'].update({sect['label']: data})
 
     for k in ['independent', 'dependent']:
         d[k] = dict()
