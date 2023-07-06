@@ -1,4 +1,4 @@
-import json_numpy
+import json_numpy  # TODO: consider replace this with https://github.com/mverleg/pyjson_tricks
 
 def data_to_json(data, fname):
     """Dump data dict to json file."""

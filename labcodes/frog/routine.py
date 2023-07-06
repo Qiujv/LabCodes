@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy.io
 import labcodes.frog.pyle_tomo as tomo
-from labcodes import fileio, fitter, misc, models, plotter
+from labcodes import fileio, fitter, misc, models, plotter, state_disc
 from labcodes.frog import tele
 import labcodes.routine as rt
 
@@ -177,6 +177,35 @@ def plot_iq_vs_freq(logf, axs=None):
     ax3.set_ylabel('SNR', color='C1')
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
+
+def plot_visibility_kmeans(lf, return_ro_mat=False):
+    df = lf.df
+    nlevels = 3
+
+    qb = lf.conf['parameter']['measure'][0]
+    stater = state_disc.KMeans([lf.conf['parameter'][f'Device.{qb}.|{i}> center'] 
+                                for i in range(nlevels)])
+
+    fig, axs = plt.subplots(ncols=nlevels, figsize=(8,3), sharex=True, sharey=True)
+    fig.suptitle(lf.name.as_plot_title())
+    for i in range(nlevels):
+        axs[i].scatter(f'i{i}', f'q{i}', data=df, marker='.', color=f'C{i}')
+        axs[i].set_aspect('equal')
+        axs[i].set_title(f'|{i}>')
+
+    ro_mat = []
+    for i in range(nlevels):
+        stater.plot_regions(axs[i])
+        probs = stater.probs((df[f'i{i}'] + 1j*df[f'q{i}']).values)
+        for j in range(nlevels):
+            center = stater.centers[j]
+            axs[i].annotate(f'{probs[j]:.1%}\n', (center.real, center.imag), ha='center')
+        ro_mat.append(probs)
+
+    if return_ro_mat:
+        return fig, ro_mat
+    
+    return fig
 
 def plot_xtalk(logf, slope=-0.01, offset=0.0, ax=None, **kwargs):
     """Plot 2d with a guide line. For xtalk data.
