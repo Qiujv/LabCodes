@@ -40,7 +40,7 @@ def replace(text, dict):
     return text
 
 
-def read_labrad(dir, id, suffix=None):
+def read_labrad(dir:Path, id:int, suffix:str=None) -> LogFile:
     path = find(dir, id)
     if suffix is None:
         if path.with_suffix('.csv_complete').exists():
@@ -85,6 +85,8 @@ def just_return_args(*args):
 LABRAD_REG_GLOBLES = {
     'DimensionlessArray': np.array,
     'Value': just_return_args,
+    'ValueArray': just_return_args,
+    'array': np.array,
 }
 
 def ini_to_dict(ini):

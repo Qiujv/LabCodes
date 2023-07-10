@@ -54,6 +54,88 @@ def round(x, roundto):
     """
     return np.round(x/roundto)*roundto
 
+def start_stop(start, stop, step=None, n=None) -> np.array:
+    """Returns evenly space array.
+    
+    >>> start_stop(1, 2, 0.2)
+    array([1. , 1.2, 1.4, 1.6, 1.8, 2. ])
+
+    >>> start_stop(2, 1, n=6)
+    array([2. , 1.8, 1.6, 1.4, 1.2, 1. ])
+
+    >>> start_stop(1, 1.9999, 0.2)  # NOTE the unexpected behavior.
+    array([1. , 1.2, 1.4, 1.6, 1.8, 2. ])
+
+    >>> start_stop(1, 5, 1)  # Return int type if possible.
+    array([1, 2, 3, 4, 5])
+
+    >>> start_stop(1, 5, n=5)
+    array([1, 2, 3, 4, 5])
+    """
+    if n is None: 
+        if (
+            isinstance(start, int) 
+            and isinstance(stop, int) 
+            and isinstance(step, int)
+        ):
+            dtype = int
+        else:
+            dtype = None
+        arr = np.arange(start, stop+step*0.01, step, dtype=dtype)
+    else: 
+        if (
+            isinstance(start, int) 
+            and isinstance(stop, int) 
+            and ((stop - start) % (n-1) == 0)
+        ):
+            dtype = int
+        else:
+            dtype = None
+        arr = np.linspace(start, stop, n, dtype=dtype)
+    return arr
+
+def center_span(center, span, step=None, n=None) -> np.array:
+    """Returns evenly space array.
+
+    >>> center_span(1, 2, 0.4)
+    array([0.2, 0.6, 1. , 1.4, 1.8])
+
+    >>> center_span(1, 2, n=5)
+    array([0. , 0.5, 1. , 1.5, 2. ])
+
+    >>> center_span(0, 4, 1)  # Return int type if possible.
+    array([-2, -1,  0,  1,  2])
+
+    >>> center_span(0, 4, n=5)
+    array([-2, -1,  0,  1,  2])
+    """
+    if n is None: 
+        n2 = (span/2) // step
+        arr = np.arange(-n2, n2 + 1, dtype=int)
+        arr = arr * step + center
+    else:
+        arr_f = np.linspace(center - span/2, center + span/2, n)
+        arr_d = np.linspace(center - span/2, center + span/2, n, dtype=int)
+        arr = arr_d if np.allclose(arr_f, arr_d) else arr_f
+    return arr
+
+
+def segments(*segs) -> np.array:
+    """Concate multiple segments. Remove repeated endpoints.
+    
+    >>> segments(
+        start_stop(0,1,0.2),
+        start_stop(1,10,2),
+    )
+    array([0. , 0.2, 0.4, 0.6, 0.8, 1. , 3. , 5. , 7. , 9. ])
+    """
+    segs = list(segs)
+    for i in range(len(segs) - 1):
+        if np.isclose(segs[i][-1], segs[i+1][0]):
+            segs[i+1] = segs[i+1][1:]
+    return np.hstack(segs)
+
+
 def multiples(period, shift, vmin, vmax):
     """Returns multiples of period with shift within [vmin, vmax]."""
     nmin = (vmin - shift) // period + 1

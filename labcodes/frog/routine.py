@@ -178,9 +178,11 @@ def plot_iq_vs_freq(logf, axs=None):
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
-def plot_visibility_kmeans(lf, return_ro_mat=False):
+def plot_visibility_kmeans(lf, return_ro_mat=False, nlevels=None):
     df = lf.df
-    nlevels = 3
+    if nlevels is None: 
+        nlevels = 1
+        while f'i{nlevels-1}' in df: nlevels += 1
 
     qb = lf.conf['parameter']['measure'][0]
     stater = state_disc.KMeans([lf.conf['parameter'][f'Device.{qb}.|{i}> center'] 
