@@ -194,7 +194,8 @@ class KMeans:
         stater = cls(centers)
 
         if plot is True:
-            fig, axs = plt.subplots(ncols=n_clusters, figsize=(8,3), sharex=True, sharey=True)
+            figsize = (6,3) if len(list_points) == 2 else (8,3)
+            fig, axs = plt.subplots(ncols=n_clusters, figsize=figsize, sharex=True, sharey=True)
             for i, pts in enumerate(list_points):
                 axs[i].scatter(pts.real, pts.imag, marker=f"${i}$", color=f'C{i}')
                 axs[i].set_aspect('equal')

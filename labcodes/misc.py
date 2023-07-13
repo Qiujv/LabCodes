@@ -136,6 +136,21 @@ def segments(*segs) -> np.array:
     return np.hstack(segs)
 
 
+def zigzag_arange(n):
+    """Returns indices that picks the first and last first, and converges to center in the end.
+    
+    >>> zigzag_arange(7)
+    array([0, 6, 1, 5, 2, 4, 3])
+
+    >>> center_span(0, 6, n=7)[zigzag_arange(7)]
+    array([-3,  3, -2,  2, -1,  1,  0])
+    """
+    idx = np.c_[np.arange(n//2), n-1 - np.arange(n//2)].ravel()
+    if n % 2 != 0:
+        idx = np.r_[idx, n//2]
+    return idx
+
+
 def multiples(period, shift, vmin, vmax):
     """Returns multiples of period with shift within [vmin, vmax]."""
     nmin = (vmin - shift) // period + 1

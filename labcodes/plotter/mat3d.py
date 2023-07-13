@@ -57,6 +57,7 @@ class MatEditor:
     Intended for ztalk matrix manipulation.
     
     Examples:
+    ```
     view = MatEditor(s['ztalk'], s['zspace'])
     view.show()
 
@@ -64,6 +65,7 @@ class MatEditor:
     view.show()
     s['ztalk'] = view.mat
     view.close()
+    ```
     """
     def __init__(self, mat, xlabels, ylabels=None):
         self.mat = np.array(mat)
@@ -87,22 +89,23 @@ class MatEditor:
         yi = self.ylabels.index(yl)
         self.mat[xi,yi] = val
 
-    def show(self, omit_diag=True, fs_scale=0.8):
+    def show(self, omit_diag=True, figsize_scale=0.8):
         """Show the matrix in a figure. Diagonal terms are omitted by default."""
         vals = self.mat.copy()
+        xdim, ydim = vals.shape
+        xax = np.arange(xdim)
+        yax = np.arange(ydim)
+        xgrid, ygrid = np.meshgrid(xax, yax)
         xlabels, ylabels = self.xlabels, self.ylabels
 
-        xdim, ydim = vals.shape
         if omit_diag is True:
             for i in range(min(xdim, ydim)):
                 vals[i,i] = 0
-        vmax = np.max(np.abs(vals))
-        xax = np.arange(xdim)
-        yax = np.arange(ydim)*-1
-        xgrid, ygrid = np.meshgrid(xax, yax)
+        mask = (np.abs(vals) >= 0.2)
+        vmax = np.max(np.abs(vals[~mask]))
 
         if self.fig is None:
-            fig, ax = plt.subplots(figsize=(xdim*fs_scale, ydim*fs_scale))
+            fig, ax = plt.subplots(figsize=(xdim*figsize_scale, ydim*figsize_scale))
             self.fig = fig
             self._interactive = plt.isinteractive()
             plt.ion()
@@ -113,17 +116,21 @@ class MatEditor:
         ax.grid(lw=1, alpha=0.5)
         ax.set_xticks(xax)
         ax.set_yticks(yax)
+        ax.set_xlim(-0.5, xdim - 0.5)
+        ax.set_ylim(-0.5, ydim - 0.5)
         ax.set_xticklabels(xlabels)
         ax.set_yticklabels(ylabels)
         ax.tick_params(labelbottom=False, labeltop=True, direction='in')
+        ax.invert_yaxis()
         ax.set_aspect('equal')
-        # ax.plot(xax, yax, lw=5, alpha=0.5, color='k', ls=':')
-        ax.scatter(xgrid, ygrid, np.abs(vals)*3e4, vals, 
-                cmap='bwr', vmin=-vmax, vmax=vmax, marker='s')
+        ax.scatter(xgrid[~mask], ygrid[~mask], np.abs(vals[~mask])*3e4, vals[~mask], 
+                   cmap='bwr', vmin=-vmax, vmax=vmax, marker='s')
+        ax.scatter(xgrid[mask], ygrid[mask], 1500, 'k', marker='s')
         for x, y, v in zip(xgrid.ravel(), ygrid.ravel(), vals.ravel()):
             if v == 0: continue
+            color = 'k' if abs(v) <= 0.2 else 'w'
             ax.annotate(f'{v:.1%}\n{ylabels[y]} by {xlabels[x]}', (x,y), 
-                        size='small', ha='center', va='center')
+                        size='small', ha='center', va='center', color=color)
         return ax
     
     def close(self):
