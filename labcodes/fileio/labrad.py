@@ -51,7 +51,7 @@ def replace(text:str, dict:dict) -> str:
     return text
 
 
-def read_labrad(dir:Path, id:int, suffix:str=None) -> LogFile:
+def read_labrad(dir:Path, id:int=-1, suffix:str=None) -> LogFile:
     """Return LogFile object from Labrad datafile."""
     if id < 0: id = last_idx(dir) + id + 1
     path = find(dir, id)
@@ -175,7 +175,7 @@ def last_idx(dir:Path) -> int:
     ini = ConfigParser()
     read = ini.read(dir/'session.ini')
     if read:
-        return int(ini['File System']['counter'])
+        return int(ini['File System']['counter']) - 1
     else:
         return int(browse(dir)[-1][1:6])
 
