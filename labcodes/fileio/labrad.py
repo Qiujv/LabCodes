@@ -1,28 +1,39 @@
-# %%
+"""Module providing utilities for reading or saving data with Labber format (.hdf5)."""
+
+
 import re
+import warnings
 from configparser import ConfigParser
 from pathlib import Path
+from typing import List
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from labcodes.fileio.base import LogFile, LogName
 
-
 ESCAPE_CHARS = {  # |, >, : in filename were replaced by %v, %g, %c.
-    r'%v': '|',
-    r'%g': '>',
+    r'%p': '%',
+    r'%f': '/',
+    r'%b': '\\',
     r'%c': ':',
     r'%a': '*',
-    r'%f': '/',
+    r'%q': '?',
+    r'%r': '"',
+    r'%l': '<',
+    r'%g': '>',
+    r'%v': '|',
 }
 
 ABBREV = {
     'pi pulse': 'pi',
     'prob.': 'prob',
-    '|1> state': 's1',
     '|0> state': 's0',
+    '|1> state': 's1',
+    '|2> state': 's2',
     '|0>': 's0',
     '|1>': 's1',
+    '|2>': 's2',
     'amplitude': 'amp',
     'coupler bias pulse amp': 'cpa',
     'coupler pulse amp': 'cpa',
@@ -34,13 +45,15 @@ ABBREV = {
     ' ': '_',
 }
 
-def replace(text, dict):
+def replace(text:str, dict:dict) -> str:
     for k, v in dict.items():
         text = text.replace(k, v)
     return text
 
 
 def read_labrad(dir:Path, id:int, suffix:str=None) -> LogFile:
+    """Return LogFile object from Labrad datafile."""
+    if id < 0: id = last_idx(dir) + id + 1
     path = find(dir, id)
     if suffix is None:
         if path.with_suffix('.csv_complete').exists():
@@ -63,7 +76,7 @@ def read_labrad(dir:Path, id:int, suffix:str=None) -> LogFile:
 
 LabradRead = read_labrad  # for back compatibility.
 
-def find(dir, id, return_all=False):
+def find(dir:Path, id:int, return_all:bool=False) -> Path:
     """Returns the full path of Labrad datafile by given data ID."""
     dir = Path(dir)
     if not dir.exists():
@@ -79,6 +92,7 @@ def find(dir, id, return_all=False):
     else:
         return all_match[0]
 
+
 def just_return_args(*args):
     return args
 
@@ -89,14 +103,14 @@ LABRAD_REG_GLOBLES = {
     'array': np.array,
 }
 
-def ini_to_dict(ini):
+def ini_to_dict(ini:ConfigParser) -> dict:
     d = dict()
     d['general'] = dict(ini['General'])
     d['general']['independent'] = int(d['general']['independent'])
     d['general']['dependent'] = int(d['general']['dependent'])
     d['general']['parameters'] = int(d['general']['parameters'])
     d['general']['comments'] = int(d['general']['comments'])
-    d['comments'] = dict(ini['Comments'])  # Maybe it should not be dict, but i have no test example now.
+    d['comments'] = dict(ini['Comments'])  # Can be other types but I have no test example now.
 
     d['parameter'] = dict()
     for i in range(int(d['general']['parameters'])):
@@ -120,7 +134,7 @@ def ini_to_dict(ini):
             d[k].update({name: dict(sect)})
     return d
 
-def logname_from_path(path):
+def logname_from_path(path:Path) -> LogName:
     dir = path.parent
     match = re.search(r'(\d+) - (.*)%c (.*)', path.stem)
     if match:
@@ -133,7 +147,8 @@ def logname_from_path(path):
     title = f'{qubit} {title}' if qubit else title
     return LogName(dir=dir, id=id, title=title)
 
-def browse(dir, do_print=False):
+def browse(dir:Path, do_print=False) -> List[str]:
+    """Returns all datafiles in given folder. Print if do_print is True."""
     dir = Path(dir)
     ini = ConfigParser()
     read = ini.read(dir/'session.ini')
@@ -154,7 +169,18 @@ def browse(dir, do_print=False):
         ret.append(msg)
     return ret
 
+def last_idx(dir:Path) -> int:
+    """Returns the last index of datafile in given folder."""
+    dir = Path(dir)
+    ini = ConfigParser()
+    read = ini.read(dir/'session.ini')
+    if read:
+        return int(ini['File System']['counter'])
+    else:
+        return int(browse(dir)[-1][1:6])
+
 def from_registry(items, **updates):
+    warnings.warn('from_registry is deprecated.', DeprecationWarning)
     # if isinstance(items, dict):
     #     kws = items.copy()
     # else:
@@ -165,6 +191,7 @@ def from_registry(items, **updates):
     return kws
 
 def to_registry(kws, **updates):
+    warnings.warn('to_registry is deprecated.', DeprecationWarning)
     kws = kws.copy()
     kws.update(updates)
     items = tuple(kws.items())

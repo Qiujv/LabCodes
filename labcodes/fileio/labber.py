@@ -1,5 +1,4 @@
-"""Module providing utilities for reading or saving data with Labber format (.hdf5).
-"""
+"""Module providing utilities for reading or saving data with Labber format (.hdf5)."""
 
 from typing import List
 from pathlib import Path
