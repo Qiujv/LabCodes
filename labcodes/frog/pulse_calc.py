@@ -113,10 +113,10 @@ class GmonSpec:
         self.amp = amp
         self.slope = slope
         self.offset = offset
-        self._ext_vs_delta = self.calc_delta_ext_vs_delta()
+        self._ext_vs_delta = self._calc_ext_vs_delta()
         # self.modify_goff(0)
         self._fshift0 = 0
-        self._kappa_vs_gpa = self.calc_kappa_vs_gpa()
+        self._kappa_vs_gpa = self._calc_kappa_vs_gpa()
     
     def junc_phase(self, delta_ext, tol=1e-6):
         delta = np.interp(delta_ext, *self._ext_vs_delta, period=4*pi)
@@ -126,7 +126,7 @@ class GmonSpec:
                               delta + np.sin(delta) * self.r, tol, mask)
         return delta
     
-    def calc_delta_ext_vs_delta(self, n=10001):
+    def _calc_ext_vs_delta(self, n=10001):
         delta = np.linspace(-2*pi, 2*pi, n)  # More periods to cover all possible values.
         delta_ext = delta + np.sin(delta) * self.r  # RF SQUID bias, from Satzinger's thesis.
         return delta_ext, delta
@@ -161,14 +161,20 @@ class GmonSpec:
 
         return gpa
     
-    def calc_kappa_vs_gpa(self, n=10001):
+    def _calc_kappa_vs_gpa(self, n=10001):
+        gpa_dip, gpa_top = self.calc_gpa_dip_top()
+        gpa = np.linspace(gpa_dip, gpa_top, n)
+        kappa = self.fshift_sqr(gpa)
+        return kappa, gpa
+    
+    def calc_gpa_dip_top(self):
+        """Returns gpa where the dip and top of gmon spectrum lays."""
         gpa_top = self.shift % self.period  # Where fshift reaches max.
         gpa_dip = gpa_top - self.period/2  # Where fshift reaches min.
         if gpa_dip > 0:  # Make sure [gpa_dip, gpa_top] include gpa=0.
             gpa_top = gpa_top - self.period
-        gpa = np.linspace(gpa_dip, gpa_top, n)
-        kappa = self.fshift_sqr(gpa)
-        return kappa, gpa
+        return gpa_dip, gpa_top
+
     
     def modify_goff(self, gpa):
         """Makes self.fshift returns 0 if gpa=goff."""
@@ -192,7 +198,7 @@ class QubitSpec:
         self.fmin = fmin
         self.xmax = xmax
         self.xmin = xmin
-        self._f_vs_zpa = self.calc_f_vs_zpa()
+        self._f_vs_zpa = self._calc_f_vs_zpa()
 
     def freq(self, zpa):
         """Frequency of transmon, following koch_charge_2007 Eq.2.18."""
@@ -203,7 +209,7 @@ class QubitSpec:
                                 * np.sqrt(1 + d**2 * np.tan(pi*phi)**2))
         return f
     
-    def calc_f_vs_zpa(self, n=10001):
+    def _calc_f_vs_zpa(self, n=10001):
         zpa = np.linspace(self.xmin, self.xmax, n)
         f = self.freq(zpa)
         return f, zpa

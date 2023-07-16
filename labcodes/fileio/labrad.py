@@ -1,6 +1,7 @@
 """Module providing utilities for reading or saving data with Labber format (.hdf5)."""
 
 
+import logging
 import re
 import warnings
 from configparser import ConfigParser
@@ -11,6 +12,8 @@ import numpy as np
 import pandas as pd
 
 from labcodes.fileio.base import LogFile, LogName
+
+logger = logging.getLogger(__name__)
 
 ESCAPE_CHARS = {  # |, >, : in filename were replaced by %v, %g, %c.
     r'%p': '%',
@@ -117,7 +120,10 @@ def ini_to_dict(ini:ConfigParser) -> dict:
         sect = ini[f'Parameter {i+1}']
         data = sect['data']
         # TODO: Maybe catch NameError?
-        data = eval(data, LABRAD_REG_GLOBLES)  # Parse string to proper objects.
+        try:
+            data = eval(data, LABRAD_REG_GLOBLES)  # Parse string to proper objects.
+        except:
+            logging.exception(f'error parsing {sect["label"]}')
         d['parameter'].update({sect['label']: data})
 
     for k in ['independent', 'dependent']:
