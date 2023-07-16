@@ -127,7 +127,7 @@ class GmonSpec:
         return delta
     
     def calc_delta_ext_vs_delta(self, n=10001):
-        delta = np.linspace(-2*pi, 2*pi, n)  # Sample periods to cover all possible values.
+        delta = np.linspace(-2*pi, 2*pi, n)  # More periods to cover all possible values.
         delta_ext = delta + np.sin(delta) * self.r  # RF SQUID bias, from Satzinger's thesis.
         return delta_ext, delta
 
@@ -257,7 +257,8 @@ if __name__ == '__main__':
         cutoff_w=10.0, 
     ):
         if goff: gfit.modify_goff(goff)
-        vt, vy = soft_edges_sample(t0, t0+delay, width, pwlin=False, sample_rate=1, edge=edge, cutoff_w=cutoff_w, alpha=alpha)
+        vt, vy = soft_edges_sample(t0, t0+delay, width, edge=edge, alpha=alpha,
+                                   pwlin=False, sample_rate=1, cutoff_w=cutoff_w)
         # kmin = gfit.fshift_sqr(0)
         kmin = 0
         kmax = gfit.fshift_sqr(gpa)
