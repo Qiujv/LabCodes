@@ -1,9 +1,13 @@
 import math
+import logging
 from functools import wraps
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import fsolve
+
+
+logger = logging.getLogger(__name__)
 
 
 def auto_rotate(data, return_rad=False):
@@ -73,6 +77,9 @@ def start_stop(start, stop, step=None, n=None) -> np.array:
     array([1, 2, 3, 4, 5])
     """
     if n is None: 
+        if (start > stop) and (step > 0):
+            logger.warning('start > stop, but step > 0, use step = -step instead.')
+            step = -step
         if (
             isinstance(start, int) 
             and isinstance(stop, int) 
@@ -167,7 +174,7 @@ def simple_interp(x, xp, yp, **kwargs):
     else:
         raise ValueError("xp must be monotonic")
 
-def inverse(func, y, x0=None, xlim=None, fast=False, show=False):
+def inverse(func, y, x0=None, xlim=None, fast=False, show=False, tol=1e-6, ninterp=1000):
     """Returns f^-1(y).
     
     Args:
@@ -185,35 +192,38 @@ def inverse(func, y, x0=None, xlim=None, fast=False, show=False):
     if xlim:
         xlower, xupper = xlim
         if func(xupper) < func(xlower):
-            xlower, xupper = xupper, xlower
+            xlower, xupper = xupper, xlower  # Make interp works for decreasing func.
         func = bound(*np.sort(xlim))(func)
     
     if x0 is None:
         if xlim:
-            # Find rough solution with interplotation, for fast fsolve.
-            xspace = np.linspace(xlower, xupper, 1000)
+            # Find rough solution with interplotation, for faster fsolve.
+            xspace = np.linspace(xlower, xupper, ninterp)
             x0 = np.interp(y, func(xspace), xspace)
         else:
             x0 = 0.
 
-    if not isinstance(y, np.ndarray):
+    if not np.iterable(y):
         x = fsolve(lambda xi: y - func(xi), x0=x0)[0]
     else:
         x0 = x0 * np.ones(y.shape)
         if fast is True:
             x = x0
-            if xlim is None: print('WARNING: fast inverse without xlim simply returns x0.')
+            if xlim is None: logger.warning('fast inverse without xlim simply returns x0.', stack_info=True)
         else:
             # NOTE: Could be time-consuming when y.size is large and x0 is bad.
             x = [fsolve(lambda xi: yi - func(xi), x0=x0i)[0] 
                  for yi, x0i in zip(y.ravel(), x0.ravel())]
-        x = np.array(x).reshape(y.shape)
+        x = np.asarray(x).reshape(y.shape)
+
+    if np.allclose(func(x), y, atol=tol, rtol=0) is False:
+        logger.warning('inverse solution not found. func(x) is not close to y.', stack_info=True)
 
     if show is True:
         _, ax = plt.subplots()
-        ax.plot(x, y, label='y')  # Assumes right solution found.
-        ax.plot(x0, func(x0), 'o', label='init', fillstyle='none')
-        ax.plot(x, func(x), 'x', label='find')
+        ax.plot(x, func(x), 'k-', label='func(x)')
+        ax.plot(x0, y, '.', label='init', fillstyle='none')
+        ax.plot(x, y, 'x', label='find', markersize=4)
         ax.legend()
         plt.show(block=True)
 
@@ -242,14 +252,14 @@ def bound(xleft, xright, scale=1., verbose=False):  # A decorator factory.
             if np.size(x) == 1:
                 if verbose:
                     if (x < xleft) or (x > xright):
-                        print('WARNING: value {} out of bound [{},{}].'.format(x, xleft, xright))
+                        logger.warning('value {} out of bound [{},{}].'.format(x, xleft, xright))
                 return _bound(fx, x, xleft, xright, scale)
             else:
                 x = np.array(x)
                 if verbose:
                     mask = (x < xleft) | (x > xright)
                     if np.any(mask):
-                        print('WARNING: value {} out of bound [{},{}].'.format(x[mask], xleft, xright))
+                        logger.warning('value {} out of bound [{},{}].'.format(x[mask], xleft, xright))
                 ys = [_bound(fx, xi, xleft, xright, scale) for xi in x]
                 return np.array(ys)
         return wrapped_f
@@ -260,7 +270,7 @@ def num2bstr(num, n_bits, base=2):
         msg = 'num {} requires more than {} bits with base {} to store.'
         raise ValueError(msg.format(num, n_bits, base))
     if base > 10:
-        print('WARNING: base > 10 is not implemented yet!')
+        logger.warning('base > 10 is not implemented yet!')
 
     l = []
     while True:
