@@ -2,6 +2,7 @@ import json
 import textwrap
 from copy import copy
 from pathlib import Path
+from typing import Union, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,11 +23,11 @@ PATH_LEGAL = {
 
 @define(slots=False, repr=False)
 class LogFile:
-    df: field()
-    conf: field()
-    name: field()
-    indeps: field()
-    deps: field()
+    df: pd.DataFrame
+    conf: dict
+    name: 'LogName'
+    indeps: List[str]
+    deps: List[str]
 
     def __repr__(self):
         return f'<LogFile at {self.name}>'
@@ -38,7 +39,7 @@ class LogFile:
         else:
             return self.plot2d(**kwargs)
 
-    def plot1d(self, x_name=0, y_name=0, ax=None, **kwargs):
+    def plot1d(self, x_name=0, y_name=0, ax:plt.Axes=None, **kwargs):
         """Quick line plot."""
         if ax is None:
             fig, ax = plt.subplots()
@@ -77,7 +78,7 @@ class LogFile:
         )
         return ax
 
-    def plot2d(self, x_name=0, y_name=1, z_name=0, ax=None, kind='collection', **kwargs):
+    def plot2d(self, x_name=0, y_name=1, z_name=0, ax:plt.Axes=None, kind='collection', **kwargs):
         """Quick 2d plot with plotter.plot2d_[kind]."""
         if ax is None:
             fig, ax = plt.subplots()
@@ -102,7 +103,7 @@ class LogFile:
         return ax
 
     @classmethod
-    def load(cls, dir, id):
+    def load(cls, dir:Path, id:int) -> 'LogFile':
         """Load a logfile from a .feather and a .json files."""
         dir = Path(dir)
         path = cls.find(dir, id, '.feather')
@@ -113,7 +114,7 @@ class LogFile:
         deps = conf['deps']
         return cls(df=df, conf=conf, name=name, indeps=indeps, deps=deps)
 
-    def save(self, dir):
+    def save(self, dir:Path) -> Path:
         """Save a logfile into a .feather file and a .json files."""
         dir = Path(dir).resolve()
         p = dir / self.name.fname()
@@ -186,14 +187,14 @@ class LogName:
     suffix could be csv, ini, json, feather, png, jpg, svg...
     id could be '12' or '1,2,3' or '1-4'.
     """
-    dir: field()
-    id: field()
+    dir: Union[str, Path]
+    id: Union[str, int]
     title: str
 
     def __repr__(self):
         return f'#{self.id}, {self.title}'
 
-    def as_plot_title(self, width=60):
+    def as_plot_title(self, width:int=60) -> str:
         s = f'#{self.id}, {self.title}'
         s = textwrap.fill(s, width=width)
 
@@ -205,7 +206,7 @@ class LogName:
 
     ptitle = as_plot_title
 
-    def as_file_name(self):
+    def as_file_name(self) -> str:
         s = f'#{self.id}, {self.title}'
         for k, v in PATH_LEGAL.items():
             s = s.replace(k, v)
@@ -214,16 +215,22 @@ class LogName:
     fname = as_file_name
 
     @classmethod
-    def from_path(cls, p):
+    def from_path(cls, p:Union[str, Path]) -> 'LogName':
         p = Path(p)
         dir = p.parent
         id, title = p.stem[1:].split(', ', 1)
         return cls(dir=dir, id=id, title=title)
 
-    def copy(self, id=None, title=None):
+    def copy(self, id:Union[str, int]=None, title: str=None) -> 'LogName':
         name = copy(self)
         if id is not None:
             name.id = id
         if title is not None:
             name.title = title
         return name
+
+    def save_aside_data(self, fig: Union[plt.Axes, plt.Figure]) -> None:
+        if isinstance(fig, plt.Axes):
+            fig = fig.get_figure()
+        fig.savefig(self.dir / (self.as_file_name() + '.png'))
+        
