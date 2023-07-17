@@ -9,6 +9,7 @@ import labcodes.frog.pyle_tomo as tomo
 from labcodes import fileio, fitter, misc, models, plotter, state_disc
 from labcodes.frog import tele
 import labcodes.routine as rt
+from typing import List
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -40,6 +41,7 @@ def plot1d_multi(dir, ids, lbs=None, sid=None, title=None, ax=None, **kwargs):
     lfs = [fileio.LabradRead(dir, id) for id in ids]
 
     if lbs is None: lbs = ids
+    if len(lbs) < len(lfs): lbs = lbs + [lf.name.id for lf in lfs[len(lbs):]]
 
     for lf, lb in zip(lfs, lbs):
         ax = lf.plot1d(label=lb, ax=ax, **kwargs)
@@ -180,7 +182,8 @@ def plot_iq_vs_freq(logf, axs=None):
 
 def plot_visibility_kmeans(lf, return_ro_mat=False):
     df = lf.df
-    nlevels = 3
+    nlevels = 0
+    while f'i{nlevels}' in df: nlevels += 1
 
     qb = lf.conf['parameter']['measure'][0]
     stater = state_disc.KMeans([lf.conf['parameter'][f'Device.{qb}.|{i}> center'] 

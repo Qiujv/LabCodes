@@ -194,18 +194,20 @@ class KMeans:
         stater = cls(centers)
 
         if plot is True:
-            ro_mat = np.array([stater.probs(pts) for pts in list_points])
-
-            fig, (ax, ax2) = plt.subplots(ncols=2, figsize=(8, 3))
+            figsize = (6,3) if len(list_points) == 2 else (8,3)
+            fig, axs = plt.subplots(ncols=n_clusters, figsize=figsize, sharex=True, sharey=True)
             for i, pts in enumerate(list_points):
-                ax.scatter(pts.real, pts.imag, marker=f"${i}$")
-            stater.plot_regions(ax)
-            ax.set_aspect("equal")
-
-            plotter.plot_mat2d(ro_mat, ax=ax2, fmt=lambda n: f"{n*100:.1f}%")
-            ax2.set_xlabel("Assgn state")
-            ax2.set_ylabel("Prep. state")
-            return stater, ax, ax2
+                axs[i].scatter(pts.real, pts.imag, marker=f"${i}$", color=f'C{i}')
+                axs[i].set_aspect('equal')
+                axs[i].set_title(f'|{i}>')
+                
+            for i, pts in enumerate(list_points):
+                stater.plot_regions(axs[i])
+                probs = stater.probs(pts)
+                for j in range(n_clusters):
+                    center = stater.centers[j]
+                    axs[i].annotate(f'{probs[j]:.1%}\n', (center.real, center.imag), ha='center')
+            return stater, fig
 
         return stater
 

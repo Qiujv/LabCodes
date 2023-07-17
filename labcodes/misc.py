@@ -1,9 +1,13 @@
 import math
+import logging
 from functools import wraps
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import fsolve
+
+
+logger = logging.getLogger(__name__)
 
 
 def auto_rotate(data, return_rad=False):
@@ -54,6 +58,106 @@ def round(x, roundto):
     """
     return np.round(x/roundto)*roundto
 
+def start_stop(start, stop, step=None, n=None) -> np.array:
+    """Returns evenly space array.
+    
+    >>> start_stop(1, 2, 0.2)
+    array([1. , 1.2, 1.4, 1.6, 1.8, 2. ])
+
+    >>> start_stop(2, 1, n=6)
+    array([2. , 1.8, 1.6, 1.4, 1.2, 1. ])
+
+    >>> start_stop(1, 1.9999, 0.2)  # NOTE the unexpected behavior.
+    array([1. , 1.2, 1.4, 1.6, 1.8, 2. ])
+
+    >>> start_stop(1, 5, 1)  # Return int type if possible.
+    array([1, 2, 3, 4, 5])
+
+    >>> start_stop(1, 5, n=5)
+    array([1, 2, 3, 4, 5])
+    """
+    if n is None: 
+        if (start > stop) and (step > 0):
+            logger.warning('start > stop, but step > 0, use step = -step instead.')
+            step = -step
+        if (
+            isinstance(start, int) 
+            and isinstance(stop, int) 
+            and isinstance(step, int)
+        ):
+            dtype = int
+        else:
+            dtype = None
+        arr = np.arange(start, stop+step*0.01, step, dtype=dtype)
+    else: 
+        if (
+            isinstance(start, int) 
+            and isinstance(stop, int) 
+            and ((stop - start) % (n-1) == 0)
+        ):
+            dtype = int
+        else:
+            dtype = None
+        arr = np.linspace(start, stop, n, dtype=dtype)
+    return arr
+
+def center_span(center, span, step=None, n=None) -> np.array:
+    """Returns evenly space array.
+
+    >>> center_span(1, 2, 0.4)
+    array([0.2, 0.6, 1. , 1.4, 1.8])
+
+    >>> center_span(1, 2, n=5)
+    array([0. , 0.5, 1. , 1.5, 2. ])
+
+    >>> center_span(0, 4, 1)  # Return int type if possible.
+    array([-2, -1,  0,  1,  2])
+
+    >>> center_span(0, 4, n=5)
+    array([-2, -1,  0,  1,  2])
+    """
+    if n is None: 
+        n2 = (span/2) // step
+        arr = np.arange(-n2, n2 + 1, dtype=int)
+        arr = arr * step + center
+    else:
+        arr_f = np.linspace(center - span/2, center + span/2, n)
+        arr_d = np.linspace(center - span/2, center + span/2, n, dtype=int)
+        arr = arr_d if np.allclose(arr_f, arr_d) else arr_f
+    return arr
+
+
+def segments(*segs) -> np.array:
+    """Concate multiple segments. Remove repeated endpoints.
+    
+    >>> segments(
+        start_stop(0,1,0.2),
+        start_stop(1,10,2),
+    )
+    array([0. , 0.2, 0.4, 0.6, 0.8, 1. , 3. , 5. , 7. , 9. ])
+    """
+    segs = list(segs)
+    for i in range(len(segs) - 1):
+        if np.isclose(segs[i][-1], segs[i+1][0]):
+            segs[i+1] = segs[i+1][1:]
+    return np.hstack(segs)
+
+
+def zigzag_arange(n):
+    """Returns indices that picks the first and last first, and converges to center in the end.
+    
+    >>> zigzag_arange(7)
+    array([0, 6, 1, 5, 2, 4, 3])
+
+    >>> center_span(0, 6, n=7)[zigzag_arange(7)]
+    array([-3,  3, -2,  2, -1,  1,  0])
+    """
+    idx = np.c_[np.arange(n//2), n-1 - np.arange(n//2)].ravel()
+    if n % 2 != 0:
+        idx = np.r_[idx, n//2]
+    return idx
+
+
 def multiples(period, shift, vmin, vmax):
     """Returns multiples of period with shift within [vmin, vmax]."""
     nmin = (vmin - shift) // period + 1
@@ -70,7 +174,7 @@ def simple_interp(x, xp, yp, **kwargs):
     else:
         raise ValueError("xp must be monotonic")
 
-def inverse(func, y, x0=None, xlim=None, fast=False, show=False):
+def inverse(func, y, x0=None, xlim=None, fast=False, show=False, tol=1e-6, ninterp=1000):
     """Returns f^-1(y).
     
     Args:
@@ -88,35 +192,38 @@ def inverse(func, y, x0=None, xlim=None, fast=False, show=False):
     if xlim:
         xlower, xupper = xlim
         if func(xupper) < func(xlower):
-            xlower, xupper = xupper, xlower
+            xlower, xupper = xupper, xlower  # Make interp works for decreasing func.
         func = bound(*np.sort(xlim))(func)
     
     if x0 is None:
         if xlim:
-            # Find rough solution with interplotation, for fast fsolve.
-            xspace = np.linspace(xlower, xupper, 1000)
+            # Find rough solution with interplotation, for faster fsolve.
+            xspace = np.linspace(xlower, xupper, ninterp)
             x0 = np.interp(y, func(xspace), xspace)
         else:
             x0 = 0.
 
-    if not isinstance(y, np.ndarray):
+    if not np.iterable(y):
         x = fsolve(lambda xi: y - func(xi), x0=x0)[0]
     else:
         x0 = x0 * np.ones(y.shape)
         if fast is True:
             x = x0
-            if xlim is None: print('WARNING: fast inverse without xlim simply returns x0.')
+            if xlim is None: logger.warning('fast inverse without xlim simply returns x0.', stack_info=True)
         else:
             # NOTE: Could be time-consuming when y.size is large and x0 is bad.
             x = [fsolve(lambda xi: yi - func(xi), x0=x0i)[0] 
                  for yi, x0i in zip(y.ravel(), x0.ravel())]
-        x = np.array(x).reshape(y.shape)
+        x = np.asarray(x).reshape(y.shape)
+
+    if np.allclose(func(x), y, atol=tol, rtol=0) is False:
+        logger.warning('inverse solution not found. func(x) is not close to y.', stack_info=True)
 
     if show is True:
         _, ax = plt.subplots()
-        ax.plot(x, y, label='y')  # Assumes right solution found.
-        ax.plot(x0, func(x0), 'o', label='init', fillstyle='none')
-        ax.plot(x, func(x), 'x', label='find')
+        ax.plot(x, func(x), 'k-', label='func(x)')
+        ax.plot(x0, y, '.', label='init', fillstyle='none')
+        ax.plot(x, y, 'x', label='find', markersize=4)
         ax.legend()
         plt.show(block=True)
 
@@ -145,14 +252,14 @@ def bound(xleft, xright, scale=1., verbose=False):  # A decorator factory.
             if np.size(x) == 1:
                 if verbose:
                     if (x < xleft) or (x > xright):
-                        print('WARNING: value {} out of bound [{},{}].'.format(x, xleft, xright))
+                        logger.warning('value {} out of bound [{},{}].'.format(x, xleft, xright))
                 return _bound(fx, x, xleft, xright, scale)
             else:
                 x = np.array(x)
                 if verbose:
                     mask = (x < xleft) | (x > xright)
                     if np.any(mask):
-                        print('WARNING: value {} out of bound [{},{}].'.format(x[mask], xleft, xright))
+                        logger.warning('value {} out of bound [{},{}].'.format(x[mask], xleft, xright))
                 ys = [_bound(fx, xi, xleft, xright, scale) for xi in x]
                 return np.array(ys)
         return wrapped_f
@@ -163,7 +270,7 @@ def num2bstr(num, n_bits, base=2):
         msg = 'num {} requires more than {} bits with base {} to store.'
         raise ValueError(msg.format(num, n_bits, base))
     if base > 10:
-        print('WARNING: base > 10 is not implemented yet!')
+        logger.warning('base > 10 is not implemented yet!')
 
     l = []
     while True:
