@@ -194,6 +194,13 @@ class QubitSpec:
     True
     """
     def __init__(self, fmax, fmin, xmax, xmin):
+        # make sure 0 lays between xmin and xmax.
+        if xmin > 0 and xmax > 0:
+            if xmin > xmax: xmin = 2*xmax - xmin
+            else: xmax = 2*xmin - xmax
+        if xmin < 0 and xmax < 0:
+            if xmin < xmax: xmin = 2*xmax - xmin
+            else: xmax = 2*xmin - xmax
         self.fmax = fmax
         self.fmin = fmin
         self.xmax = xmax
