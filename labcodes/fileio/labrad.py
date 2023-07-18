@@ -56,8 +56,12 @@ def replace(text:str, dict:dict) -> str:
 
 def read_labrad(dir:Path, id:int=-1, suffix:str=None) -> LogFile:
     """Return LogFile object from Labrad datafile."""
-    if id < 0: id = last_idx(dir) + id + 1
-    path = find(dir, id)
+    if dir.is_file():
+        path = dir
+    else:
+        if id < 0: id = last_idx(dir) + id + 1
+        path = find(dir, id)
+        
     if suffix is None:
         if path.with_suffix('.csv_complete').exists():
             suffix = '.csv_complete'
