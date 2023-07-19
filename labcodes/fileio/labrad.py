@@ -56,6 +56,7 @@ def replace(text:str, dict:dict) -> str:
 
 def read_labrad(dir:Path, id:int=-1, suffix:str=None) -> LogFile:
     """Return LogFile object from Labrad datafile."""
+    dir = Path(dir)
     if dir.is_file():
         path = dir
     else:
