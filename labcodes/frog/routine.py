@@ -678,3 +678,66 @@ def plot_2q_qpt(dir, start, ref_start=None, ro_mat=None, plot_all=False):
     ax.get_figure().suptitle(lf_name.as_plot_title())
 
     return ax, lf_name
+
+def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0):
+    fig, (ax, ax2) = plt.subplots(nrows=2, figsize=(5,5), sharex=True)
+
+    if isinstance(x_name, int): x_name = lf.indeps[x_name]
+    if isinstance(y_name, int): y_name = lf.indeps[y_name]
+    if isinstance(z_name, int): z_name = lf.deps[z_name]
+
+    lf.plot2d(x_name, y_name, z_name, ax=ax2, colorbar=False)
+    ax2.set_xscale('log')
+    fig.suptitle(ax2.get_title())
+    ax2.set_title(None)
+
+    df = lf.df.groupby('delay_ns').filter(lambda x: len(x) > 1)
+    records = []
+    for x, gp in df.groupby(x_name):
+        phi = misc.guess_phase(gp[y_name].values, gp[z_name].values, 1/(2*np.pi))
+        records.append({x_name: x, 'phi': phi})
+    df = pd.DataFrame.from_records(records)
+    df['phi'] = np.unwrap(df['phi'].values)
+    ax.plot(x_name, 'phi', data=df, marker='.', label='')
+    ax.set_xscale('log')
+    ax.set_ylabel('phi')
+    ax2.autoscale_view()
+    return fig, df
+
+def fit_distortion(xdata, ydata, taus=(1e3, 1e2)):
+    prefixs = 'abcdefghijklmn'
+
+    mod = models.OffsetFeature()
+    def exp(x, tau=1, amp=1):
+        return amp * np.exp(-x/tau)
+    for i in range(len(taus)):
+        mod = mod + models.MyModel(exp, prefix=prefixs[i]+'_')
+
+    for i in range(len(taus)):
+        mod.set_param_hint(prefixs[i]+'_tau', min=0, value=taus[i])
+        # mod.set_param_hint(prefixs[i]+'_amp', min=0)
+
+    mod.set_param_hint('offset', value=-10)
+
+    cfit = fitter.CurveFit(xdata, ydata, model=mod)
+
+    fig = plt.figure()
+    gs = fig.add_gridspec(2, 1, hspace=0, height_ratios=[1,4])
+    ax2, ax = gs.subplots(sharex=True)
+
+    fx, fy = cfit.fdata(500)
+    ax.plot(xdata, ydata, marker='.')
+    ax.plot(fx, fy)
+    ylims = ax.get_ylim()
+    for pre, comp in cfit.result.eval_components(x=fx).items():
+        if pre == 'const_offset': continue
+        ax.plot(fx, comp + cfit['offset'], ls='--',
+                label='tau={:.0f}, amp={:.0f}'.format(cfit[pre+'tau'], cfit[pre+'amp']))
+    ax.set_ylim(ylims)
+    ax.set_xscale('log')
+    ax.legend()
+
+    ax2.plot(xdata, cfit.result.residual, 'o', label='residual')
+    ax2.axhline(y=0, color='k')
+    ax2.legend()
+    return cfit, fig

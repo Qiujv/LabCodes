@@ -196,12 +196,14 @@ class SineFeature(MyModel):
     def guess(self, data, x=None, **kwargs):
         """Estimate initial model parameter values from data."""
         if x is not None:
-            freq_guess = misc.find_freq_guess(x, data)
+            freq_guess = misc.guess_freq(x, data)
+            phase_guess = misc.guess_phase(x, data, freq_guess)
         else:
             freq_guess = 1  # A non-zero value.
+            phase_guess = 0  # A random phase.
 
         pars = self.make_params(
-            phase=0,
+            phase=phase_guess,
             freq=freq_guess,
         )
         return update_param_vals(pars, self.prefix, **kwargs)

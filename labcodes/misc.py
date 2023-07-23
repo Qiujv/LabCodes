@@ -36,8 +36,21 @@ def remove_e_delay(phase, freq, i_start=0, i_end=-1):
     phase -= phase[i_start]
     return phase
 
-def find_freq_guess(x, y):
-    """Finds the dominant fft component for input (x, y) data."""
+
+def guess_freq(x:np.ndarray, y:np.ndarray) -> float:
+    """Finds the dominant fft component for input (x, y) data.
+
+    Assumes x to by evenly spaced.
+    
+    >>> x = np.linspace(0, 1, 101)
+    ... freq = 2
+    ... guess_freq(x, np.sin(2*np.pi*freq*x))
+    1.9801980198019802
+
+    >>> x = np.linspace(0, 1, 51)  # A bit too few points.
+    ... guess_freq(x, np.sin(2*np.pi*freq*x))
+    1.9607843137254901
+    """
     if np.iscomplexobj(y):
         fft =  np.fft.fft(y-np.mean(y))
         freqs = np.fft.fftfreq(x.size, x[1]-x[0])
@@ -51,6 +64,38 @@ def find_freq_guess(x, y):
         freq_guess = 1
 
     return freq_guess
+
+find_freq_guess = guess_freq
+
+def guess_phase(x: np.ndarray, y:np.ndarray, freq: float = None, phi_space: np.ndarray=None) -> float:
+    """Return the possible phase for single-frequency, noisy data.
+
+    Args:
+        phi_space: the returned phi will be one in this. 
+            if None, use `np.linspace(-np.pi, np.pi, 51)`
+
+    Examples:
+    >>> x = np.linspace(0, 1, 101)
+    ... freq, phase = 2, 1
+    ... y = np.sin(2*np.pi*freq*x + phase) + np.random.uniform(-1, 1, x.size)*0.05
+    ... guess_phase(x, y)
+    1.0053096491487343
+
+    >>> x = np.linspace(0, 1, 51)  # A bit too few points.
+    ... freq, phase = 2, 1
+    ... y = np.sin(2*np.pi*freq*x + phase) + np.random.uniform(-1, 1, x.size)*0.05
+    ... guess_phase(x, y)
+    1.1309733552923262
+
+    >>> guess_phase(x, y, freq)  # Given accurate freq. makes it robust.
+    1.0053096491487343
+    """
+    if freq is None: freq = find_freq_guess(x, y)
+    if phi_space is None: phi_space = np.linspace(-np.pi, np.pi, 101)
+    integral = [np.sum(y * np.sin(2*np.pi*freq*x + phase)) for phase in phi_space]
+    imax = np.argmax(integral)
+    return phi_space[imax]
+
 
 def round(x, roundto):
     """Round x to given precision.

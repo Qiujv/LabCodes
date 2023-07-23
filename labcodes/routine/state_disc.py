@@ -148,7 +148,7 @@ class KMeans:
         centers = np.array(centers)
         if len(centers.shape) == 2:
             centers = self._xy_to_cplx(centers)
-        self.centers = centers
+        self.centers:np.ndarray = centers
 
     @classmethod
     def fit(cls, list_points: list, plot: bool = False):
