@@ -41,6 +41,7 @@ ABBREV = {
     'coupler bias pulse amp': 'cpa',
     'coupler pulse amp': 'cpa',
     'gmon pulse amp': 'gpa',
+    'g pulse amp': 'gpa',
     'z pulse amp': 'zpa',
     'readout': 'ro',
     'frequency': 'freq',

@@ -687,11 +687,11 @@ def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0):
     if isinstance(z_name, int): z_name = lf.deps[z_name]
 
     lf.plot2d(x_name, y_name, z_name, ax=ax2, colorbar=False)
-    ax2.set_xscale('log')
+    # ax2.set_xscale('log')
     fig.suptitle(ax2.get_title())
     ax2.set_title(None)
 
-    df = lf.df.groupby('delay_ns').filter(lambda x: len(x) > 1)
+    df = lf.df.groupby(x_name).filter(lambda x: len(x) > 1)
     records = []
     for x, gp in df.groupby(x_name):
         phi = misc.guess_phase(gp[y_name].values, gp[z_name].values, 1/(2*np.pi))
@@ -699,7 +699,7 @@ def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0):
     df = pd.DataFrame.from_records(records)
     df['phi'] = np.unwrap(df['phi'].values)
     ax.plot(x_name, 'phi', data=df, marker='.', label='')
-    ax.set_xscale('log')
+    # ax.set_xscale('log')
     ax.set_ylabel('phi')
     ax2.autoscale_view()
     return fig, df

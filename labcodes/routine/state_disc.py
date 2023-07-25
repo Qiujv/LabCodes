@@ -6,10 +6,10 @@ Contains:
     probs_from_flags: Calculate probabilities from flags.
 """
 
+from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
 import sklearn.cluster
-from labcodes import plotter
 
 
 def flags_mq_from_1q(list_flags: list, nlevels: int, return_str: bool = False):
@@ -66,7 +66,7 @@ def flags_mq_from_1q(list_flags: list, nlevels: int, return_str: bool = False):
 
 
 def probs_from_flags(
-    flags: np.array, nlevels: int, n_qbs: int, return_labels: bool = False
+    flags: np.ndarray, nlevels: int, n_qbs: int, return_labels: bool = False
 ):
     """Calculate probabilities from flags.
 
@@ -140,7 +140,7 @@ class KMeans:
     ```
     """
 
-    def __init__(self, centers):
+    def __init__(self, centers:list[complex]):
         """
         Args:
             centers: list of complex numbers, looks like `[cplx0, cplx1, cplx2, ...]`.
@@ -151,7 +151,7 @@ class KMeans:
         self.centers:np.ndarray = centers
 
     @classmethod
-    def fit(cls, list_points: list, plot: bool = False):
+    def fit(cls, list_points: list, plot: bool = False) -> Union['KMeans', tuple['KMeans', plt.Figure]]:
         """Find centers with sklearn.cluster.KMeans.
 
         Args:
@@ -211,7 +211,7 @@ class KMeans:
 
         return stater
 
-    def flags(self, points: np.array):
+    def flags(self, points: np.ndarray) -> np.ndarray:
         """Calculate state flags from complex IQ points.
 
         Returns:
@@ -223,7 +223,7 @@ class KMeans:
         )
         return state_flags
 
-    def probs(self, points: np.array):
+    def probs(self, points: np.ndarray) -> np.ndarray:
         """Calculate single qubit state probabilities from complex IQ points.
 
         Returns:
