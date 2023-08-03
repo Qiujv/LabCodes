@@ -1,18 +1,145 @@
-"""State discrimination routines for multi-qubit states. 
+"""State discrimination routines for qubit states."""
 
-Contains:
-    StateDis_KMeans: State Discriminator based on KMeans clustering. For 1 qubit states.
-    flags_mq_from_1q: Convert flags from 1 qubit to multi-qubit.
-    probs_from_flags: Calculate probabilities from flags.
-"""
-
-from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
-import sklearn.cluster
+from sklearn.neighbors import NearestCentroid
 
 
-def flags_mq_from_1q(list_flags: list, nlevels: int, return_str: bool = False):
+class NCenter:
+    """State discriminator based on nearest centroid.
+
+    Examples:
+    >>> np.random.seed(0)
+    >>> n_pts = 500
+    >>> centers = [(0, 0), (1, 1), (0, 1)]
+    >>> list_pts = [np.random.multivariate_normal(center, np.eye(len(centers[0])) * 0.1, n_pts) 
+    ...             for center in centers]
+    >>> stater, fig = NCenter.fit(list_pts, plot=True)
+    >>> stater.flags(centers)
+    array([0, 1, 2])
+    >>> np.array([stater.probs(pts) for pts in list_pts])
+    array([[0.932, 0.006, 0.062],
+           [0.004, 0.948, 0.048],
+           [0.042, 0.048, 0.91 ]])
+    >>> stater2 = NCenter(centers)  # With ideal centers.
+    >>> np.array([stater2.probs(pts) for pts in list_pts])
+    array([[0.934, 0.006, 0.06 ],
+           [0.004, 0.94 , 0.056],
+           [0.044, 0.044, 0.912]])
+    """
+    def __init__(self, centers: list[np.ndarray[float]]):
+        clf = NearestCentroid()
+        clf.centroids_ = np.asarray(centers)
+        clf.classes_ = np.arange(len(centers))
+        self._clf = clf
+
+    @property
+    def centers(self):
+        return self._clf.centroids_
+
+    @classmethod
+    def fit(cls, list_points: list[np.ndarray[float]], plot: bool = False):
+        clf = NearestCentroid()
+        clf.fit(
+            np.vstack(list_points), 
+            np.repeat(np.arange(len(list_points)), [len(p) for p in list_points])
+        )
+        
+        self = cls(clf.centroids_)
+        self._clf = clf
+
+        if plot is False: return self
+
+        stater = self
+        n_clusters = len(self.centers)
+
+        figsize = (6,3) if len(list_points) == 2 else (8,3)
+        fig, axs = plt.subplots(ncols=n_clusters, figsize=figsize, sharex=True, sharey=True)
+        for i, pts in enumerate(list_points):
+            axs[i].scatter(pts[:,0], pts[:,1], marker=f"${i}$", color=f'C{i}')
+            axs[i].set_aspect('equal')
+            axs[i].set_title(f'|{i}>')
+            
+        for i, pts in enumerate(list_points):
+            stater.plot_regions(axs[i], label=False)
+            probs = stater.probs(pts)
+            for j in range(n_clusters):
+                center = stater.centers[j]
+                axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', (center[0], center[1]), ha='center')
+        return stater, fig
+    
+    def flags(self, points: np.ndarray[float]) -> np.ndarray[int]:
+        return self._clf.predict(np.vstack(points))
+    
+    def probs(self, points: np.ndarray[float]) -> np.ndarray[float]:
+        flags = self.flags(points)
+        return probs_from_flags(flags, len(self.centers), 1)
+    
+    def plot_regions(self, ax: plt.Axes, label=True) -> None:
+        """Plot the region of each state.
+
+        Keeps the ax lims unchanges, so plot your data points before calling this method.
+        """
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
+
+        xx, yy = np.meshgrid(np.linspace(xmin, xmax, 201), np.linspace(ymin, ymax, 201))
+        ax.imshow(
+            self.flags(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape),
+            interpolation="nearest",
+            cmap=plt.cm.Paired,
+            origin="lower",
+            extent=[xmin, xmax, ymin, ymax],
+        )
+
+        if label is True:
+            for i, center in enumerate(self.centers):
+                ax.annotate(str(i), (center[0], center[1]))
+
+
+def probs_from_flags(
+    flags: np.ndarray[int], 
+    nlevels: int, 
+    n_qbs: int, 
+    return_labels: bool = False,
+):
+    """Calculate probabilities from flags.
+
+    Args:
+        flags: array of int, values in range(nlevel**n_qbs).
+            if ndim == 2, take the first dimension as n_qbs.
+        nlevels: Number of levels for qubits, same for all qubits.
+        n_qbs: Number of qubits.
+
+    Returns:
+        probs (np.ndarray): Probabilities.
+        labels (list[str], optional): Labels for each probability, if return_labels is True.
+
+    Examples:
+    >>> np.random.seed(0)
+    >>> n_qbs, nlevels = 3, 2
+    >>> flags = [np.random.randint(0, nlevels, 50) for _ in range(n_qbs)]
+    >>> probs, labels = probs_from_flags(flags, nlevels, n_qbs, return_labels=True)
+    >>> dict(zip(labels, probs))
+    {'000': 0.1, '001': 0.12, '010': 0.08, '011': 0.1, '100': 0.12, '101': 0.14, '110': 0.18, '111': 0.16}
+    """
+    flags = np.asarray(flags)
+    if flags.ndim == 2:
+        flags = flags_mq_from_1q(flags, nlevels)
+
+    counts = np.bincount(flags, minlength=nlevels**n_qbs)
+    probs = counts / np.sum(counts)
+
+    if return_labels is True:
+        return probs, str_from_flags(np.arange(nlevels**n_qbs), n_qbs, nlevels)
+    else:
+        return probs
+    
+
+def flags_mq_from_1q(
+    list_flags: list[np.ndarray[int]], 
+    nlevels: int, 
+) -> np.ndarray[int]:
     """Convert flags from 1 qubit to multi-qubit.
 
     Args:
@@ -21,250 +148,77 @@ def flags_mq_from_1q(list_flags: list, nlevels: int, return_str: bool = False):
         nlevels: Number of levels for qubits, same for all qubits.
 
     Returns:
-        Flags for multi-qubit, array of int in range(nlevel**n_qbs) or str like "020".
-
-    See also:
-        probs_from_flags: Calculate probabilities from flags.
+        Flags for multi-qubit, array of int in range(nlevel**n_qbs) or strings.
 
     Examples:
-    ```
-    # Check flags as expect.
-    nlevels = 3
-    n_qbs = 3
-
-    # Generate all possible flags.
-    mask = np.arange(nlevels ** n_qbs)
-    np.random.shuffle(mask)  # Randomly shuffles the flags order.
-    list_flags = n_qbs * [np.arange(nlevels)]
-    list_flags = [q.flatten()[mask] for q in np.meshgrid(*list_flags)]
-
-    flags_mq = flags_mq_from_1q(list_flags, nlevels)
-    str_flags = flags_mq_from_1q(list_flags, nlevels, return_str=True)
-
-    df = {f'q{i}': flags for i, flags in enumerate(list_flags)}
-    df['flags_mq'] = flags_mq
-    df['str_flags'] = str_flags
-    df = pd.DataFrame(df)
-    df
-    ```
+    >>> list_flags = [
+    ...     [0, 0, 0, 1, 1, 1, 0, 1],
+    ...     [0, 0, 1, 0, 1, 0, 1, 1],
+    ...     [0, 1, 0, 0, 0, 1, 1, 1]
+    ... ]
+    >>> flags_mq_from_1q(list_flags, 2)
+    array([0, 1, 2, 4, 6, 5, 3, 7])
     """
     n_qbs = len(list_flags)
     n_pts = len(list_flags[0])
 
     flags_mq = np.zeros(n_pts, dtype=int)
     for i, flags_1q in enumerate(list_flags):
-        flags_mq += flags_1q * nlevels ** (n_qbs - i - 1)
+        flags_mq += np.asarray(flags_1q) * nlevels ** (n_qbs - i - 1)
 
-    if not return_str:
-        return flags_mq
+    return flags_mq
 
-    # Covert int flags into str flags.
-    str_flags = np.zeros_like(flags_mq, dtype=f"<U{n_qbs}")
-    for i in range(nlevels**n_qbs):
-        str_flags[flags_mq == i] = np.base_repr(i, base=nlevels).zfill(n_qbs)
+def str_from_flags(
+    flags: np.ndarray[int], 
+    n_qbs: int, 
+    nlevels: int = 2,
+) -> np.ndarray[str]:
+    """Convert flags to str.
+
+    Args:
+        flags: Flags, array of int in range(nlevels**n_qbs).
+        n_qbs: Number of qubits.
+        nlevels: Number of levels for qubits, same for all qubits.
+
+    Returns:
+        str_flags: Flags, array of str.
+
+    Examples:
+    >>> n_qbs, nlevels = 3, 2
+    >>> str_from_flags(np.arange(nlevels**n_qbs), n_qbs, nlevels)
+    array(['000', '001', '010', '011', '100', '101', '110', '111'],
+          dtype='<U3')
+    """
+    if isinstance(flags, int): flags = [flags]
+    flags = np.asarray(flags)
+    str_flags = np.zeros_like(flags, dtype=f"<U{n_qbs}")
+    for i in range(nlevels ** n_qbs):
+        str_flags[flags == i] = np.base_repr(i, base=nlevels).zfill(n_qbs)
     return str_flags
 
 
-def probs_from_flags(
-    flags: np.ndarray, nlevels: int, n_qbs: int, return_labels: bool = False
-):
-    """Calculate probabilities from flags.
-
-    Args:
-        flags: list of int, values in range(nlevel**n_qbs).
-        nlevels: Number of levels for qubits, same for all qubits.
-        n_qbs: Number of qubits.
+def flags_from_str(
+    str_flags: list[str],
+    nlevels: int = 2,
+) -> np.ndarray[int]:
+    """Convert str to flags.
 
     Returns:
-        probs (np.ndarray): Probabilities.
-        labels (list[str], optional): Labels for each probability, if return_labels is True.
-
-    See also:
-        flags_mq_from_1q: Convert flags from 1 qubit to multi-qubit.
+        flags: Flags, array of int in range(nlevels**n_qbs).
 
     Examples:
-    ```
-    # # Random flags.
-    # flags_mq = flags_mq_from_1q([np.random.randint(0, 2, 50) for _ in range(3)], 3)
-
-    # Manually set flags.
-    flags_mq = flags_mq_from_1q(np.array([1,0,1]).reshape((3,1)), 3)
-
-    probs, labels = probs_from_flags(flags_mq, nlevels=3, n_qbs=3, return_labels=True)
-    dict(zip(labels, probs))
-    ```
+    >>> flags_from_str(['000', '001', '010', '011', '100', '101', '110', '111'], 2)
+    array([0, 1, 2, 3, 4, 5, 6, 7])
     """
-    counts = np.bincount(flags, minlength=nlevels**n_qbs)
-    probs = counts / np.sum(counts)
+    if isinstance(str_flags, str): str_flags = [str_flags]
+    str_flags = np.asarray(str_flags)
+    n_qbs = len(str_flags[0])
+    flags = np.zeros_like(str_flags, dtype=int)
+    for i in range(nlevels ** n_qbs):
+        flags[str_flags == np.base_repr(i, base=nlevels).zfill(n_qbs)] = i
+    return flags
 
-    if not return_labels:
-        return probs
 
-    labels = [np.base_repr(i, base=nlevels).zfill(n_qbs) for i in range(len(probs))]
-    return probs, labels
-
-
-class KMeans:
-    """State Discriminator based on KMeans clustering.
-
-    Fields:
-        centers: list of clustering centers, in complex number.
-
-    Methods:
-        fit: class method, construct a KMeans instance.
-        flags: Calculate flags for each data point.
-        probs: Calculate single qubit probabilities for each possible state.
-        plot_region: Plot the region of each state.
-
-    Examples:
-    ```
-    # 3-level state discrimination.
-    i0 = np.random.normal(loc= 1, scale=0.5, size=500)
-    q0 = np.random.normal(loc= 1, scale=0.5, size=500)
-    i1 = np.random.normal(loc= 1, scale=0.5, size=500)
-    q1 = np.random.normal(loc=-1, scale=0.5, size=500)
-    i2 = np.random.normal(loc=-1, scale=0.5, size=500)
-    q2 = np.random.normal(loc= 1, scale=0.5, size=500)
-    iqs = [i0 + 1j*q0, i1 + 1j*q1, i2 + 1j*q2]
-    stater, ax, ax2 = KMeans.fit(iqs, plot=True)
-
-    stater = KMeans(centers=[1+1j, 1-1j, -1+1j])  # Give ideal centers.
-
-    # Plot data points against regions.
-    fig, ax = plt.subplots()
-    for i, pts in enumerate(iqs):
-        ax.scatter(pts.real, pts.imag, marker=f'${i}$')
-    stater.plot_regions(ax)
-
-    stater.flags(iqs[0]), stater.probs(iqs[1])
-    ```
-    """
-
-    def __init__(self, centers:list[complex]):
-        """
-        Args:
-            centers: list of complex numbers, looks like `[cplx0, cplx1, cplx2, ...]`.
-        """
-        centers = np.array(centers)
-        if len(centers.shape) == 2:
-            centers = self._xy_to_cplx(centers)
-        self.centers:np.ndarray = centers
-
-    @classmethod
-    def fit(cls, list_points: list, plot: bool = False) -> Union['KMeans', tuple['KMeans', plt.Figure]]:
-        """Find centers with sklearn.cluster.KMeans.
-
-        Args:
-            list_points: list of complex IQ points for different state preparations. 
-                e.g. `[arr_c0, arr_c1, arr_c2, ...]`
-
-        Returns:
-            state discriminator with found centers.
-        """
-        # Find centers with sklearn.cluster.KMeans.
-        n_clusters = len(list_points)
-        flatten_pts = np.hstack(list_points)
-        flatten_pts = np.c_[flatten_pts.real, flatten_pts.imag]
-        kms = sklearn.cluster.KMeans(n_clusters=n_clusters, n_init="auto").fit(flatten_pts)
-        # centers = kms.cluster_centers_  # NOTE: The order is random, DO NOT use.
-
-        # Collect cluster centers in order as given in `list_points`.
-        centers = []
-        added_center_index = []
-        for pts in list_points:
-            # pts -> idx of the clothest center.
-            icenters = kms.predict(np.c_[pts.real, pts.imag])
-            # Find the center with most pts of this label in neighbourhood.
-            idxs, counts = np.unique(icenters, return_counts=True)
-            the_idx = idxs[np.argmax(counts)]
-            center = kms.cluster_centers_[the_idx]
-
-            # Check center and clusters are mapped one-by-one.
-            if the_idx in added_center_index:
-                raise ValueError(
-                    (
-                        "Bad data quality! Cannot tell difference between "
-                        f"pts[{added_center_index.index(the_idx)}] and pts[{the_idx}]"
-                    )
-                )
-
-            centers.append(center[0] + 1j * center[1])
-            added_center_index.append(the_idx)
-
-        stater = cls(centers)
-
-        if plot is True:
-            figsize = (6,3) if len(list_points) == 2 else (8,3)
-            fig, axs = plt.subplots(ncols=n_clusters, figsize=figsize, sharex=True, sharey=True)
-            for i, pts in enumerate(list_points):
-                axs[i].scatter(pts.real, pts.imag, marker=f"${i}$", color=f'C{i}')
-                axs[i].set_aspect('equal')
-                axs[i].set_title(f'|{i}>')
-                
-            for i, pts in enumerate(list_points):
-                stater.plot_regions(axs[i])
-                probs = stater.probs(pts)
-                for j in range(n_clusters):
-                    center = stater.centers[j]
-                    axs[i].annotate(f'{probs[j]:.1%}\n', (center.real, center.imag), ha='center')
-            return stater, fig
-
-        return stater
-
-    def flags(self, points: np.ndarray) -> np.ndarray:
-        """Calculate state flags from complex IQ points.
-
-        Returns:
-            `[0, 2, 1, 1, 0, ...]`
-        """
-        n_states = len(self.centers)
-        state_flags = np.argmin(
-            np.abs(points - self.centers.reshape((n_states, 1))), axis=0
-        )
-        return state_flags
-
-    def probs(self, points: np.ndarray) -> np.ndarray:
-        """Calculate single qubit state probabilities from complex IQ points.
-
-        Returns:
-            Array with length same as centers, e.g. `[0.5, 0.02, 0.01, 0.47]`.
-        """
-        flags = self.flags(points)
-        counts = np.bincount(flags, minlength=len(self.centers))
-        return counts / len(points)
-
-    def plot_regions(self, ax: plt.Axes):
-        """Plot regions for different states on given ax.
-
-        Examples:
-        ```
-        fig, ax = plt.subplots()
-        ax.scatter(points.real, points.imag)
-        state_dis.plot_regions(ax)
-        ```
-        """
-        xmin, xmax = ax.get_xlim()
-        ymin, ymax = ax.get_ylim()
-
-        xx, yy = np.meshgrid(np.linspace(xmin, xmax, 201), np.linspace(ymin, ymax, 201))
-        ax.imshow(
-            self.flags(xx.ravel() + 1j * yy.ravel()).reshape(xx.shape),
-            interpolation="nearest",
-            cmap=plt.cm.Paired,
-            origin="lower",
-            extent=[xmin, xmax, ymin, ymax],
-        )
-        for i, center in enumerate(self.centers):
-            ax.annotate(str(i), (center.real, center.imag))
-
-    @staticmethod
-    def _xy_to_cplx(arr):
-        """[[1,2],[3,4],...] -> [1+2j, 3+4j, ...]"""
-        arr = np.array(arr)
-        return arr[:,0] + 1j*arr[:,1]
-    
-    @staticmethod
-    def _cplx_to_xy(arr):
-        """[1+2j, 3+4j, ...] -> [[1,2],[3,4],...]"""
-        arr = np.array(arr)
-        return np.c_[arr.real, arr.imag]
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
