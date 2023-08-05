@@ -1,21 +1,24 @@
 import math
 import logging
-from functools import wraps
+from typing import Union
 
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import fsolve
+import scipy.interpolate
 
 
 logger = logging.getLogger(__name__)
 
 
-def auto_rotate(data, return_rad=False):
+def auto_rotate(data:np.ndarray[complex], return_rad: bool = False):
     """Returns data with shifted phase s.t. variation of imaginary part minimized.
     
-    Algorithm by Kaho.
+    >>> auto_rotate([0, 1j])
+    array([0.+0.000000e+00j, 1.+6.123234e-17j])
     """
-    rad = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)  # Minimize imag(var(data)), by Kaho
+    data = np.asarray(data)
+    
+    # Minimize imag(var(data)), by Kaho
+    rad = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)
     
     if return_rad is True:
         return data * np.exp(1j*rad), rad  # counter-clockwise
@@ -26,29 +29,34 @@ def remove_e_delay(phase, freq, i_start=0, i_end=-1):
     """Returns phase without linear freq dependence.
 
     Args:
-        phase: real numbers, with linear dependence to freq.
-        freq: real numbers with same shape as phase.
+        phase: array of angle in rads, with linear dependence to freq.
+        freq: array of same shape as phase.
         i_start, i_end: region where linear fit applied.
+
+    >>> remove_e_delay([0,1], [0,1])
+    array([0., 0.])
     """
+    phase = np.asarray(phase)
+    freq = np.asarray(freq)
+
     phase = np.unwrap(phase)
     e_delay = (phase[i_end] - phase[i_start]) / (freq[i_end] - freq[i_start])
-    phase -= e_delay * (freq - freq[i_start])
-    phase -= phase[i_start]
-    return phase
+    e_phase = e_delay * (freq - freq[i_start]) + phase[i_start]
+    return phase - e_phase
 
 
-def guess_freq(x:np.ndarray, y:np.ndarray) -> float:
+def guess_freq(x:np.ndarray[float], y:np.ndarray[float]) -> float:
     """Finds the dominant fft component for input (x, y) data.
 
     Assumes x to by evenly spaced.
     
     >>> x = np.linspace(0, 1, 101)
-    ... freq = 2
-    ... guess_freq(x, np.sin(2*np.pi*freq*x))
+    >>> freq = 2
+    >>> guess_freq(x, np.sin(2*np.pi*freq*x))
     1.9801980198019802
 
     >>> x = np.linspace(0, 1, 51)  # A bit too few points.
-    ... guess_freq(x, np.sin(2*np.pi*freq*x))
+    >>> guess_freq(x, np.sin(2*np.pi*freq*x))
     1.9607843137254901
     """
     if np.iscomplexobj(y):
@@ -65,7 +73,7 @@ def guess_freq(x:np.ndarray, y:np.ndarray) -> float:
 
     return freq_guess
 
-find_freq_guess = guess_freq
+find_freq_guess = guess_freq  # Old name, for backward compatibility.
 
 def guess_phase(x: np.ndarray, y:np.ndarray, freq: float = None, phi_space: np.ndarray=None) -> float:
     """Return the possible phase for single-frequency, noisy data.
@@ -76,34 +84,37 @@ def guess_phase(x: np.ndarray, y:np.ndarray, freq: float = None, phi_space: np.n
 
     Examples:
     >>> x = np.linspace(0, 1, 101)
-    ... freq, phase = 2, 1
-    ... y = np.sin(2*np.pi*freq*x + phase) + np.random.uniform(-1, 1, x.size)*0.05
-    ... guess_phase(x, y)
-    1.0053096491487343
+    >>> freq, phase = 2, 1
+    >>> np.random.seed(0)
+    >>> y = np.sin(2*np.pi*freq*x + phase) + np.random.uniform(-1, 1, x.size)*0.05
+    >>> guess_phase(x, y)
+    1.0681415022205298
 
     >>> x = np.linspace(0, 1, 51)  # A bit too few points.
-    ... freq, phase = 2, 1
-    ... y = np.sin(2*np.pi*freq*x + phase) + np.random.uniform(-1, 1, x.size)*0.05
-    ... guess_phase(x, y)
+    >>> freq, phase = 2, 1
+    >>> y = np.sin(2*np.pi*freq*x + phase) + np.random.uniform(-1, 1, x.size)*0.05
+    >>> guess_phase(x, y)
     1.1309733552923262
 
     >>> guess_phase(x, y, freq)  # Given accurate freq. makes it robust.
     1.0053096491487343
     """
-    if freq is None: freq = find_freq_guess(x, y)
+    if freq is None: freq = find_freq_guess(x, y)  # Could be inaccurate.
     if phi_space is None: phi_space = np.linspace(-np.pi, np.pi, 101)
     integral = [np.sum(y * np.sin(2*np.pi*freq*x + phase)) for phase in phi_space]
     imax = np.argmax(integral)
     return phi_space[imax]
 
 
-def round(x, roundto):
+def round(x: float, roundto: float) -> float:
     """Round x to given precision.
-    e.g. round(3.141592653, 1e-3) = 3.142
+
+    >>> round(3.141592653, 1e-3)
+    3.142
     """
     return np.round(x/roundto)*roundto
 
-def start_stop(start, stop, step=None, n=None) -> np.array:
+def start_stop(start, stop, step=None, n=None) -> np.ndarray:
     """Returns evenly space array.
     
     >>> start_stop(1, 2, 0.2)
@@ -146,7 +157,7 @@ def start_stop(start, stop, step=None, n=None) -> np.array:
         arr = np.linspace(start, stop, n, dtype=dtype)
     return arr
 
-def center_span(center, span, step=None, n=None) -> np.array:
+def center_span(center, span, step=None, n=None) -> np.ndarray:
     """Returns evenly space array.
 
     >>> center_span(1, 2, 0.4)
@@ -172,13 +183,13 @@ def center_span(center, span, step=None, n=None) -> np.array:
     return arr
 
 
-def segments(*segs) -> np.array:
+def segments(*segs) -> np.ndarray:
     """Concate multiple segments. Remove repeated endpoints.
     
     >>> segments(
-        start_stop(0,1,0.2),
-        start_stop(1,10,2),
-    )
+    ...     start_stop(0, 1, 0.2),
+    ...     start_stop(1, 10, 2),
+    ... )
     array([0. , 0.2, 0.4, 0.6, 0.8, 1. , 3. , 5. , 7. , 9. ])
     """
     segs = list(segs)
@@ -203,114 +214,108 @@ def zigzag_arange(n):
     return idx
 
 
-def multiples(period, shift, vmin, vmax):
-    """Returns multiples of period with shift within [vmin, vmax]."""
+def multiples(period, shift, vmin, vmax) -> np.ndarray:
+    """Returns multiples of period with shift within [vmin, vmax].
+    
+    >>> multiples(1, 0.1, 0, 5)
+    array([0.1, 1.1, 2.1, 3.1, 4.1])
+    """
     nmin = (vmin - shift) // period + 1
     nmax = (vmax - shift) // period
     vs = np.arange(nmin, nmax+1) * period + shift
     return vs
 
+
 def simple_interp(x, xp, yp, **kwargs):
-    """Wrapper for np.interp but check monoliraty of xp."""
-    if np.all(np.diff(xp) > 0):
+    """Wrapper for np.interp but check monoliraty of xp.
+    
+    >> simple_interp(0.3, [1,0], [1,0])
+    0.3
+    """
+    dx = np.diff(xp)
+    if np.all(dx > 0):
         return np.interp(x, xp, yp, **kwargs)
-    elif np.all(np.diff(xp) < 0):
+    elif np.all(dx < 0):
         return np.interp(x, xp[::-1], yp[::-1], **kwargs)
     else:
         raise ValueError("xp must be monotonic")
 
-def inverse(func, y, x0=None, xlim=None, fast=False, show=False, tol=1e-6, ninterp=1000):
-    """Returns f^-1(y).
+
+def inverse_interp(
+    func: callable,
+    y: Union[np.ndarray, float],
+    xp: np.ndarray,
+    tol=1e-6,
+) -> Union[np.ndarray, float]:
+    """Calculate values of x that gives y=f(x) with interpolation.
     
-    Args:
-        func: callable(x) -> y. 
-            Only function of single variable is supported, i.e. no high dimensional system.
-            The function should be monotonic within xlim.
-        y: float or np.array.
-            if array, solve f^-1(y) elment by element.
-        x0: the initial guess for the inverse function to search x.
-        xlim: region where the solution cannot lay beyond. also used for guess x0 from None.
-    
-    Retuns:
-        x for which func(x) is close to y.
+    Requires f(xp) being monolithic.
+
+    >>> inverse_interp(lambda x: x**2, 4, np.linspace(0, 5, 10000))
+    1.9999999849966246
+
+    >>> inverse_interp(lambda x: x**2, [1, 4], np.linspace(0, 5, 10000))
+    array([0.99999998, 1.99999998])
     """
-    if xlim:
-        xlower, xupper = xlim
-        if func(xupper) < func(xlower):
-            xlower, xupper = xupper, xlower  # Make interp works for decreasing func.
-        func = bound(*np.sort(xlim))(func)
+    is_scalar = np.isscalar(y)
+    xp, y = np.asarray(xp), np.asarray(y)
+    yp = func(xp)
+    _dy = np.diff(yp)
+    if np.all(_dy < 0): yp, xp = yp[::-1], xp[::-1]
+    if np.any(_dy <= 0): raise ValueError("f(xp) must be monolithic.")
+    finv = scipy.interpolate.UnivariateSpline(yp, xp, k=1, s=0)
+    x = finv(y)
     
-    if x0 is None:
-        if xlim:
-            # Find rough solution with interplotation, for faster fsolve.
-            xspace = np.linspace(xlower, xupper, ninterp)
-            x0 = np.interp(y, func(xspace), xspace)
-        else:
-            x0 = 0.
+    # Check extrapolation.
+    mask_low = y < yp[0]
+    mask_high = y > yp[-1]
+    msgs = ["Extrapolation detected. "]
+    if np.any(mask_low):
+        msgs.append(
+            f"{np.sum(mask_low)} points are below the lower bound of f({xp[0]})={yp[0]} by:\n"
+            f"{(y[mask_low] - yp[0])[:10]}"
+        )
+    if np.any(mask_high):
+        msgs.append(
+            f"{np.sum(mask_high)} points are above the upper bound of f({xp[-1]})={yp[-1]} by:\n"
+            f"{(y[mask_high] - yp[-1])[:10]}"
+        )
+    if len(msgs) > 1:
+        logging.warning("\n".join(msgs))
 
-    if not np.iterable(y):
-        x = fsolve(lambda xi: y - func(xi), x0=x0)[0]
+    # Check tolerance.
+    mask_extrap = mask_low | mask_high
+    mask_tol = np.abs(y[~mask_extrap] - func(x[~mask_extrap])) < tol
+    if np.all(mask_tol) == False:
+        logging.warning(
+            f"Failed to find inverse for {np.sum(~mask_tol)} points"
+            f" (except extrapolate) within tolerance {tol}."
+        )
+    
+    if is_scalar == True:
+        return x.item()
     else:
-        x0 = x0 * np.ones(y.shape)
-        if fast is True:
-            x = x0
-            if xlim is None: logger.warning('fast inverse without xlim simply returns x0.', stack_info=True)
-        else:
-            # NOTE: Could be time-consuming when y.size is large and x0 is bad.
-            x = [fsolve(lambda xi: yi - func(xi), x0=x0i)[0] 
-                 for yi, x0i in zip(y.ravel(), x0.ravel())]
-        x = np.asarray(x).reshape(y.shape)
+        return x
+    
+def num2bstr(num: int, n_bits: int, base: int = 2) -> str:
+    """Converts a number to a bit string with leading zeros.
+    
+    >>> num2bstr(3, 4)
+    '0011'
+    """
+    new = np.base_repr(num, base).zfill(n_bits)
+    old = _old_num2bstr(num, n_bits, base)
+    if new == old: return new
+    
+    logger.warning(
+        'Inconsistence found, '
+        f'_old_num2bstr(num={num}, n_bits={n_bits}, base={base}) = {old}, '
+        f'np.base_repr({num}, {base}).zfill({n_bits}) = {new}.',
+        stack_info=True,
+        stacklevel=2,
+    )
 
-    if np.allclose(func(x), y, atol=tol, rtol=0) is False:
-        logger.warning('inverse solution not found. func(x) is not close to y.', stack_info=True)
-
-    if show is True:
-        _, ax = plt.subplots()
-        ax.plot(x, func(x), 'k-', label='func(x)')
-        ax.plot(x0, y, '.', label='init', fillstyle='none')
-        ax.plot(x, y, 'x', label='find', markersize=4)
-        ax.legend()
-        plt.show(block=True)
-
-    return x
-
-def _bound(f, x, xleft, xright, scale):
-    # f(x) = y, x is scalar.  # BUG: inverse works abnormally when scale != 1.
-    if xleft > xright:
-        xleft, xright = xright, xleft  # Exchange to make sure xleft <= xright.
-    x1, x2 = xleft, xright
-    y1, y2 = f(x1), f(x2)
-    if x <= x1:
-        return (x-x1)*(y2-y1)/(x2-x1)*scale + y1
-    elif x >= x2:
-        return (x-x2)*(y2-y1)/(x2-x1)*scale + y2
-    else:
-        return f(x)
-
-def bound(xleft, xright, scale=1., verbose=False):  # A decorator factory.
-    """Decorate f(x, *arg, **kwargs) such that f(x) with x beyond [xleft, xright] 
-    is obtained by linear extrapolation. Intended for `misc.inverse`.`"""
-    def decorator(f):
-        @wraps(f)
-        def wrapped_f(x, *args, **kwargs):
-            def fx(x): return f(x, *args, **kwargs)
-            if np.size(x) == 1:
-                if verbose:
-                    if (x < xleft) or (x > xright):
-                        logger.warning('value {} out of bound [{},{}].'.format(x, xleft, xright))
-                return _bound(fx, x, xleft, xright, scale)
-            else:
-                x = np.array(x)
-                if verbose:
-                    mask = (x < xleft) | (x > xright)
-                    if np.any(mask):
-                        logger.warning('value {} out of bound [{},{}].'.format(x[mask], xleft, xright))
-                ys = [_bound(fx, xi, xleft, xright, scale) for xi in x]
-                return np.array(ys)
-        return wrapped_f
-    return decorator
-
-def num2bstr(num, n_bits, base=2):
+def _old_num2bstr(num: int, n_bits: int, base: int = 2) -> str:
     if num >= base**n_bits:
         msg = 'num {} requires more than {} bits with base {} to store.'
         raise ValueError(msg.format(num, n_bits, base))
@@ -319,77 +324,53 @@ def num2bstr(num, n_bits, base=2):
 
     l = []
     while True:
-        l.append(num % base)  # TODO: consider use np.base_repr
+        l.append(num % base)
         last_num = num
         num = num // base
         if last_num // base == 0:
             break
     bit_string = ''.join([str(i) for i in l[::-1]])
-    return bit_string.zfill(n_bits)
+    return bit_string.zfill(n_bits)        
+
 
 def bitstrings(n_qbs, base=2):
-    """Returns ['00', '01', '10', '11'] for n_qbs=2, and etc."""
+    """Returns bit strings of n_qbs qubits with the base.
+    
+    >>> bitstrings(2)
+    ['00', '01', '10', '11']
+
+    >>> bitstrings(2, base=3)
+    ['00', '01', '02', '10', '11', '12', '20', '21', '22']
+
+    >>> bitstrings(3)
+    ['000', '001', '010', '011', '100', '101', '110', '111']
+    """
     return [num2bstr(i, n_qbs, base=base) for i in range(base**n_qbs)]
 
 
-ENG_PREFIXES = {
-    -24: "y",
-    -21: "z",
-    -18: "a",
-    -15: "f",
-    -12: "p",
-    -9: "n",
-    -6: "\N{MICRO SIGN}",
-    -3: "m",
-    0: "",
-    3: "k",
-    6: "M",
-    9: "G",
-    12: "T",
-    15: "P",
-    18: "E",
-    21: "Z",
-    24: "Y"
-}
-
-def estr(num, places=None, sep=' '):
+def estr(num:float, places: int = None, sep: str="") -> str:
     """Format a number in engineering notation, appending a letter
     representing the power of 1000 of the original number.
 
     Adapted from `matplotlib.ticker.EngFormatter`
 
     Examples:
-        >>> eng_string(0, places=0)
+        >>> estr(0, places=0)
         '0'
 
-        >>> eng_string(1000000, places=1)
-        '1.0 M'
+        >>> estr(1000000, places=1)
+        '1.0M'
 
-        >>> eng_string("-1e-6", places=2)
-        '-1.00 \N{MICRO SIGN}'
+        >>> estr(-1e-6, places=2)
+        '-1.00µ'
 
     Args: 
-        places : int, default: None
-            Precision with which to display the number, specified in
-            digits after the decimal point (there will be between one
-            and three digits before the decimal point). If it is None,
-            the formatting falls back to the floating point format '%g',
-            which displays up to 6 *significant* digits, i.e. the equivalent
-            value for *places* varies between 0 and 5 (inclusive).
+        places: Precision with which to display the number If None, displays up 
+            to 6 *significant* digits.
 
-        sep : str, default: " "
-            Separator used between the value and the prefix/unit. For
-            example, one get '3.14 mV' if ``sep`` is " " (default) and
-            '3.14mV' if ``sep`` is "". Besides the default behavior, some
-            other useful options may be:
-
-            * ``sep=""`` to append directly the prefix/unit to the value;
-            * ``sep="\N{THIN SPACE}"`` (``U+2009``);
-            * ``sep="\N{NARROW NO-BREAK SPACE}"`` (``U+202F``);
-            * ``sep="\N{NO-BREAK SPACE}"`` (``U+00A0``).
-
-    Returns: 
-        String of the formatted num.
+        sep : Separator used between the value and the prefix/unit. 
+            could be unicode like `"\\u2009"` (thin space), `\\u202f` (narrow 
+            no-break space) or `"\\u00a0"` (no-break space).
 
     Notes:
         To use this in axis ticks,
@@ -426,19 +407,29 @@ def estr(num, places=None, sep=' '):
         pow10 += 3
 
     prefix = ENG_PREFIXES[int(pow10)]
-    formatted = "{mant:{fmt}}{sep}{prefix}".format(
-        mant=mant, sep=sep, prefix=prefix, fmt=fmt)
+    return f"{mant:{fmt}}{sep}{prefix}"
 
-    return formatted
+ENG_PREFIXES = {
+    -24: "y",
+    -21: "z",
+    -18: "a",
+    -15: "f",
+    -12: "p",
+    -9: "n",
+    -6: "µ",
+    -3: "m",
+    0: "",
+    3: "k",
+    6: "M",
+    9: "G",
+    12: "T",
+    15: "P",
+    18: "E",
+    21: "Z",
+    24: "Y"
+}
+
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-    def f(x, r):
-        return x + r*np.sin(x)
-    x = np.linspace(0, 2*np.pi)
-    y = f(x, r=1)
-    plt.plot(x, y, label='original one')
-    plt.plot(inverse(f, y, r=1), y, label='inversed one')  # shold have the same shape as above.
-    plt.legend()
-    plt.show()
+    import doctest
+    doctest.testmod()
