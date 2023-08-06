@@ -2,8 +2,10 @@
 """
 
 import copy
-from tqdm import tqdm, trange
+import logging
+from tqdm import trange
 from pathlib import Path
+from typing import Union
 
 import lmfit
 import matplotlib.pyplot as plt
@@ -12,38 +14,56 @@ import pandas as pd
 from scipy.interpolate import interp1d
 
 
+logger = logging.getLogger(__name__)
+
+
 class CurveFit(object):
     """Class encapsulating data, model and fit result for curve fitting.
 
-    Attributes:
-        xdata, ydata: the fit data.
-        model: lmfit.Model.
-        result: lmfit.ModelResult.
-        params: pandas.Series updated with result.
-        fit_report: str.
+    Examples:
+        >>> def sine(x, amp, freq, phase):
+        ...     return amp * np.sin(2*np.pi*freq*x + phase)
+        >>> xdata = np.linspace(0, 1)
+        >>> np.random.seed(0)
+        >>> ydata = sine(xdata, 1.1, 1.1, 0.1) + np.random.normal(size=len(xdata), scale=0.1)
+        >>> cfit = CurveFit(xdata, ydata, sine, dict(amp=1, freq=1, phase=0))
+        >>> cfit.params
+        chi          0.747171
+        amp          1.117566
+        amp_err      0.022657
+        freq         1.076386
+        freq_err     0.009642
+        phase        0.178043
+        phase_err    0.037869
+        dtype: float64
+        >>> cfit.plot()
+        <Figure size 640x640 with 2 Axes>
     """
-    def __init__(self, xdata, ydata, model, hold=False):
-        """Initialize a curve fit.
-
-        Args:
-            xdata, ydata: 1d np.arrays with same shape.
-            model: lmfit.Model,
-            hold: boolean,
-                if False, try to do fit right after initialization.
-        """
-        self.xdata = xdata
-        self.ydata = ydata
+    def __init__(
+        self, 
+        xdata:np.ndarray, 
+        ydata:np.ndarray, 
+        model:lmfit.Model, 
+        fit_kws: dict[str, float] = None,
+        hold:bool=False, 
+    ):
+        if not isinstance(model, lmfit.Model) and callable(model):
+            model = lmfit.Model(model)
+        self.xdata = np.asarray(xdata)
+        self.ydata = np.asarray(ydata)
         self.model = model
-        self.result = None
-        self.params = None
+        self.result:lmfit.model.ModelResult = None
+        self.params:pd.Series = None
+        self.fit_kws = fit_kws if fit_kws is not None else {}
+
         if not hold:
             try:
                 self.fit()
-            except Exception as exc:
-                print(f'WARNING: Fit failed. Error reports \n{exc}')
+            except Exception:
+                logger.exception("Error in fitting.")
 
     @classmethod
-    def from_result(cls, result, xdata=None):
+    def from_result(cls, result:lmfit.model.ModelResult, xdata=None):
         if xdata is None:
             xdata = result.userkws['x']  # x for most of LabCodes models.
         ydata = result.data
@@ -53,16 +73,16 @@ class CurveFit(object):
         return cfit
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path:Path):
         raise NotImplementedError()  # TODO: require a dict of model def functions.
 
-    def dump(self, path):
+    def dump(self, path:Path):
         path = Path(path)
         path.touch()
         with path.open('w') as f:
-            self.result.dump()
+            self.result.dump(f)
 
-    def _update_result(self, result):
+    def _update_result(self, result:lmfit.model.ModelResult) -> None:
         self.result = result
 
         # Update params.
@@ -75,7 +95,6 @@ class CurveFit(object):
             else:
                 d[key+'_err'] = err
         self.params = pd.Series(d)
-        return
 
     def __getitem__(self, key):
         return self.params[key]
@@ -86,23 +105,14 @@ class CurveFit(object):
 
     @property
     def kws(self):
-        result = self.result
-        return {k: v.value for k, v in result.params.items() if v.expr is None}
+        params:lmfit.Parameters = self.result.params
+        return {k: v.value for k, v in params.items() if v.expr is None}
 
-    def fdata(self, x=None):
-        """Return values of fitted curve.
-        
-        Args:
-            x: int, number of sample points for the curve.
-                or array of values.
-
-        Return:
-            y, if n_pts is None,
-            x, y, np.array of values of fitted curve, if n_pts is not None.
-        """
+    def fdata(self, x: Union[int, np.ndarray]=None) -> tuple[np.ndarray, np.ndarray]:
+        """Return x and y values of fitted curve."""
         if x is None:
-            return self.result.best_fit
-        elif np.size(x) == 1:
+            return self.xdata, self.result.best_fit
+        elif np.isscalar(x):
             ip = np.linspace(0, 1, num=len(self.xdata))
             i = np.linspace(0, 1, num=x)
             x = np.interp(i, ip, np.sort(self.xdata))
@@ -110,104 +120,68 @@ class CurveFit(object):
         else:
             return x, self.result.eval(x=x)
 
-    def fit(self, **kwargs):
-        """Perform fit with xdata and ydata.
-        
-        Args:
-            kwargs: fit initial values of parameters passed to model.
-        """
-        result = self.model.fit(self.ydata, x=self.xdata, **kwargs)
+    def fit(self, **kws) -> None:
+        """Perform fit with given kws as initial values of parameters."""
+        try:
+            params = self.model.guess(self.ydata, x=self.xdata)
+        except NotImplementedError:
+            params = None
+        except:
+            logger.exception("Error in guessing parameters.")
+            params = None
+
+        _kws = self.fit_kws.copy()
+        _kws.update(kws)
+        result = self.model.fit(self.ydata, x=self.xdata, params=params, **_kws)
         self._update_result(result)
 
-    def _add_fit_report(self, axes):
-        """Attach fit report on matplotlib.axes."""
-        x0, x1 = axes.get_xlim()
-        y0, y1 = axes.get_ylim()
-        axes.text(
-                x=x0 + (x1-x0)*1.1,
-                y=y0 + (y1-y0)*1.0,
-                s=self.fit_report,
-                ha='left',
-                va='top'
-            )
-        return axes
-
-    def plot(self, ax=None, fit_report=False, plot_init=True):
-        """Plot the fit result with matplotlib.
-        If not fit result, plot data with guess params.
+    def plot(self, show_init=False) -> plt.Figure:
+        """Plot the fit result. If no result, plot data with guess params."""
+        is_complex = np.iscomplexobj(self.ydata)
+        if self.result is not None and not is_complex:
+            return self.result.plot(show_init=show_init)
         
-        Args:
-            fit_report: boolean, default is False.
-                whether or not to plot fitted data along with fit report.
-
-        Returns:
-            ax of matplotlib.
-        """
-        if ax is None:
-            fig, ax = plt.subplots()
-        ax.set(
-            title=self.model.name,
-            xlabel='x',
-        )
-
-        if np.iscomplexobj(self.ydata):
-            ax.set_ylabel('|y|')
+        fig, ax = plt.subplots()
+        ax.set_title(self.model.name)
+        if is_complex:
+            ax.set(
+                xlabel='Re(y)',
+                ylabel='Im(y)',
+                aspect='equal',
+            )
+            ax.plot(self.ydata.real, self.ydata.imag, 'o')
         else:
-            ax.set_ylabel('y')
+            ax.set(
+                xlabel='x',
+                ylabel='y',
+            )
+            ax.plot(self.xdata, self.ydata, 'o')
 
-        ax.plot(self.xdata, self.ydata, 'bo')
         if self.result is None:
             try:
                 p_guess = self.model.guess(self.ydata, x=self.xdata)
                 y_guess = self.model.eval(p_guess, x=self.xdata)
-                ax.plot(self.xdata, y_guess, 'k--', label='guess')
+                if is_complex:
+                    ax.plot(y_guess.real, y_guess.imag, '--', color='gray', label='guess')
+                else:
+                    ax.plot(self.xdata, y_guess, '--', color='gray', label='guess')
             except:
-                pass
-        else:
-            if plot_init is True:
-                ax.plot(self.xdata, self.result.init_fit, 'k--', label='initial fit')
-            ax.plot(self.xdata, self.result.best_fit, 'r-', label='best fit')
+                logger.exception("Error in guessing parameters.")
+        else:  # self.result is not None and is_complex.
+            if show_init:
+                y0 = self.result.init_fit
+                if is_complex:
+                    ax.plot(y0.real, y0.imag, '--', color='gray', label='init')
+                else:
+                    ax.plot(self.xdata, y0, '--', color='gray', label='init')
+                    
+            fdata = self.result.best_fit
+            if is_complex:
+                ax.plot(fdata.real, fdata.imag, label='best fit')
+            else:
+                ax.plot(self.xdata, fdata, label='best fit')
+
         ax.legend()
-
-        if fit_report:
-            ax = self._add_fit_report(ax)
-        return ax
-
-    def plot_complex(self, ax=None, fit_report=False, plot_init=True):
-        """Plot the fit result on complex plane.
-        
-        Args:
-            fit_report: boolean, default is False.
-                whether or not to plot fitted data along with fit report.
-
-        Returns:
-            ax of matplotlib.
-        """
-        if ax is None:
-            fig, ax = plt.subplots()
-        ax.set(
-            title=self.model.name,
-            xlabel='Re(y)',
-            ylabel='Im(y)',
-            aspect='equal',
-        )
-
-        def plot_c(data, *args, **kwargs):
-            ax.plot(data.real, data.imag, *args, **kwargs)
-
-        plot_c(self.ydata, '.')
-        if self.result is None:
-            p_guess = self.model.guess(self.ydata, x=self.xdata)
-            y_guess = self.model.eval(p_guess, x=self.xdata)
-            plot_c(y_guess, 'k--', label='guess')
-        else:
-            if plot_init is True: 
-                plot_c(self.result.init_fit, 'k--', label='initial fit')
-            plot_c(self.result.best_fit, 'r-', label='best fit')
-        ax.legend()
-
-        if fit_report:
-            ax = self._add_fit_report(ax)
         return ax
 
 
@@ -446,7 +420,6 @@ class BatchFit(object):
                 Default is half of number of fits.
             cancel_if_fail: boolean,
                 Whether to cancel all the changes to bfit if fit failed.
-                Default is True.
         """
 
         if max_trial is None:
@@ -707,4 +680,5 @@ def df_to_traces(df, index, columns, values):
 
 
 if __name__ == '__main__':
-    pass
+    import doctest
+    doctest.testmod()
