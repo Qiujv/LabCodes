@@ -28,7 +28,7 @@ def dept(f):
             attr = getattr(self, arg_name)
             if getattr(attr, 'is_dept', False):
                 if attr == f: raise Exception('Loop evaluation!')  # TODO: Need a smarter checker.
-                if debug is True: print(arg_name)
+                if debug: print(arg_name)
                 final_kw[arg_name] = attr(**user_kw)  # Recursion here.
             else:
                 final_kw[arg_name] = attr

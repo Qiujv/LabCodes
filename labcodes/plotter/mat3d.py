@@ -98,7 +98,7 @@ class MatEditor:
         xgrid, ygrid = np.meshgrid(xax, yax)
         xlabels, ylabels = self.xlabels, self.ylabels
 
-        if omit_diag is True:
+        if omit_diag:
             for i in range(min(xdim, ydim)):
                 vals[i,i] = 0
         mask = (np.abs(vals) >= 0.2)
@@ -138,10 +138,10 @@ class MatEditor:
         if self.fig is None: return
         plt.close(self.fig)
         self.fig = None
-        if self._interactive is False:
-            plt.ioff()
-        elif self._interactive is True:
+        if self._interactive:
             plt.ion()
+        else:
+            plt.ioff()
 
 def _plot_mat3d(ax, mat, cval, cmin=None, cmax=None, cmap='bwr', alpha=1.0, label=True, fmt=None):
     if fmt is None: fmt = lambda v: f'{v:.3f}'.replace('0.', '.')
@@ -172,7 +172,7 @@ def _plot_mat3d(ax, mat, cval, cmin=None, cmax=None, cmap='bwr', alpha=1.0, labe
         bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=(0,0,0,0), alpha=None, 
                            edgecolor='black', linewidth=0.5)
 
-    if label is True:
+    if label:
         for x, y, z in zip(xpos, ypos, dz):
             msg = fmt(z)
             ax.text(x+bar_width/2, y+bar_width/2, z, msg, ha='center', va='bottom',
@@ -213,7 +213,7 @@ def plot_mat3d(mat, ax=None, alpha=1.0, label=True, fmt=None,
         bar_col, extend_cbar = _plot_mat3d(ax, mat, cval=mat, cmin=cmin, cmax=cmax, 
                                         cmap=cmap, alpha=alpha, label=label, fmt=fmt)
 
-        if colorbar is True:
+        if colorbar:
             cbar = fig.colorbar(bar_col, shrink=0.6, fraction=0.1, pad=0.05,
                                 extend=extend_cbar, location=cbar_location)
         else:
@@ -227,7 +227,7 @@ def plot_mat3d(mat, ax=None, alpha=1.0, label=True, fmt=None,
                                         cmin=cmin, cmax=cmax, 
                                         cmap=cmap, alpha=alpha, label=label, fmt=fmt)
 
-        if colorbar is True:
+        if colorbar:
             cbar = fig.colorbar(bar_col, shrink=0.6, fraction=0.1, pad=0.05,
                                 extend=extend_cbar, location=cbar_location)
             cbar.set_ticks(np.linspace(-np.pi, np.pi, 5))
@@ -250,7 +250,7 @@ def plot_complex_mat3d(mat, axs=None, cmin=None, cmax=None, cmap='bwr', colorbar
         fig = ax_real.get_figure()
 
     norm, extend_cbar = misc.get_norm(np.hstack((mat.imag, mat.real)), cmin=cmin, cmax=cmax)
-    if colorbar is True:
+    if colorbar:
         fig.subplots_adjust(right=0.9)
         cax = fig.add_axes([0.95, 0.15, 0.01, 0.6])
         cmap = plt.cm.get_cmap(cmap)

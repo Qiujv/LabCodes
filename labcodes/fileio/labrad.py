@@ -96,7 +96,7 @@ def find(dir:Path, id:int, return_all:bool=False) -> Path:
     if len(all_match) == 0:
         raise ValueError(f'Files like "{prn}" not found in {dir}')
 
-    if return_all is True:
+    if return_all:
         return all_match
     else:
         return all_match[0]
@@ -160,7 +160,7 @@ def logname_from_path(path:Path) -> LogName:
     return LogName(dir=dir, id=id, title=title)
 
 def browse(dir:Path, do_print=False) -> List[str]:
-    """Returns all datafiles in given folder. Print if do_print is True."""
+    """Returns all datafiles in given folder."""
     dir = Path(dir)
     ini = ConfigParser()
     read = ini.read(dir/'session.ini')

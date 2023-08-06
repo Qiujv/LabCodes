@@ -12,15 +12,18 @@ logger = logging.getLogger(__name__)
 def auto_rotate(data:np.ndarray[complex], return_rad: bool = False):
     """Returns data with shifted phase s.t. variation of imaginary part minimized.
     
-    >>> auto_rotate([0, 1j])
-    array([0.+0.000000e+00j, 1.+6.123234e-17j])
+    >>> rot_data = auto_rotate([0, 1j])
+    >>> rot_data.real
+    array([0., 1.])
+    >>> np.allclose(rot_data.imag, 0)
+    True
     """
     data = np.asarray(data)
     
     # Minimize imag(var(data)), by Kaho
     rad = -0.5 * np.angle(np.mean(data**2) - np.mean(data)**2)
     
-    if return_rad is True:
+    if return_rad:
         return data * np.exp(1j*rad), rad  # counter-clockwise
     else:
         return data * np.exp(1j*rad)
@@ -33,7 +36,7 @@ def remove_e_delay(phase, freq, i_start=0, i_end=-1):
         freq: array of same shape as phase.
         i_start, i_end: region where linear fit applied.
 
-    >>> remove_e_delay([0,1], [0,1])
+    >>> remove_e_delay([0, np.pi], [0, 1])
     array([0., 0.])
     """
     phase = np.asarray(phase)
@@ -286,13 +289,13 @@ def inverse_interp(
     # Check tolerance.
     mask_extrap = mask_low | mask_high
     mask_tol = np.abs(y[~mask_extrap] - func(x[~mask_extrap])) < tol
-    if np.all(mask_tol) == False:
+    if not np.all(mask_tol):
         logging.warning(
             f"Failed to find inverse for {np.sum(~mask_tol)} points"
             f" (except extrapolate) within tolerance {tol}."
         )
     
-    if is_scalar == True:
+    if is_scalar:
         return x.item()
     else:
         return x
@@ -315,6 +318,7 @@ def num2bstr(num: int, n_bits: int, base: int = 2) -> str:
         stacklevel=2,
     )
 
+# TODO: remove this by 2024-01-01.
 def _old_num2bstr(num: int, n_bits: int, base: int = 2) -> str:
     if num >= base**n_bits:
         msg = 'num {} requires more than {} bits with base {} to store.'

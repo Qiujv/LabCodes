@@ -331,7 +331,7 @@ def plot_qst(dir, id, ro_mat=None, fid=None, normalize=False):
         rho = tomo.qst(probs, f'tomo{n_qs}')
     labels = misc.bitstrings(n_qs)
     rho_abs = np.abs(rho)
-    if normalize is True: rho = rho / np.trace(rho_abs)
+    if normalize: rho = rho / np.trace(rho_abs)
     ax = plotter.plot_mat3d(rho)
 
     if fid is None:

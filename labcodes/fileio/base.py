@@ -140,7 +140,7 @@ class LogFile:
         if len(all_match) == 0:
             raise ValueError(f'Files like "{prn}" not found in {dir}')
 
-        if return_all is True:
+        if return_all:
             return all_match
         else:
             return all_match[0]

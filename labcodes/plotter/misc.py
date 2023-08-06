@@ -85,7 +85,7 @@ def get_norm(data, cmin=None, cmax=None, symmetric=False):
     if cmax is None:
         cmax = vmax
 
-    if symmetric is True:
+    if symmetric:
         cmax = max(abs(cmin), abs(cmax))
         cmin = -cmax
 

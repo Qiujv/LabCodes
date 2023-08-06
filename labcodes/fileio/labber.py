@@ -161,7 +161,6 @@ class LabberRead(MyLogfile):
         Args:
             path: str, path to the logfile.
             hold: boolean, whether or not to read data to dots at initializing.
-                Default is False.
             ch_to_read: 'all', List(str), name of channels to read, 
                 overwriting step_chn and log_chn.
             log_chn: 'all' or List(str), name of log channels to read.
@@ -234,7 +233,6 @@ class LabberRead(MyLogfile):
                 if None, use self.ch_to_read
             expand_vector: boolean,
                 Whether to expand vector.
-                Default is True.
 
         Returns:
             Dots with data from the entry.
