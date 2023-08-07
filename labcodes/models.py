@@ -31,6 +31,9 @@ class SineModel(Model):
         amp = (y.max() - y.min()) / 2
         offset = y.mean()
         freq = misc.guess_freq(x, y)
+        if 'freq' in self.param_hints:
+            if 'value' in self.param_hints['freq']:
+                freq = self.param_hints['freq']['value']
         phase = misc.guess_phase(x, y, freq)
         return self.make_params(amp=amp, offset=offset, freq=freq, phase=phase)
 
@@ -66,6 +69,9 @@ class ExpSineModel(Model):
         offset = y.mean()
         tau = x.mean()
         freq = misc.guess_freq(x, y)
+        if 'freq' in self.param_hints:
+            if 'value' in self.param_hints['freq']:
+                freq = self.param_hints['freq']['value']
         phase = misc.guess_phase(x, y, freq)
         return self.make_params(amp=amp, offset=offset, rate=1/tau, freq=freq, phase=phase)
 

@@ -1,6 +1,3 @@
-"""Module containing fitters for conveniently fitting data.
-"""
-
 import copy
 import logging
 from tqdm import trange
@@ -62,26 +59,6 @@ class CurveFit(object):
             except Exception:
                 logger.exception("Error in fitting.")
 
-    @classmethod
-    def from_result(cls, result:lmfit.model.ModelResult, xdata=None):
-        if xdata is None:
-            xdata = result.userkws['x']  # x for most of LabCodes models.
-        ydata = result.data
-        model = result.model
-        cfit = cls(xdata, ydata, model, hold=True)
-        cfit._update_result(result)
-        return cfit
-
-    @classmethod
-    def load(cls, path:Path):
-        raise NotImplementedError()  # TODO: require a dict of model def functions.
-
-    def dump(self, path:Path):
-        path = Path(path)
-        path.touch()
-        with path.open('w') as f:
-            self.result.dump(f)
-
     def _update_result(self, result:lmfit.model.ModelResult) -> None:
         self.result = result
 
@@ -103,10 +80,23 @@ class CurveFit(object):
     def fit_report(self):
         return self.result.fit_report()
 
-    @property
-    def kws(self):
-        params:lmfit.Parameters = self.result.params
-        return {k: v.value for k, v in params.items() if v.expr is None}
+    def fit(self, **kws) -> None:
+        """Perform fit with given kws as initial values of parameters."""
+        try:
+            params = self.model.guess(self.ydata, x=self.xdata)
+        except NotImplementedError:
+            params = None
+        except:
+            logger.exception("Error in guessing parameters.")
+            params = None
+
+        if params is not None:
+            params.set(**self.model.param_hints)
+
+        _kws = self.fit_kws.copy()
+        _kws.update(kws)
+        result = self.model.fit(self.ydata, x=self.xdata, params=params, **_kws)
+        self._update_result(result)
 
     def fdata(self, x: Union[int, np.ndarray]=None) -> tuple[np.ndarray, np.ndarray]:
         """Return x and y values of fitted curve."""
@@ -120,24 +110,10 @@ class CurveFit(object):
         else:
             return x, self.result.eval(x=x)
 
-    def fit(self, **kws) -> None:
-        """Perform fit with given kws as initial values of parameters."""
-        try:
-            params = self.model.guess(self.ydata, x=self.xdata)
-        except NotImplementedError:
-            params = None
-        except:
-            logger.exception("Error in guessing parameters.")
-            params = None
-
-        _kws = self.fit_kws.copy()
-        _kws.update(kws)
-        result = self.model.fit(self.ydata, x=self.xdata, params=params, **_kws)
-        self._update_result(result)
-
-    def plot(self, show_init=False) -> plt.Figure:
+    def plot(self, show_init=False, x_for_fdata=None) -> plt.Figure:
         """Plot the fit result. If no result, plot data with guess params."""
         is_complex = np.iscomplexobj(self.ydata)
+        if self.result is None: print("No fit result, plotting data with guess params.")
         if self.result is not None and not is_complex:
             return self.result.plot(show_init=show_init)
         
@@ -174,15 +150,36 @@ class CurveFit(object):
                     ax.plot(y0.real, y0.imag, '--', color='gray', label='init')
                 else:
                     ax.plot(self.xdata, y0, '--', color='gray', label='init')
-                    
-            fdata = self.result.best_fit
+
+            fx, fy = self.fdata(x=x_for_fdata)
             if is_complex:
-                ax.plot(fdata.real, fdata.imag, label='best fit')
+                ax.plot(fy.real, fy.imag, label='best fit')
             else:
-                ax.plot(self.xdata, fdata, label='best fit')
+                ax.plot(fx, fy, label='best fit')
 
         ax.legend()
         return ax
+    
+
+    @classmethod
+    def from_result(cls, result:lmfit.model.ModelResult, xdata=None):
+        if xdata is None:
+            xdata = result.userkws['x']  # x for most of LabCodes models.
+        ydata = result.data
+        model = result.model
+        cfit = cls(xdata, ydata, model, hold=True)
+        cfit._update_result(result)
+        return cfit
+
+    @classmethod
+    def load(cls, path:Path):
+        raise NotImplementedError()  # TODO: require a dict of model def functions.
+
+    def dump(self, path:Path):
+        path = Path(path)
+        path.touch()
+        with path.open('w') as f:
+            self.result.dump(f)
 
 
 class BatchFit(object):
@@ -532,6 +529,7 @@ class BatchFit(object):
             self._params.iloc[idx,:]['chi'] = np.sqrt(np.sum((ftrace - self.ybatch[idx])**2))
         print(f'Fit below has been replaced: \n{np.arange(len(mask_out))[mask_out]}')
 
+
 class BatchFit_withDots(BatchFit):
     """Subclass of BatchFit, work directly on Dots.
     
@@ -577,28 +575,6 @@ class BatchFit_withDots(BatchFit):
         params = super().get_params()
         params = params.set_index(self.stepper_value)
         return params
-
-    def save_with_logfile(
-        self,
-        logfile,
-        user,
-        suffix,
-        cover_if_exist=False,
-    ):
-        """Save fit parameters into Labber logfile, with metadatas from given logfile."""
-        from labcodes.fileio import labber  # Import only when needed.
-        logf_new = labber.LabberWrite(
-            dots=self.params.reset_index(),
-            path=logfile.path.with_name(logfile.path.stem + suffix),
-            user=user,
-            step_channels=[ch for ch in logfile.step_channels
-                if ch['name'] in self.stepper_name],
-            cover_if_exist=cover_if_exist,
-            project=logfile.project,
-            tags=logfile.tags + ['fit',],
-            comment=f'# BatchFit\n{self.model.name}\n\n# Data from\n{logfile.path}',
-        )
-        return logf_new
 
 
 def bfit_check(batch_fit, name, min=-np.inf, max=np.inf, tolerance=0):
@@ -651,23 +627,6 @@ def df_to_traces(df, index, columns, values):
         Function signature mimics pandas.DataFrame.pivot. It is actually an extension to
         pivot, in case where traces has different x values or lengths.
     """
-    # # The old bfit style.
-    # x_name = columns
-    # y_name = values
-    # traces = df.set_index(index)
-    # stepper_value = traces.index.unique()  # order as it appears.
-    # xbatch = []
-    # ybatch = []
-    # for v in stepper_value:
-    #     try:
-    #         trace = traces.loc[v, :].sort_values(by=[x_name])
-    #     # If traces got no more column than x_name and stepper_name,
-    #     # loc returns pd.Series for whom sort_values() requires no arguemnt name 'by'.
-    #     except TypeError as error:
-    #         raise KeyError(f'Column with name {y_name} not found.') from error
-    #     ybatch.append(trace[y_name].values)
-    #     xbatch.append(trace[x_name].values)
-
     # New method with native functions by pandas.
     gp = df.groupby(index)
     x_series = gp[columns].apply(lambda se: se.values)  # se to np array.
