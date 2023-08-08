@@ -9,7 +9,6 @@ import labcodes.frog.pyle_tomo as tomo
 from labcodes import fileio, fitter, misc, models, plotter, state_disc
 from labcodes.frog import tele
 import labcodes.routine as rt
-from typing import List
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):

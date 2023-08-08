@@ -9,6 +9,16 @@ import scipy.interpolate
 logger = logging.getLogger(__name__)
 
 
+def fidelity(a: np.ndarray, b: np.ndarray):
+    """Returns fidelity between two matrices.
+    
+    >>> fidelity([[1,0],[0,0]], [[.5,.5],[.5,.5]])
+    0.5
+    """
+    a, b = np.asarray(a), np.asarray(b)
+    return np.real(np.trace(a @ b))
+
+
 def auto_rotate(data:np.ndarray[complex], return_rad: bool = False):
     """Returns data with shifted phase s.t. variation of imaginary part minimized.
     
