@@ -114,6 +114,7 @@ def probs_from_flags(
     Returns:
         probs (np.ndarray): Probabilities.
         labels (list[str], optional): Labels for each probability, if return_labels is True.
+            Also available via another function `prob_labels(nlevels, n_qbs)`.
 
     Examples:
     >>> np.random.seed(0)
@@ -122,6 +123,9 @@ def probs_from_flags(
     >>> probs, labels = probs_from_flags(flags, nlevels, n_qbs, return_labels=True)
     >>> dict(zip(labels, probs))
     {'000': 0.1, '001': 0.12, '010': 0.08, '011': 0.1, '100': 0.12, '101': 0.14, '110': 0.18, '111': 0.16}
+    >>> prob_labels(nlevels, n_qbs)
+    array(['000', '001', '010', '011', '100', '101', '110', '111'],
+          dtype='<U3')
     """
     flags = np.asarray(flags)
     if flags.ndim == 2:
@@ -135,6 +139,17 @@ def probs_from_flags(
     else:
         return probs
     
+
+def prob_labels(nlevels: int, n_qbs: int) -> np.ndarray[str]:
+    """Returns string labels for probs_from_flags.
+    
+    >>> prob_labels(nlevels=2, n_qbs=3)
+    array(['000', '001', '010', '011', '100', '101', '110', '111'],
+          dtype='<U3')
+    """
+    return str_from_flags(np.arange(nlevels**n_qbs), n_qbs, nlevels)
+
+bitstrings = prob_labels  # Actually same as misc.bitstrings.
 
 def flags_mq_from_1q(
     list_flags: list[np.ndarray[int]], 

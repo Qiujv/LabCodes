@@ -1,5 +1,6 @@
 """Process single shot tomo datas, for state teleport experiments."""
 
+import logging
 from functools import cache
 from itertools import product
 
@@ -9,6 +10,9 @@ import pandas as pd
 
 import labcodes.frog.pyle_tomo as tomo
 from labcodes import fileio, misc, plotter
+
+
+logger = logging.getLogger(__name__)
 
 
 def rho(alpha, beta):
@@ -27,7 +31,7 @@ class single_shot_data:
 
     Check .df for original data, check .probs for probilities table.
     """
-    def __init__(self, folder, id, suffix='csv', c_qubits=('q1',), p_qubits=('q2',)):
+    def __init__(self, folder, id, suffix='csv', c_qubits=('q4',), p_qubits=('q5',)):
         lf = fileio.LabradRead(folder, id, suffix=suffix)
         self.lf = lf
 
@@ -44,9 +48,8 @@ class single_shot_data:
         df = lf.df.copy()
         try:
             self.construct()
-        except Exception as exc:
-            print('WARNING: single_shot_data.construct fails\n'
-                  f'Error reports {repr(exc)}')
+        except Exception:
+            logger.exception(f'Failed to construct single shot data {folder}/{id}.')
             self.df = None
             self.probs = None
 
@@ -182,7 +185,7 @@ class qst_1q:
 
         # Do NOT keep ss datas to save memory.
         datas = [
-            single_shot_data(folder, id, suffix, c_qubits=('q1', 'q2'), p_qubits=('q5'))
+            single_shot_data(folder, id, suffix, c_qubits=('q4', 'q5'), p_qubits=('q2'))
             for id in self.ids
         ]
         # Fix logfiles missing |0> center or |1> center in conf.
@@ -199,8 +202,8 @@ class qst_1q:
         self.probs = [ss_data.probs for ss_data in datas]
     
     def rho(self, select, ro_mat=None):
-        probs = [(df.loc[f'q1q2_{select}', 'q5_0'], 
-                  df.loc[f'q1q2_{select}', 'q5_1']) 
+        probs = [(df.loc[f'q4q5_{select}', 'q2_0'], 
+                  df.loc[f'q4q5_{select}', 'q2_1']) 
                  for df in self.probs]
 
         if ro_mat is not None:

@@ -1,6 +1,6 @@
 """Script provides functions dealing with routine experiment datas."""
 
-
+import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -148,10 +148,6 @@ def fit_spec(spec_map, ax=None, **kwargs):
     ax = cfit.model.plot(cfit, ax=ax, **kwargs)
     return cfit, ax
 
-def plot_visibility(logf, **kwargs):
-    """Plot visibility, for iq_scatter experiments only."""
-    return rt.basic.IQScatter.from_logfile(logf).plot()
-
 def plot_iq_vs_freq(logf, axs=None):
     if axs is None:
         fig, (ax, ax2) = plt.subplots(tight_layout=True, figsize=(5,5), nrows=2, sharex=True)
@@ -180,35 +176,56 @@ def plot_iq_vs_freq(logf, axs=None):
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
-def plot_visibility_kmeans(lf, return_ro_mat=False):
-    df = lf.df
+def plot_visibility(lf, return_ro_mat=False):
+    df:pd.DataFrame = lf.df
     nlevels = 0
     while f'i{nlevels}' in df: nlevels += 1
 
     qb = lf.conf['parameter']['measure'][0]
-    stater = state_disc.KMeans([lf.conf['parameter'][f'Device.{qb}.|{i}> center'] 
-                                for i in range(nlevels)])
+    stater = state_disc.NCenter(
+        [lf.conf['parameter'][f'Device.{qb}.|{i}> center'] for i in range(nlevels)])
+    list_points = [df[[f'i{i}', f'q{i}']].values for i in range(nlevels)]
 
-    fig, axs = plt.subplots(ncols=nlevels, figsize=(8,3), sharex=True, sharey=True)
+    if '|0> center new' in lf.conf['parameter']:
+        new = np.array([lf.conf['parameter'][f'|{i}> center new'] for i in range(nlevels)])
+        old = np.array([lf.conf['parameter'][f'|{i}> center old'] for i in range(nlevels)])
+    else:
+        new = np.zeros((2,2))
+        old = np.zeros((2,2))
+
+    figsize = (6,3) if len(list_points) == 2 else (8,3)
+    fig, axs = plt.subplots(ncols=nlevels, figsize=figsize, sharex=True, sharey=True)
     fig.suptitle(lf.name.as_plot_title())
-    for i in range(nlevels):
-        axs[i].scatter(f'i{i}', f'q{i}', data=df, marker='.', color=f'C{i}')
+    for i, pts in enumerate(list_points):
+        axs[i].scatter(pts[:,0], pts[:,1], marker=f"${i}$", color=f'C{i}')
         axs[i].set_aspect('equal')
         axs[i].set_title(f'|{i}>')
-
+        axs[i].plot(old[:,0], old[:,1], ls='--', color='gray')
+        axs[i].plot(new[:,0], new[:,1], ls=':', color='k')
+        
     ro_mat = []
-    for i in range(nlevels):
-        stater.plot_regions(axs[i])
-        probs = stater.probs((df[f'i{i}'] + 1j*df[f'q{i}']).values)
+    for i, pts in enumerate(list_points):
+        stater.plot_regions(axs[i], label=False)
+        probs = stater.probs(pts)
+        ro_mat.append(probs)
         for j in range(nlevels):
             center = stater.centers[j]
-            axs[i].annotate(f'{probs[j]:.1%}\n', (center.real, center.imag), ha='center')
-        ro_mat.append(probs)
-
+            axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', (center[0], center[1]), ha='center')
+    
     if return_ro_mat:
         return fig, ro_mat
-    
-    return fig
+    else:
+        return fig
+
+def plot_visibility_kmeans(lf, return_ro_mat=False):
+    warnings.warn('state_disc.KMeans has been removed due to its instability. '
+                  'Use state_disc.NCenter instead.', DeprecationWarning)
+    return plot_visibility(lf, return_ro_mat=return_ro_mat)
+
+def plot_visibility_scatter(logf, **kwargs):
+    """Plot visibility, for iq_scatter experiments only."""
+    return rt.basic.IQScatter.from_logfile(logf).plot()
+
 
 def plot_xtalk(logf, slope=-0.01, offset=0.0, ax=None, **kwargs):
     """Plot 2d with a guide line. For xtalk data.
