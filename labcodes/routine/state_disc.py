@@ -48,7 +48,7 @@ class NCenter:
         self = cls(clf.centroids_)
         self._clf = clf
 
-        if plot is False: return self
+        if not plot: return self
 
         stater = self
         n_clusters = len(self.centers)
