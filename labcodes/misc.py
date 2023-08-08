@@ -305,15 +305,17 @@ def num2bstr(num: int, n_bits: int, base: int = 2) -> str:
     """
     new = np.base_repr(num, base).zfill(n_bits)
     old = _old_num2bstr(num, n_bits, base)
-    if new == old: return new
-    
-    logger.warning(
-        'Inconsistence found, '
-        f'_old_num2bstr(num={num}, n_bits={n_bits}, base={base}) = {old}, '
-        f'np.base_repr({num}, {base}).zfill({n_bits}) = {new}.',
-        stack_info=True,
-        stacklevel=2,
-    )
+    if new == old:
+        return new
+    else:
+        logger.warning(
+            'Inconsistence found, '
+            f'_old_num2bstr(num={num}, n_bits={n_bits}, base={base}) = {old}, '
+            f'np.base_repr({num}, {base}).zfill({n_bits}) = {new}.',
+            stack_info=True,
+            stacklevel=2,
+        )
+        return old
 
 def _old_num2bstr(num: int, n_bits: int, base: int = 2) -> str:
     if num >= base**n_bits:
@@ -330,7 +332,7 @@ def _old_num2bstr(num: int, n_bits: int, base: int = 2) -> str:
         if last_num // base == 0:
             break
     bit_string = ''.join([str(i) for i in l[::-1]])
-    return bit_string.zfill(n_bits)        
+    return bit_string.zfill(n_bits)
 
 
 def bitstrings(n_qbs, base=2):
