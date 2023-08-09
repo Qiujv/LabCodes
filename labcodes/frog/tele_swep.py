@@ -21,13 +21,15 @@ class qpt_tele_state:
     >>> qpt.plot_chi_4x2()
     <Figure size 1400x800 with 9 Axes>
     """
-    def __init__(self, lf:fileio.LogFile, kind=None):
+    def __init__(self, lf:fileio.LogFile, kind: Literal['fb', 'ps'] = None):
         self.lf = lf
+        df = lf.df
+        if 'run' not in df: df['run'] = 0  # For data with only one run.
         complete_runs = []
-        for run in lf.df['run'].unique():
-            if len(lf.df.query(f'run == {run}')) == 12:
+        for run in df['run'].unique():
+            if len(df.query(f'run == {run}')) == 12:
                 complete_runs.append(run)
-        self.df = lf.df.query(f'run in {complete_runs}')
+        self.df = df.query(f'run in {complete_runs}')
 
         self.selects = ['00', '01', '10', '11']
         self.rho_in = ts.rho_in
@@ -137,6 +139,11 @@ class qpt_tele_state:
         fname = self.lf.name
         fname.title = fname.title + f' Fchi_mean={self.Fchi["Fchi"].mean():.2%}'
         return fname
+    
+    def dump_chi_mean(self, fname: str = 'chi_exp.json'):
+        chi_mean = {select: self.chi('mean', select) for select in self.selects}
+        chi_mean['id'] = self.lf.name.id
+        return fileio.data_to_json(chi_mean, fname)
 
     def plot_chi_4x2(self, run='mean'):
         chi_dict = {select: self.chi(run, select) for select in self.selects}
@@ -158,7 +165,7 @@ class qpt_tele_state:
 
         cax = fig.add_axes([0.4, 0.5, 0.2, 0.01])
         fig.colorbar(ax_r.collections[0], cax=cax, orientation='horizontal')
-        fig.suptitle(self.fname.as_plot_title())
+        fig.suptitle(self.fname.as_plot_title(width=100))
         return fig
     
     def plot_rho_4x2(self, run='mean', select='00'):

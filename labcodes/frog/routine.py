@@ -175,7 +175,7 @@ def plot_iq_vs_freq(logf, axs=None):
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
-def plot_visibility(lf, return_ro_mat=False):
+def plot_iq_scatter(lf, return_ro_mat=False):
     df:pd.DataFrame = lf.df
     nlevels = 0
     while f'i{nlevels}' in df: nlevels += 1
@@ -188,6 +188,9 @@ def plot_visibility(lf, return_ro_mat=False):
     if '|0> center new' in lf.conf['parameter']:
         new = np.array([lf.conf['parameter'][f'|{i}> center new'] for i in range(nlevels)])
         old = np.array([lf.conf['parameter'][f'|{i}> center old'] for i in range(nlevels)])
+    elif '-|0> center new' in lf.conf['parameter']:
+        new = np.array([lf.conf['parameter'][f'-|{i}> center new'] for i in range(nlevels)])
+        old = np.array([lf.conf['parameter'][f'-|{i}> center old'] for i in range(nlevels)])
     else:
         new = np.zeros((2,2))
         old = np.zeros((2,2))
@@ -215,11 +218,16 @@ def plot_visibility(lf, return_ro_mat=False):
         return fig, ro_mat
     else:
         return fig
+    
+def plot_visibility(lf, return_ro_mat=False):
+    warnings.warn('plot_visi is deprecated. Use plot_iq_scatter instead.', 
+                  DeprecationWarning)
+    return plot_iq_scatter(lf, return_ro_mat=return_ro_mat)
 
 def plot_visibility_kmeans(lf, return_ro_mat=False):
     warnings.warn('state_disc.KMeans has been removed due to its instability. '
                   'Use state_disc.NCenter instead.', DeprecationWarning)
-    return plot_visibility(lf, return_ro_mat=return_ro_mat)
+    return plot_iq_scatter(lf, return_ro_mat=return_ro_mat)
 
 def plot_visibility_scatter(logf, **kwargs):
     """Plot visibility, for iq_scatter experiments only."""

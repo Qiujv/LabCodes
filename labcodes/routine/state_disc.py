@@ -179,7 +179,7 @@ def flags_mq_from_1q(
 
     flags_mq = np.zeros(n_pts, dtype=int)
     for i, flags_1q in enumerate(list_flags):
-        flags_mq += np.asarray(flags_1q) * nlevels ** (n_qbs - i - 1)
+        flags_mq = flags_mq + np.asarray(flags_1q) * nlevels ** (n_qbs - i - 1)
 
     return flags_mq
 
