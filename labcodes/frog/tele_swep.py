@@ -17,24 +17,18 @@ class qpt_tele_state:
     """For state teleportation qpt data.
     
     >>> lf = fileio.read_labrad('//XLD2-PC2/labRAD_data/crab.dir/230716.dir/230807_245_tele_fb.dir', 433)
-    >>> qpt = qpt_tele_state(lf, 'fb')
-    >>> qpt.plot_chi_4x2()
-    <Figure size 1400x800 with 9 Axes>
+    >>> qpt = qpt_tele_state(lf)
+    >>> qpt.plot_chi()
+    <Figure size 800x500 with 8 Axes>
     """
     def __init__(self, lf:fileio.LogFile, kind: Literal['fb', 'ps'] = None):
         self.lf = lf
         df = lf.df
         if 'run' not in df: df['run'] = 0  # For data with only one run.
-        complete_runs = []
-        for run in df['run'].unique():
-            if len(df.query(f'run == {run}')) == 12:
-                complete_runs.append(run)
-        self.df = df.query(f'run in {complete_runs}')
-
-        self.selects = ['00', '01', '10', '11']
-        self.rho_in = ts.rho_in
-        self._rho = {select: {} for select in self.selects}
-        self._chi = {select: {} for select in self.selects}
+        df = df.groupby('run').filter(lambda df: len(df) == 12)
+        df['tomo_op'] = df['tomo_op'].replace(dict(zip([0,1,2], '0xy')))
+        df['init_state'] = df['init_state'].replace(dict(zip([0,1,2,3], '0xy1')))
+        self.df = df
 
         if kind is None:
             title = self.lf.name.title.lower()
@@ -52,10 +46,26 @@ class qpt_tele_state:
         else:
             raise ValueError(f'kind {kind} not recognized')
         
+        self.selects = ('00', '01', '10', '11')
+        self.rho_in = ts.rho_in
+        self._rho = {select: {} for select in self.selects}
+        self._chi = {select: {} for select in self.selects}
         try:
             self.constuct_all()
         except:
             logger.exception(f'failed to construct rho and chi for {self.lf.name}')
+
+    def probs(
+        self, 
+        run: Union[int, Literal['mean', 'ideal']] = 0, 
+        init_state: Literal['0', 'x', 'y', '1'] = '0', 
+        select: Literal['00', '01', '10', '11'] = '00',
+    ) -> pd.DataFrame:
+        probs = self.df.query(f'run == {run} & init_state == "{init_state}"')
+        probs = probs.set_index('tomo_op').loc[list('0xy'), [f'p{select}0', f'p{select}1']]
+        p_select = probs.sum(axis='columns')  # TODO: include this in result.
+        probs = probs.divide(p_select, axis='index')
+        return probs
 
     def rho(
         self, 
@@ -73,14 +83,8 @@ class qpt_tele_state:
         
         if run == 'ideal':
             return self.rho_ideal[select][init_state]
-            
-        init_state = '0xy1'.index(init_state)
-        tomo_op = [0, 1, 2]  # "I", "X/2", "Y/2"
-
-        probs = self.df.query(f'run == {run} & init_state == {init_state}')
-        probs = probs.set_index('tomo_op').loc[tomo_op, [f'p{select}0', f'p{select}1']]
-        p_select = probs.sum(axis='columns')
-        probs = probs.divide(p_select, axis='index')
+        
+        probs = self.probs(run, init_state, select)
         return tomo.qst(probs.values, 'tomo')
 
     def chi(
@@ -146,8 +150,8 @@ class qpt_tele_state:
         fname.title = fname.title + f' Fchi_mean={self.Fchi["Fchi"].mean():.2%}'
         return fname
     
-    def dump_chi_mean(self, fname: str = 'chi_exp.json'):
-        chi_mean = {select: self.chi('mean', select) for select in self.selects}
+    def dump_chi(self, fname: str = 'chi_exp.json', run='mean'):
+        chi_mean = {select: self.chi(run, select) for select in self.selects}
         chi_mean['id'] = self.lf.name.id
         return fileio.data_to_json(chi_mean, fname)
 
@@ -180,15 +184,20 @@ class qpt_tele_state:
         for i, (select, mat) in enumerate(chi_dict.items()):
             ax_r = axs.ravel()[2*i]
             ax_i = axs.ravel()[2*i+1]
-            plotter.plot_mat(mat.real, .2, -.2, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
-            plotter.plot_mat(mat.imag, .2, -.2, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+            plotter.plot_mat(mat.real, .3, -.3, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+            plotter.plot_mat(mat.imag, .3, -.3, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
             fid = misc.fidelity(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
         ax_r.set_xticks(range(4))
         ax_r.set_yticks(range(4))
         ax_r.set_xticklabels([])
         ax_r.set_yticklabels('IXYZ')
-        fig.suptitle(self.fname.as_plot_title(width=100))
+        fname = self.fname.copy()
+        fname.title = fname.title + f' run={run}'
+        fig.suptitle(fname.as_plot_title(width=100))
+        # cax = fig.add_axes([0.04, 0.9, 0.1, 0.01])
+        # fig.colorbar(fig.axes[0].collections[0], cax=cax, extend='both', location='top', 
+        #              orientation='horizontal', label=f'run={run}', ticks=[-.3,.3])
         return fig
     
     def plot_rho(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
@@ -208,7 +217,12 @@ class qpt_tele_state:
                 fid = misc.fidelity(mat, self.rho_ideal[select][init])
                 ax_r.set_ylabel(f'init={init},\nFrho={fid:.2%}')
             ax_r.set_xticks([])
-        fig.suptitle(self.fname.as_plot_title(width=100))
+        fname = self.fname.copy()
+        fname.title = fname.title + f' run={run}'
+        fig.suptitle(fname.as_plot_title(width=100))
+        # cax = fig.add_axes([0.03, 0.92, 0.1, 0.01])
+        # fig.colorbar(fig.axes[0].collections[0], cax=cax, extend='both', location='top', 
+        #              orientation='horizontal', label=f'run={run}', ticks=[-.5,.5])
         return fig
     
     def plot_fidelity(self) -> plt.Figure:
@@ -232,7 +246,7 @@ class qpt_tele_state:
         plot_panel(axs[2], df, 'Fx')
         plot_panel(axs[3], df, 'Fy')
         plot_panel(axs[4], df, 'F1')
-        axs[0].legend(ncols=4, loc='upper left')
+        axs[1].legend(ncols=4, loc='center left')
         axs[-1].set_xlabel('run')
         fig.suptitle(self.fname.as_plot_title())
         return fig
