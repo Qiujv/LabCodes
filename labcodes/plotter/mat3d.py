@@ -87,7 +87,8 @@ def plot_mat(
     ax.set_aspect('equal')
     if origin == 'upper':
         ax.tick_params(labelbottom=False, labeltop=True, direction='in')
-        ax.invert_yaxis()
+        # ax.invert_yaxis()
+        ax.yaxis.set_inverted(True)
     ax.margins(0)
     ax.autoscale_view()
     return ax

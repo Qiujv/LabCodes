@@ -57,7 +57,7 @@ class qpt_tele_state:
 
     def rho(
         self, 
-        run: Union[int, Literal['mean']] = 0, 
+        run: Union[int, Literal['mean', 'ideal']] = 0, 
         init_state: Literal['0', 'x', 'y', '1'] = '0', 
         select: Literal['00', '01', '10', '11'] = '00',
     ) -> np.ndarray:
@@ -68,6 +68,9 @@ class qpt_tele_state:
         if run == 'mean':
             return np.mean([self.rho(run, init_state, select) 
                             for run in self.df['run'].unique()], axis=0)
+        
+        if run == 'ideal':
+            return self.rho_ideal[select][init_state]
             
         init_state = '0xy1'.index(init_state)
         tomo_op = [0, 1, 2]  # "I", "X/2", "Y/2"
@@ -80,7 +83,7 @@ class qpt_tele_state:
 
     def chi(
         self, 
-        run: Union[int, Literal['mean']] = 0, 
+        run: Union[int, Literal['mean', 'ideal']] = 0, 
         select: Literal['00', '01', '10', '11'] = '00',
     ) -> np.ndarray:
         if run in self._chi[select]:
@@ -89,6 +92,9 @@ class qpt_tele_state:
         if run == 'mean':
             return np.mean([self.chi(run, select) 
                             for run in self.df['run'].unique()], axis=0)
+        
+        if run == 'ideal':
+            return self.chi_ideal[select]
         
         return tomo.qpt(
             [ts.rho_in[init] for init in '0xy1'],
@@ -134,11 +140,11 @@ class qpt_tele_state:
     
     @property
     def fname(self) -> fileio.LogName:
-        fname = self.lf.name
+        fname = self.lf.name.copy()
         fname.title = fname.title + f' Fchi_mean={self.Fchi["Fchi"].mean():.2%}'
         return fname
 
-    def plot_chi_4x2(self, run='mean'):
+    def plot_chi_4x2(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
         chi_dict = {select: self.chi(run, select) for select in self.selects}
 
         fig = plt.figure(figsize=(14,8), tight_layout=False)
@@ -161,8 +167,65 @@ class qpt_tele_state:
         fig.suptitle(self.fname.as_plot_title())
         return fig
     
-    def plot_rho_4x2(self, run='mean', select='00'):
-        raise NotImplementedError
+    def plot_chi(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
+        chi_dict = {select: self.chi(run, select) for select in self.selects}
+        fig, axs = plt.subplots(ncols=4, nrows=2, figsize=(8, 5), sharex=True, sharey=True)
+        for i, (select, mat) in enumerate(chi_dict.items()):
+            ax_r = axs.ravel()[2*i]
+            ax_i = axs.ravel()[2*i+1]
+            plotter.plot_mat(mat.real, .2, -.2, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+            plotter.plot_mat(mat.imag, .2, -.2, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+            fid = misc.fidelity(mat, self.chi_ideal[select])
+            ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
+        ax_r.set_xticks(range(4))
+        ax_r.set_yticks(range(4))
+        ax_r.set_xticklabels([])
+        ax_r.set_yticklabels('IXYZ')
+        fig.suptitle(self.fname.as_plot_title(width=100))
+        return fig
     
-    def plot_fidelity(self):
-        raise NotImplementedError
+    def plot_rho(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
+        fig = plt.figure(figsize=(10, 5), layout='constrained')
+        subfigs = fig.subfigures(ncols=4, nrows=1, wspace=0.02)
+        for ic, select in enumerate(self.selects):
+            subfig = subfigs[ic]
+            fchi = misc.fidelity(self.chi(run, select), self.chi_ideal[select])
+            subfig.suptitle(f'select={select}, Fchi={fchi:.2%}')
+            axs = subfig.subplots(ncols=2, nrows=4, sharex=True, sharey=True, gridspec_kw=dict(wspace=0))
+            for ir, init in enumerate('0xy1'):
+                ax_r = axs[ir, 0]
+                ax_i = axs[ir, 1]
+                mat = self.rho(run, init, select)
+                plotter.plot_mat(mat.real, .5, -.5, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+                plotter.plot_mat(mat.imag, .5, -.5, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+                fid = misc.fidelity(mat, self.rho_ideal[select][init])
+                ax_r.set_ylabel(f'init={init},\nFrho={fid:.2%}')
+            ax_r.set_xticks([])
+        fig.suptitle(self.fname.as_plot_title(width=100))
+        return fig
+    
+    def plot_fidelity(self) -> plt.Figure:
+        df = pd.concat(
+            [self.Fchi.set_index(['run', 'select']), 
+            self.Frho.set_index(['run', 'select'])],
+            axis='columns',
+        ).reset_index()
+
+        fig, axs = plt.subplots(nrows=5, sharex=True, figsize=(6,6))
+        def plot_panel(ax:plt.Axes, df:pd.DataFrame, yname:str):
+            ax.plot('run', yname, data=df.query('select=="00"'), label='00')
+            ax.plot('run', yname, data=df.query('select=="01"'), label='01')
+            ax.plot('run', yname, data=df.query('select=="10"'), label='10')
+            ax.plot('run', yname, data=df.query('select=="11"'), label='11')
+            ymean = df[yname].mean()
+            plotter.cursor(ax=ax, y=ymean, text=f'{ymean:.2%}', text_style=dict(ha='right'))
+            ax.set_ylabel(yname)
+        plot_panel(axs[0], df, 'Fchi')
+        plot_panel(axs[1], df, 'F0')
+        plot_panel(axs[2], df, 'Fx')
+        plot_panel(axs[3], df, 'Fy')
+        plot_panel(axs[4], df, 'F1')
+        axs[0].legend(ncols=4, loc='upper left')
+        axs[-1].set_xlabel('run')
+        fig.suptitle(self.fname.as_plot_title())
+        return fig
