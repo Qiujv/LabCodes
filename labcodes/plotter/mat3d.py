@@ -1,10 +1,13 @@
 """Functions for plotting matrice."""
 
-import numpy as np
+from itertools import product
+from typing import Callable, Literal, Union
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as patheffects
+import numpy as np
 from labcodes.plotter import misc
-from matplotlib.ticker import EngFormatter
 
 qutip_cmap = mpl.colors.LinearSegmentedColormap(
     'phase_colormap', 
@@ -30,6 +33,66 @@ try:
     cmap_phase = cmocean.cm.phase
 except ImportError:
     cmap_phase = None
+
+
+def plot_mat(
+    mat: np.ndarray,
+    zmax: float = None,
+    zmin: float = None,
+    ax: plt.Axes = None,
+    cmap='RdBu_r',
+    fmt: Callable[[float], str] = '{:.2f}'.format,
+    omit_below: Union[float, None] = None,
+    origin: Literal['lower', 'upper'] = 'upper',
+    vary_size: bool = False,
+) -> plt.Axes:
+    """Plot matrix values in a 2d grid.
+    
+    >>> plot_mat(np.random.rand(4, 4) - 0.5)
+    <Axes: >
+    """
+    if ax is None: fig, ax = plt.subplots(figsize=(3,3))
+    if zmax is None: zmax = np.max(mat)
+    if zmin is None: zmin = np.min(mat)
+    xdim, ydim = mat.shape
+    cmap = mpl.colormaps.get_cmap(cmap)
+    norm, extend_cbar = misc.get_norm(mat, cmin=zmin, cmax=zmax)
+    if vary_size:
+        size = np.abs(mat).clip(0, zmax) / zmax * 0.9 + 0.1
+    else:
+        size = np.ones_like(mat)
+
+    squares = []
+    colors = []
+    for x, y in product(range(xdim), range(ydim)):
+        v = mat[x, y]
+        s = size[x, y]
+        if omit_below is not None:
+            if np.abs(v) <= omit_below: continue
+        squares.append(mpl.patches.Rectangle((x-s/2, y-s/2), s, s))
+        c = cmap(norm(v))
+        colors.append(c)
+        # Use black text if squares are light; otherwise white. See https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.convert
+        txt_color = 'k' if (.299*c[0] + .587*c[1] + .114*c[2]) > 0.5 else 'w'
+        txt = ax.annotate(fmt(v), (x, y), ha='center', va='center', color=txt_color)
+        stroke_color = 'k' if txt_color == 'w' else 'w'
+        txt.set_path_effects(
+            [patheffects.withStroke(linewidth=1, foreground=stroke_color, alpha=.5)])
+
+    col = mpl.collections.PatchCollection(squares, facecolors=colors, cmap=cmap, 
+                                          norm=norm, linewidth=0)
+    ax.add_collection(col)
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(mpl.ticker.MultipleLocator(1))
+    ax.set_aspect('equal')
+    if origin == 'upper':
+        ax.tick_params(labelbottom=False, labeltop=True, direction='in')
+        # ax.invert_yaxis()
+        ax.yaxis.set_inverted(True)
+    ax.margins(0)
+    ax.autoscale_view()
+    return ax
+
 
 def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwargs):
     """Plot matrix values in a 2d grid."""
@@ -266,3 +329,8 @@ def plot_complex_mat3d(mat, axs=None, cmin=None, cmax=None, cmap='bwr', colorbar
     plot_mat3d(mat.imag, ax=ax_imag, **kwargs)
 
     return ax_real, ax_imag
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
