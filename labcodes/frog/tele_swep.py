@@ -182,10 +182,8 @@ class qpt_tele_state:
     def fname(self) -> fileio.LogName:
         fname = self.lf.name.copy()
         fchi_mean = self.Fchi['Fchi'].mean()
-        # fchi_std = self.Fchi['Fchi'].std()  # TODO: which is correct?
-        fchi_std = np.mean([self.Fchi.query(f'select == "{select}"')['Fchi'].std()
-                            for select in self.selects])
-        fname.title = fname.title + f' Fchi_mean={fchi_mean:.2%}±{fchi_std:.2%}'
+        fchi_std = self.Fchi.groupby('run')['Fchi'].mean().std()  # As previous.
+        fname.title += f' Fchi_mean={fchi_mean:.2%}±{fchi_std:.2%},runs{self.df.run.max()+1}'
         return fname
     
     def dump_chi(self, fname: str = 'chi_exp.json', run='mean'):
@@ -196,7 +194,8 @@ class qpt_tele_state:
     def plot_chi_4x2(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
         chi_dict = {select: self.chi(run, select) for select in self.selects}
 
-        fig = plt.figure(figsize=(14,8), tight_layout=False)
+        fig = plt.figure(figsize=(10,5))
+        fig.set_layout_engine('compressed')  # Setting tight_layout=False not working.
         for i, (select, mat) in enumerate(chi_dict.items()):
             ax_r:plt.Axes = fig.add_subplot(2, 4, 2*i+1, projection='3d')
             ax_i:plt.Axes = fig.add_subplot(2, 4, 2*i+2, projection='3d')
@@ -204,14 +203,17 @@ class qpt_tele_state:
             # Ok for run=='mean' because `fid` is linear.
             fid = misc.fidelity(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
-            ax_r.collections[0].set_linewidth(0.2)
-            ax_r.set_xticklabels('IXYZ')
-            ax_r.set_yticklabels('IXYZ')
-            ax_i.collections[0].set_linewidth(0.2)
-            ax_i.set_xticklabels('IXYZ')
-            ax_i.set_yticklabels('IXYZ')
-
-        cax = fig.add_axes([0.45, 0.5, 0.1, 0.01])
+            for ax in ax_r, ax_i:
+                ax.set_zlim(-0.5, 0.5)
+                ax.set_zticks([0, 0.5])
+                ax.collections[0].set_linewidth(0.2)
+                ax.set_xticklabels('IXYZ')
+                ax.set_yticklabels('IXYZ')
+                ax.tick_params('both', pad=0, labelsize='small')
+                for txt in ax.texts:
+                    if abs(float(txt.get_text())) <= 5e-3: txt.remove()
+                    txt.set_fontsize('x-small')
+        cax = fig.add_axes([0.4, 0.48, 0.1, 0.01])
         fig.colorbar(ax_r.collections[0], cax=cax, orientation='horizontal')
         fig.suptitle(self.fname.as_plot_title(width=100))
         return fig
@@ -416,7 +418,9 @@ class qpt_tele_gate:
     @property
     def fname(self) -> fileio.LogName:
         fname = self.lf.name.copy()
-        fname.title = fname.title + f' Fchi_mean={self.Fchi["Fchi"].mean():.2%}'
+        fchi_mean = self.Fchi['Fchi'].mean()
+        fchi_std = self.Fchi.groupby('run')['Fchi'].mean().std()  # As previous.
+        fname.title += f' Fchi_mean={fchi_mean:.2%}±{fchi_std:.2%},runs{self.df.run.max()+1}'
         return fname
     
     def dump_chi(self, fname: str = 'chi_exp.json', run='mean'):
@@ -427,8 +431,8 @@ class qpt_tele_gate:
     def plot_chi_4x2(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
         chi_dict = {select: self.chi(run, select) for select in self.selects}
 
-        ticklabels = [i+j for i,j in product('IXYZ', repeat=2)]
-        fig = plt.figure(figsize=(14,8), tight_layout=False)
+        fig = plt.figure(figsize=(10,4.5))
+        fig.set_layout_engine('none')  # Setting tight_layout=False not working.
         for i, (select, mat) in enumerate(chi_dict.items()):
             ax_r:plt.Axes = fig.add_subplot(2, 4, 2*i+1, projection='3d')
             ax_i:plt.Axes = fig.add_subplot(2, 4, 2*i+2, projection='3d')
@@ -436,39 +440,44 @@ class qpt_tele_gate:
                                     colorbar=False, label=False)
             # Ok for run=='mean' because `fid` is linear.
             fid = misc.fidelity(mat, self.chi_ideal[select])
-            ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
+            ax_r.set_title(f'select={select}, Fchi={fid:.2%}', y=0.92)
             for ax in ax_r, ax_i:
                 ax.set_zlim(-0.25, 0.25)
                 ax.set_zticks([0, 0.25])
                 ax.collections[0].set_linewidth(0.2)
-                ax.set_xticklabels(ticklabels)
-                ax.set_yticklabels(ticklabels)
-                ax.tick_params('both', pad=0, labelsize='small')
-                ax.tick_params('x', labelrotation=45)
-                ax.tick_params('y', labelrotation=-45)
+                ax.set_xticklabels([])
+                ax.set_yticklabels([])
+                ax.tick_params('z', pad=0, labelsize='x-small')
 
-        cax = fig.add_axes([0.45, 0.5, 0.1, 0.01])
-        fig.colorbar(ax_r.collections[0], cax=cax, orientation='horizontal')
+        cax = fig.add_axes([0.475, 0.5, 0.05, 0.01])
+        fig.colorbar(ax_r.collections[0], cax=cax, orientation='horizontal', location='top',
+                    ticks=[-.25, .25])
         fig.suptitle(self.fname.as_plot_title(width=100))
+        fig.subplots_adjust(wspace=0, hspace=0)
         return fig
     
     def plot_chi(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
         chi_dict = {select: self.chi(run, select) for select in self.selects}
-        fig, axs = plt.subplots(ncols=2, nrows=4, figsize=(10, 22), sharex=True, sharey=True)
+        fmt = lambda x: f'{x*100:.1f}'
+        fig, axs = plt.subplots(ncols=2, nrows=4, figsize=(8, 16), sharex=True, sharey=True)
+        fig.set_layout_engine('compressed')
         for i, (select, mat) in enumerate(chi_dict.items()):
             ax_r = axs.ravel()[2*i]
             ax_i = axs.ravel()[2*i+1]
-            plotter.plot_mat(mat.real, .2, -.2, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=1e-2)
-            plotter.plot_mat(mat.imag, .2, -.2, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=1e-2)
+            plotter.plot_mat(mat.real, .2, -.2, ax=ax_r, vary_size=True, fmt=fmt, omit_below=5e-3)
+            plotter.plot_mat(mat.imag, .2, -.2, ax=ax_i, vary_size=True, fmt=fmt, omit_below=5e-3)
             fid = misc.fidelity(mat, self.chi_ideal[select])
-            ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
+            ax_r.set_title(f'select={select}, Fchi={fid:.2%}', fontdict=dict(fontsize='small'))
+            ax_r.set_xlim(-.5, 15.5)
+            ax_r.set_ylim(-.5, 15.5)
+            ax_r.set_xticks(range(16))
+            ax_r.set_yticks(range(16))
+            ax_r.set_xticklabels([])
+            ax_r.set_yticklabels([i+j for i,j in product('IXYZ', repeat=2)])
+            ax_r.tick_params('both', labelsize='x-small', pad=0.1)
         for ax in axs.ravel():
             for txt in ax.texts:
                 txt.set_fontsize('x-small')
-        ax_r.set_xticks(range(16))
-        ax_r.set_yticks(range(16))
-        ax_r.set_xticklabels([])
-        ax_r.set_yticklabels([i+j for i,j in product('IXYZ', repeat=2)])
         fname = self.fname.copy()
         fname.title = fname.title + f' run={run}'
         fig.suptitle(fname.as_plot_title(width=100))
@@ -481,7 +490,6 @@ class qpt_tele_gate:
             axis='columns',
         ).reset_index()
 
-        fig, axs = plt.subplots(nrows=17, sharex=True, figsize=(6,10), gridspec_kw=dict(hspace=0))
         def plot_panel(ax:plt.Axes, df:pd.DataFrame, yname:str):
             ax.plot('run', yname, data=df.query('select=="00"'), label='00')
             ax.plot('run', yname, data=df.query('select=="01"'), label='01')
@@ -489,11 +497,46 @@ class qpt_tele_gate:
             ax.plot('run', yname, data=df.query('select=="11"'), label='11')
             ymean = df[yname].mean()
             plotter.cursor(ax=ax, y=ymean, text=f'{ymean:.2%}', text_style=dict(ha='right'))
-            ax.set_ylabel(yname)
-        plot_panel(axs[0], df, 'Fchi')
+
+        fig = plt.figure(figsize=(8,6))
+        fig.set_layout_engine('none')
+        gs = fig.add_gridspec(5, 4, hspace=0.2, wspace=0.2)
         for i, init in enumerate(self.QPT_INITS):
-            plot_panel(axs[i+1], df, f'F{init}')
-        axs[0].legend(ncols=4, loc='center left')
-        axs[-1].set_xlabel('run')
-        fig.suptitle(self.fname.as_plot_title())
+            ax = fig.add_subplot(gs[i//4+1, i%4])
+            plot_panel(ax, df, f'F{init}')
+            ax.set_title(f'F{init}', fontdict=dict(fontsize='x-small'), y=0.9)
+            ax.tick_params(axis='both', labelsize='x-small', pad=0.1)
+            if i < 12:
+                ax.set_xticklabels([])
+            else:
+                ax.set_xlabel('run', fontsize='x-small')
+        ax0 = fig.add_subplot(gs[0,:], sharex=ax)
+        plot_panel(ax0, df, 'Fchi')
+        ax0.set_xticklabels([])
+        ax0.tick_params(axis='y', labelsize='x-small', pad=0.1)
+        ax0.legend(loc='center left')
+        fig.suptitle(self.fname.as_plot_title(width=100))
+        return fig
+
+    def plot_rho(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
+        logger.warning('large plot, very slow!')
+        fig = plt.figure(figsize=(15,30), layout='constrained')
+        subfigs = fig.subfigures(ncols=4, nrows=1, wspace=0.02)
+        for ic, select in enumerate(self.selects):
+            subfig = subfigs[ic]
+            fchi = misc.fidelity(self.chi(run, select), self.chi_ideal[select])
+            subfig.suptitle(f'select={select}, Fchi={fchi:.2%}')
+            axs = subfig.subplots(ncols=2, nrows=16, sharex=True, sharey=True, gridspec_kw=dict(wspace=0))
+            for ir, init in enumerate(self.QPT_INITS):
+                ax_r = axs[ir, 0]
+                ax_i = axs[ir, 1]
+                mat = self.rho(run, init, select)
+                plotter.plot_mat(mat.real, .5, -.5, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+                plotter.plot_mat(mat.imag, .5, -.5, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
+                fid = misc.fidelity(mat, self.rho_ideal[select][init])
+                ax_r.set_ylabel(f'init={init},\nFrho={fid:.2%}')
+            ax_r.set_xticks([])
+        fname = self.fname.copy()
+        fname.title = fname.title + f' run={run}'
+        fig.suptitle(fname.as_plot_title(width=100))
         return fig

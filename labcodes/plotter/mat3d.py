@@ -239,7 +239,7 @@ def _plot_mat3d(ax, mat, cval, cmin=None, cmax=None, cmap='bwr', alpha=1.0, labe
         for x, y, z in zip(xpos, ypos, dz):
             msg = fmt(z)
             ax.text(x+bar_width/2, y+bar_width/2, z, msg, ha='center', va='bottom',
-                    bbox=dict(fill=True, color='white', alpha=0.4))
+                    path_effects=[patheffects.withStroke(linewidth=0.5, foreground='w')])
 
     ax.set(
         xticks=np.arange(1, mat.shape[0] + 1, 1),
