@@ -456,6 +456,31 @@ class qpt_tele_gate:
         fig.subplots_adjust(wspace=0, hspace=0)
         return fig
     
+    # TODO: run = mean.
+    def plot_truth_table(self, run: Union[int, Literal['mean', 'ideal']] = 0) -> plt.Figure:
+        fig, axs = plt.subplots(ncols=4, figsize=(8, 3), sharex=True, sharey=True)
+        fig.set_layout_engine('compressed')
+        for ax, select in zip(axs, ['00', '01', '10', '11']):
+            truth_table = np.vstack([
+                self.probs(run=run, init_state=input, select=select).loc['00',:].values
+                for input in ['00', '01', '10', '11']
+            ])
+            plotter.plot_mat(truth_table.T, ax=ax, zmax=1, zmin=0, cmap='Blues', 
+                            omit_below=0.03, vary_size=True, fmt='{:.1%}'.format)
+            ax.set_title('Select ' + select)
+            ax.set_xlabel('Input')
+            ax.set_xticks(np.arange(4))
+            ax.set_xticklabels(['00', '01', '10', '11'])
+            for txt in ax.texts:
+                txt.set_fontsize('small')
+        axs[0].set_ylabel('Output')
+        axs[0].set_yticks(np.arange(4))
+        axs[0].set_yticklabels(['00', '01', '10', '11'])
+        fname = self.fname.copy()
+        fname.title = fname.title + f' run={run}'
+        fig.suptitle(fname.as_plot_title(width=100))
+        return fig
+    
     def plot_chi(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
         chi_dict = {select: self.chi(run, select) for select in self.selects}
         fmt = lambda x: f'{x*100:.1f}'
@@ -512,10 +537,39 @@ class qpt_tele_gate:
                 ax.set_xlabel('run', fontsize='x-small')
         ax0 = fig.add_subplot(gs[0,:], sharex=ax)
         plot_panel(ax0, df, 'Fchi')
+        ax0.set_title('Fchi', fontdict=dict(fontsize='x-small'), y=0.9)
         ax0.set_xticklabels([])
         ax0.tick_params(axis='y', labelsize='x-small', pad=0.1)
         ax0.legend(loc='center left')
         fig.suptitle(self.fname.as_plot_title(width=100))
+        return fig
+
+    def plot_bell(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
+        fmt = lambda x: f'{x*100:.1f}'
+        fig = plt.figure(figsize=(10, 5), layout='constrained')
+        subfigs = fig.subfigures(ncols=4, nrows=1, hspace=0, wspace=0)
+        for ic, select in enumerate(self.selects):
+            subfig = subfigs[ic]
+            fchi = misc.fidelity(self.chi(run, select), self.chi_ideal[select])
+            subfig.suptitle(f'select={select}, Fchi={fchi:.2%}')
+            axs = subfig.subplots(ncols=2, nrows=4, sharex=True, sharey=True, 
+                                  gridspec_kw=dict(wspace=0, hspace=0))
+            for ir, init in enumerate(['y0', 'y1', 'x0', 'x1']):
+                ax_r = axs[ir, 0]
+                ax_i = axs[ir, 1]
+                mat = self.rho(run, init, select)
+                plotter.plot_mat(mat.real, .4, -.4, ax=ax_r, vary_size=True, fmt=fmt, omit_below=3e-2)
+                plotter.plot_mat(mat.imag, .4, -.4, ax=ax_i, vary_size=True, fmt=fmt, omit_below=3e-2)
+                fid = misc.fidelity(mat, self.rho_ideal[select][init])
+                ax_r.set_ylabel(f'init={init},\nFrho={fid:.2%}', fontdict=dict(fontsize='x-small'))
+                ax_r.tick_params('both', labelsize='x-small', pad=0.1)
+                ax_i.tick_params('both', labelsize='x-small', pad=0.1)
+                for txt in ax_r.texts + ax_i.texts:
+                    txt.set_fontsize('x-small')
+            ax_r.set_xticks([])
+        fname = self.fname.copy()
+        fname.title = fname.title + f' run={run}'
+        fig.suptitle(fname.as_plot_title(width=100))
         return fig
 
     def plot_rho(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:

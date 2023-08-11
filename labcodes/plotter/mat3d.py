@@ -51,6 +51,7 @@ def plot_mat(
     >>> plot_mat(np.random.rand(4, 4) - 0.5)
     <Axes: >
     """
+    mat = mat.T  # Make it same as plt.imshow.
     if ax is None: fig, ax = plt.subplots(figsize=(3,3))
     if zmax is None: zmax = np.max(mat)
     if zmin is None: zmin = np.min(mat)
@@ -86,8 +87,8 @@ def plot_mat(
     ax.yaxis.set_major_locator(mpl.ticker.MultipleLocator(1))
     ax.set_aspect('equal')
     if origin == 'upper':
-        ax.tick_params(labelbottom=False, labeltop=True, direction='in')
-        # ax.invert_yaxis()
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.set_ticks_position('top')
         ax.yaxis.set_inverted(True)
     ax.margins(0)
     ax.autoscale_view()
