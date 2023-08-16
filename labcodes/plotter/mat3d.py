@@ -264,9 +264,8 @@ def plot_mat3d(mat, ax=None, alpha=1.0, label=True, fmt=None,
     - To adjust view angle: `ax.view_init(azim=30, elev=60)`
     """
     if ax is None:
-        fig = plt.figure(tight_layout=False)
+        fig = plt.figure(layout='none')
         ax = fig.add_subplot(projection='3d')
-        
     else:
         fig = ax.get_figure()
 
@@ -306,7 +305,7 @@ def plot_complex_mat3d(mat, axs=None, cmin=None, cmax=None, cmap='bwr', colorbar
     """Plot 3d bar for complex matrix, both the real and imag part on two axes.
     """
     if axs is None:
-        fig = plt.figure(figsize=(9,4), tight_layout=False)
+        fig = plt.figure(figsize=(9,4), layout='none')
         ax_real = fig.add_subplot(1,2,1,projection='3d')
         ax_imag = fig.add_subplot(1,2,2,projection='3d')
     else:

@@ -95,6 +95,14 @@ class qpt_tele_state:
         init_state: Literal['0', 'x', 'y', '1'] = '0', 
         select: Literal['00', '01', '10', '11'] = '00',
     ) -> pd.DataFrame:
+        if run == 'mean':
+            vals = np.mean([self.probs(run, init_state, select).values 
+                            for run in self.df['run'].unique()], axis=0)
+            return pd.DataFrame(vals, index=self.probs().index, 
+                                columns=self.probs().columns)
+        elif run == 'ideal':
+            raise ValueError('run="ideal" not supported for probs')
+        
         probs = self.df.query(f'run == {run} & init_state == "{init_state}"')
         probs = probs.set_index('tomo_op').loc[self.TOMO_OPS, [f'p{select}0', f'p{select}1']]
         p_select = probs.sum(axis='columns')  # TODO: include this in result.
@@ -332,6 +340,14 @@ class qpt_tele_gate:
         init_state: str = '00', 
         select: Literal['00', '01', '10', '11'] = '00',
     ) -> pd.DataFrame:
+        if run == 'mean':
+            vals = np.mean([self.probs(run, init_state, select).values 
+                            for run in self.df['run'].unique()], axis=0)
+            return pd.DataFrame(vals, index=self.probs().index, 
+                                columns=self.probs().columns)
+        elif run == 'ideal':
+            raise ValueError('run="ideal" not supported for probs')
+        
         probs = self.df.query(f'run == {run} & init_state == "{init_state}"')
         probs = probs.set_index('tomo_op').loc[self.TOMO_OPS, [f'p0{select}0', f'p0{select}1', f'p1{select}0', f'p1{select}1']]
         p_select = probs.sum(axis='columns')  # TODO: include this in result.
@@ -456,7 +472,6 @@ class qpt_tele_gate:
         fig.subplots_adjust(wspace=0, hspace=0)
         return fig
     
-    # TODO: run = mean.
     def plot_truth_table(self, run: Union[int, Literal['mean', 'ideal']] = 0) -> plt.Figure:
         fig, axs = plt.subplots(ncols=4, figsize=(8, 3), sharex=True, sharey=True)
         fig.set_layout_engine('compressed')
