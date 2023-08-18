@@ -8,7 +8,7 @@ Codes used in SUSTech superconducting quantum lab.
 
 `models`: Fitting models with pre-defined initial value guess functions.
 
-`plotter`: Data plotting routine for data generated in 2d sweep or other experiments.
+`plotter`: Data plotting routines for data generated in 2d sweep or other experiments.
 
 `fileio`: Reading and writing data files, supports Labber, LabRAD, LTspice;
 

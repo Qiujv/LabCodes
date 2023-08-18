@@ -1,4 +1,4 @@
-"""Functions for plotting matrice."""
+"""Functions for plotting matrices."""
 
 from itertools import product
 from typing import Callable, Literal, Union

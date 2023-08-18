@@ -1,6 +1,4 @@
-"""Functions for general 2d plot.
-"""
-
+"""Functions for general 2d plot."""
 
 import numpy as np
 import matplotlib.pyplot as plt
