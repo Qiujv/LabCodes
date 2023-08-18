@@ -160,6 +160,8 @@ def qst(
     >>> np.allclose([[1,0],[0,0]], rho_fit, atol=1e-5)
     True
     """
+    probs = np.asarray(probs).ravel()
+    
     # Infer number of qubits.
     if tomo_ops == "ixy":
         n_ops = 3
@@ -559,7 +561,7 @@ def qpt_lstsq(
         return chi
 
 
-check_tolerance = 1e-5
+check_tolerance = 5e-5
 
 
 def warn_if_not_herm_unit_or_pos(mat: np.matrix, atol: float = None) -> None:
@@ -621,6 +623,8 @@ def random_density_matrix(n_dim: int, pure: bool = False) -> np.matrix:
     return rho
 
 
+# TODO: get_rho(state_vector) -> density_matrix
+# TODO: get_chi(operation_matrix) -> chi matrix.
 def get_probs(
     rho: np.matrix,
     tomo_ops: Union[list[np.matrix], Literal["ixy", "oct"]] = "ixy",
@@ -777,7 +781,7 @@ def overlap(a: np.matrix, b: np.matrix) -> float:
     True
     """
     a, b = np.asarray(a), np.asarray(b)
-    if not np.isclose(purity(a), 1) or not np.isclose(purity(b), 1):
+    if not np.isclose(purity(a), 1) and not np.isclose(purity(b), 1):
         logger.warning("overlap is only correct if at least one operand is a pure")
     return np.real(np.trace(a @ b))
 

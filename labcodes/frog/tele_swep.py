@@ -11,8 +11,7 @@ from tqdm import tqdm
 
 import labcodes.frog.tele_state as ts
 import labcodes.frog.tele_gate as tg
-import labcodes.frog.pyle_tomo as tomo
-from labcodes import fileio, misc, plotter, state_disc
+from labcodes import fileio, plotter, state_disc, tomo
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,6 @@ class qpt_tele_state:
             raise ValueError(f'kind {kind} not recognized')
         
         self.selects = ('00', '01', '10', '11')
-        self.rho_in = ts.rho_in
         self._rho = {select: {} for select in self.selects}
         self._chi = {select: {} for select in self.selects}
         try:
@@ -127,7 +125,7 @@ class qpt_tele_state:
             return self.rho_ideal[select][init_state]
         
         probs = self.probs(run, init_state, select)
-        return tomo.qst(probs.values, 'tomo')
+        return tomo.qst(probs.values)
 
     def chi(
         self, 
@@ -144,11 +142,7 @@ class qpt_tele_state:
         if run == 'ideal':
             return self.chi_ideal[select]
         
-        return tomo.qpt(
-            [self.rho_in[init] for init in self.QPT_INITS],
-            [self.rho(run, init, select) for init in self.QPT_INITS],
-            'sigma',
-        )
+        return tomo.qpt([self.rho(run, init, select) for init in self.QPT_INITS])
     
     def constuct_all(self) -> None:
         for run in self.df['run'].unique():
@@ -168,7 +162,7 @@ class qpt_tele_state:
             for select in self.selects:
                 rec = {'run': run, 'select': select}
                 for init in self.QPT_INITS:
-                    rec[f'F{init}'] = misc.fidelity(
+                    rec[f'F{init}'] = tomo.fid_overlap(
                         self.rho(run, init, select),
                         self.rho_ideal[select][init.lower()],
                     )
@@ -181,8 +175,8 @@ class qpt_tele_state:
         for run in self.df['run'].unique():
             for select in self.selects:
                 rec = {'run': run, 'select': select}
-                rec['Fchi'] = misc.fidelity(self.chi(run, select),
-                                            self.chi_ideal[select])
+                rec['Fchi'] = tomo.fid_overlap(self.chi(run, select),
+                                               self.chi_ideal[select])
                 records.append(rec)
         return pd.DataFrame.from_records(records)
     
@@ -209,7 +203,7 @@ class qpt_tele_state:
             ax_i:plt.Axes = fig.add_subplot(2, 4, 2*i+2, projection='3d')
             plotter.plot_complex_mat3d(mat, [ax_r, ax_i], cmin=-1, cmax=1, colorbar=False)
             # Ok for run=='mean' because `fid` is linear.
-            fid = misc.fidelity(mat, self.chi_ideal[select])
+            fid = tomo.fid_overlap(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
             for ax in ax_r, ax_i:
                 ax.set_zlim(-0.5, 0.5)
@@ -234,7 +228,7 @@ class qpt_tele_state:
             ax_i = axs.ravel()[2*i+1]
             plotter.plot_mat(mat.real, .3, -.3, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
             plotter.plot_mat(mat.imag, .3, -.3, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
-            fid = misc.fidelity(mat, self.chi_ideal[select])
+            fid = tomo.fid_overlap(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
         ax_r.set_xticks(range(4))
         ax_r.set_yticks(range(4))
@@ -250,7 +244,7 @@ class qpt_tele_state:
         subfigs = fig.subfigures(ncols=4, nrows=1, wspace=0.02)
         for ic, select in enumerate(self.selects):
             subfig = subfigs[ic]
-            fchi = misc.fidelity(self.chi(run, select), self.chi_ideal[select])
+            fchi = tomo.fid_overlap(self.chi(run, select), self.chi_ideal[select])
             subfig.suptitle(f'select={select}, Fchi={fchi:.2%}')
             axs = subfig.subplots(ncols=2, nrows=4, sharex=True, sharey=True, gridspec_kw=dict(wspace=0))
             for ir, init in enumerate('0xy1'):
@@ -259,7 +253,7 @@ class qpt_tele_state:
                 mat = self.rho(run, init, select)
                 plotter.plot_mat(mat.real, .5, -.5, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
                 plotter.plot_mat(mat.imag, .5, -.5, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
-                fid = misc.fidelity(mat, self.rho_ideal[select][init])
+                fid = tomo.fid_overlap(mat, self.rho_ideal[select][init])
                 ax_r.set_ylabel(f'init={init},\nFrho={fid:.2%}')
             ax_r.set_xticks([])
         fname = self.fname.copy()
@@ -298,7 +292,12 @@ class qpt_tele_gate:
     TOMO_OPS = ('00','0x','0y','x0','xx','xy','y0','yx','yy')
     QPT_INITS = ('00','0x','0y','01','x0','xx','xy','x1','y0','yx','yy','y1','10','1x','1y','11')
     """For gate teleportation qpt data."""
-    def __init__(self, lf:fileio.LogFile, kind: Literal['fb', 'ps'] = None):
+    def __init__(
+        self,
+        lf:fileio.LogFile,
+        kind: Literal['fb', 'ps'] = None,
+        ro_mat: np.matrix = ((1, 0, 0, 0),(0, 1, 0, 0),(0, 0, 1, 0),(0, 0, 0, 1)),
+    ):
         self.lf = lf
         df = lf.df
         if 'run' not in df: df['run'] = 0  # For data with only one run.
@@ -325,8 +324,8 @@ class qpt_tele_gate:
         else:
             raise ValueError(f'kind {kind} not recognized')
         
+        self.ro_mat = np.asarray(ro_mat)
         self.selects = ('00', '01', '10', '11')
-        self.rho_in = tg.rho_in
         self._rho = {select: {} for select in self.selects}
         self._chi = {select: {} for select in self.selects}
         try:
@@ -339,9 +338,10 @@ class qpt_tele_gate:
         run: Union[int, Literal['mean', 'ideal']] = 0, 
         init_state: str = '00', 
         select: Literal['00', '01', '10', '11'] = '00',
+        ro_mat: np.matrix = None,
     ) -> pd.DataFrame:
         if run == 'mean':
-            vals = np.mean([self.probs(run, init_state, select).values 
+            vals = np.mean([self.probs(run, init_state, select, ro_mat).values 
                             for run in self.df['run'].unique()], axis=0)
             return pd.DataFrame(vals, index=self.probs().index, 
                                 columns=self.probs().columns)
@@ -352,6 +352,11 @@ class qpt_tele_gate:
         probs = probs.set_index('tomo_op').loc[self.TOMO_OPS, [f'p0{select}0', f'p0{select}1', f'p1{select}0', f'p1{select}1']]
         p_select = probs.sum(axis='columns')  # TODO: include this in result.
         probs = probs.divide(p_select, axis='index')
+        if ro_mat is None:
+            ro_mat = self.ro_mat
+        else:
+            ro_mat = np.asarray(ro_mat)
+        probs = probs @ np.linalg.inv(ro_mat).T
         return probs
 
     def rho(
@@ -372,7 +377,7 @@ class qpt_tele_gate:
             return self.rho_ideal[select][init_state]
 
         probs = self.probs(run, init_state, select)
-        return tomo.qst(probs.values, 'tomo2')
+        return tomo.qst(probs.values)
 
     def chi(
         self, 
@@ -389,14 +394,10 @@ class qpt_tele_gate:
         if run == 'ideal':
             return self.chi_ideal[select]
         
-        return tomo.qpt(
-            [self.rho_in[init] for init in self.QPT_INITS],
-            [self.rho(run, init, select) for init in self.QPT_INITS],
-            'sigma2',
-        )
+        return tomo.qpt([self.rho(run, init, select) for init in self.QPT_INITS])
     
     def constuct_all(self) -> None:
-        for run in self.df['run'].unique():
+        for run in tqdm(self.df['run'].unique()):
             if len(self.df.query(f'run == {run}')) != 144:
                 logger.warning(f'run {run} does not have 144 tomo points')
                 continue
@@ -413,7 +414,7 @@ class qpt_tele_gate:
             for select in self.selects:
                 rec = {'run': run, 'select': select}
                 for init in self.QPT_INITS:
-                    rec[f'F{init}'] = misc.fidelity(
+                    rec[f'F{init}'] = tomo.fid_overlap(
                         self.rho(run, init, select),
                         self.rho_ideal[select][init.lower()],
                     )
@@ -426,14 +427,15 @@ class qpt_tele_gate:
         for run in self.df['run'].unique():
             for select in self.selects:
                 rec = {'run': run, 'select': select}
-                rec['Fchi'] = misc.fidelity(self.chi(run, select),
-                                            self.chi_ideal[select])
+                rec['Fchi'] = tomo.fid_overlap(self.chi(run, select),
+                                               self.chi_ideal[select])
                 records.append(rec)
         return pd.DataFrame.from_records(records)
     
     @property
     def fname(self) -> fileio.LogName:
         fname = self.lf.name.copy()
+        fname.title = fname.title[12:]
         fchi_mean = self.Fchi['Fchi'].mean()
         fchi_std = self.Fchi.groupby('run')['Fchi'].mean().std()  # As previous.
         fname.title += f' Fchi_mean={fchi_mean:.2%}±{fchi_std:.2%},runs{self.df.run.max()+1}'
@@ -455,7 +457,7 @@ class qpt_tele_gate:
             plotter.plot_complex_mat3d(mat, [ax_r, ax_i], cmin=-.25, cmax=.25, 
                                     colorbar=False, label=False)
             # Ok for run=='mean' because `fid` is linear.
-            fid = misc.fidelity(mat, self.chi_ideal[select])
+            fid = tomo.fid_overlap(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}', y=0.92)
             for ax in ax_r, ax_i:
                 ax.set_zlim(-0.25, 0.25)
@@ -506,7 +508,7 @@ class qpt_tele_gate:
             ax_i = axs.ravel()[2*i+1]
             plotter.plot_mat(mat.real, .2, -.2, ax=ax_r, vary_size=True, fmt=fmt, omit_below=5e-3)
             plotter.plot_mat(mat.imag, .2, -.2, ax=ax_i, vary_size=True, fmt=fmt, omit_below=5e-3)
-            fid = misc.fidelity(mat, self.chi_ideal[select])
+            fid = tomo.fid_overlap(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}', fontdict=dict(fontsize='small'))
             ax_r.set_xlim(-.5, 15.5)
             ax_r.set_ylim(-.5, 15.5)
@@ -565,7 +567,7 @@ class qpt_tele_gate:
         subfigs = fig.subfigures(ncols=4, nrows=1, hspace=0, wspace=0)
         for ic, select in enumerate(self.selects):
             subfig = subfigs[ic]
-            fchi = misc.fidelity(self.chi(run, select), self.chi_ideal[select])
+            fchi = tomo.fid_overlap(self.chi(run, select), self.chi_ideal[select])
             subfig.suptitle(f'select={select}, Fchi={fchi:.2%}')
             axs = subfig.subplots(ncols=2, nrows=4, sharex=True, sharey=True, 
                                   gridspec_kw=dict(wspace=0, hspace=0))
@@ -575,7 +577,7 @@ class qpt_tele_gate:
                 mat = self.rho(run, init, select)
                 plotter.plot_mat(mat.real, .4, -.4, ax=ax_r, vary_size=True, fmt=fmt, omit_below=3e-2)
                 plotter.plot_mat(mat.imag, .4, -.4, ax=ax_i, vary_size=True, fmt=fmt, omit_below=3e-2)
-                fid = misc.fidelity(mat, self.rho_ideal[select][init])
+                fid = tomo.fid_overlap(mat, self.rho_ideal[select][init])
                 ax_r.set_ylabel(f'init={init},\nFrho={fid:.2%}', fontdict=dict(fontsize='x-small'))
                 ax_r.tick_params('both', labelsize='x-small', pad=0.1)
                 ax_i.tick_params('both', labelsize='x-small', pad=0.1)
@@ -593,7 +595,7 @@ class qpt_tele_gate:
         subfigs = fig.subfigures(ncols=4, nrows=1, wspace=0.02)
         for ic, select in enumerate(self.selects):
             subfig = subfigs[ic]
-            fchi = misc.fidelity(self.chi(run, select), self.chi_ideal[select])
+            fchi = tomo.fid_overlap(self.chi(run, select), self.chi_ideal[select])
             subfig.suptitle(f'select={select}, Fchi={fchi:.2%}')
             axs = subfig.subplots(ncols=2, nrows=16, sharex=True, sharey=True, gridspec_kw=dict(wspace=0))
             for ir, init in enumerate(self.QPT_INITS):
@@ -602,7 +604,7 @@ class qpt_tele_gate:
                 mat = self.rho(run, init, select)
                 plotter.plot_mat(mat.real, .5, -.5, ax=ax_r, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
                 plotter.plot_mat(mat.imag, .5, -.5, ax=ax_i, vary_size=True, fmt='{:.1%}'.format, omit_below=3e-3)
-                fid = misc.fidelity(mat, self.rho_ideal[select][init])
+                fid = tomo.fid_overlap(mat, self.rho_ideal[select][init])
                 ax_r.set_ylabel(f'init={init},\nFrho={fid:.2%}')
             ax_r.set_xticks([])
         fname = self.fname.copy()
