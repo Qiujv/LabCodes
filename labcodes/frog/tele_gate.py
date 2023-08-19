@@ -22,7 +22,7 @@ class qst_2q:
 
         # Do NOT keep ss datas to save memory.
         datas = [
-            single_shot_data(folder, id, suffix, c_qubits=['q2', 'q5'], p_qubits=['q1', 'q4'])
+            single_shot_data(folder, id, suffix, c_qubits=['q5', 'q2'], p_qubits=['q4', 'q1'])
             for id in range(m, m+9)
         ]
         # Fix logfiles missing |0> center or |1> center in conf.
@@ -39,10 +39,10 @@ class qst_2q:
         self.probs = [ss_data.probs for ss_data in datas]
     
     def rho(self, select, ro_mat=None):
-        probs = [(df.loc[f'q2q5_{select}', 'q1q4_00'], 
-                  df.loc[f'q2q5_{select}', 'q1q4_01'], 
-                  df.loc[f'q2q5_{select}', 'q1q4_10'], 
-                  df.loc[f'q2q5_{select}', 'q1q4_11']) 
+        probs = [(df.loc[f'q5q2_{select}', 'q4q1_00'], 
+                  df.loc[f'q5q2_{select}', 'q4q1_01'], 
+                  df.loc[f'q5q2_{select}', 'q4q1_10'], 
+                  df.loc[f'q5q2_{select}', 'q4q1_11']) 
                  for df in self.probs]
 
         if ro_mat is not None:

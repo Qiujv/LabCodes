@@ -41,6 +41,7 @@ ABBREV = {
     'coupler bias pulse amp': 'cpa',
     'coupler pulse amp': 'cpa',
     'gmon pulse amp': 'gpa',
+    'g pulse amp': 'gpa',
     'z pulse amp': 'zpa',
     'readout': 'ro',
     'frequency': 'freq',
@@ -56,8 +57,13 @@ def replace(text:str, dict:dict) -> str:
 
 def read_labrad(dir:Path, id:int=-1, suffix:str=None) -> LogFile:
     """Return LogFile object from Labrad datafile."""
-    if id < 0: id = last_idx(dir) + id + 1
-    path = find(dir, id)
+    dir = Path(dir)
+    if dir.is_file():
+        path = dir
+    else:
+        if id < 0: id = last_idx(dir) + id + 1
+        path = find(dir, id)
+        
     if suffix is None:
         if path.with_suffix('.csv_complete').exists():
             suffix = '.csv_complete'
@@ -104,6 +110,14 @@ LABRAD_REG_GLOBLES = {
     'Value': just_return_args,
     'ValueArray': just_return_args,
     'array': np.array,
+    'uint32': int,
+}
+_strange_numbers = {
+    "0L": "0",
+    "1L": "1",
+    "2L": "2",
+    "3L": "3",
+    "4L": "4",
 }
 
 def ini_to_dict(ini:ConfigParser) -> dict:
@@ -121,9 +135,10 @@ def ini_to_dict(ini:ConfigParser) -> dict:
         data = sect['data']
         # TODO: Maybe catch NameError?
         try:
+            data = replace(data, _strange_numbers)
             data = eval(data, LABRAD_REG_GLOBLES)  # Parse string to proper objects.
         except:
-            logging.exception(f'error parsing {sect["label"]}')
+            logging.exception(f'error parsing {sect["label"]}:{sect["data"]}')
         d['parameter'].update({sect['label']: data})
 
     for k in ['independent', 'dependent']:

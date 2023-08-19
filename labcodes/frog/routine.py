@@ -1,6 +1,6 @@
 """Script provides functions dealing with routine experiment datas."""
 
-
+import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,7 +9,6 @@ import labcodes.frog.pyle_tomo as tomo
 from labcodes import fileio, fitter, misc, models, plotter, state_disc
 from labcodes.frog import tele
 import labcodes.routine as rt
-from typing import List
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -148,10 +147,6 @@ def fit_spec(spec_map, ax=None, **kwargs):
     ax = cfit.model.plot(cfit, ax=ax, **kwargs)
     return cfit, ax
 
-def plot_visibility(logf, **kwargs):
-    """Plot visibility, for iq_scatter experiments only."""
-    return rt.basic.IQScatter.from_logfile(logf).plot()
-
 def plot_iq_vs_freq(logf, axs=None):
     if axs is None:
         fig, (ax, ax2) = plt.subplots(tight_layout=True, figsize=(5,5), nrows=2, sharex=True)
@@ -180,35 +175,64 @@ def plot_iq_vs_freq(logf, axs=None):
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
-def plot_visibility_kmeans(lf, return_ro_mat=False):
-    df = lf.df
+def plot_iq_scatter(lf, return_ro_mat=False):
+    df:pd.DataFrame = lf.df
     nlevels = 0
     while f'i{nlevels}' in df: nlevels += 1
 
     qb = lf.conf['parameter']['measure'][0]
-    stater = state_disc.KMeans([lf.conf['parameter'][f'Device.{qb}.|{i}> center'] 
-                                for i in range(nlevels)])
+    stater = state_disc.NCenter(
+        [lf.conf['parameter'][f'Device.{qb}.|{i}> center'] for i in range(nlevels)])
+    list_points = [df[[f'i{i}', f'q{i}']].values for i in range(nlevels)]
 
-    fig, axs = plt.subplots(ncols=nlevels, figsize=(8,3), sharex=True, sharey=True)
+    if '|0> center new' in lf.conf['parameter']:
+        new = np.array([lf.conf['parameter'][f'|{i}> center new'] for i in range(nlevels)])
+        old = np.array([lf.conf['parameter'][f'|{i}> center old'] for i in range(nlevels)])
+    elif '-|0> center new' in lf.conf['parameter']:
+        new = np.array([lf.conf['parameter'][f'-|{i}> center new'] for i in range(nlevels)])
+        old = np.array([lf.conf['parameter'][f'-|{i}> center old'] for i in range(nlevels)])
+    else:
+        new = np.zeros((2,2))
+        old = np.zeros((2,2))
+
+    figsize = (6,3) if len(list_points) == 2 else (8,3)
+    fig, axs = plt.subplots(ncols=nlevels, figsize=figsize, sharex=True, sharey=True)
     fig.suptitle(lf.name.as_plot_title())
-    for i in range(nlevels):
-        axs[i].scatter(f'i{i}', f'q{i}', data=df, marker='.', color=f'C{i}')
+    for i, pts in enumerate(list_points):
+        axs[i].scatter(pts[:,0], pts[:,1], marker=f"${i}$", color=f'C{i}')
         axs[i].set_aspect('equal')
         axs[i].set_title(f'|{i}>')
-
+        axs[i].plot(old[:,0], old[:,1], ls='--', color='gray')
+        axs[i].plot(new[:,0], new[:,1], ls=':', color='k')
+        
     ro_mat = []
-    for i in range(nlevels):
-        stater.plot_regions(axs[i])
-        probs = stater.probs((df[f'i{i}'] + 1j*df[f'q{i}']).values)
+    for i, pts in enumerate(list_points):
+        stater.plot_regions(axs[i], label=False)
+        probs = stater.probs(pts)
+        ro_mat.append(probs)
         for j in range(nlevels):
             center = stater.centers[j]
-            axs[i].annotate(f'{probs[j]:.1%}\n', (center.real, center.imag), ha='center')
-        ro_mat.append(probs)
-
+            axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', (center[0], center[1]), ha='center')
+    
     if return_ro_mat:
         return fig, ro_mat
+    else:
+        return fig
     
-    return fig
+def plot_visibility(lf, return_ro_mat=False):
+    warnings.warn('plot_visi is deprecated. Use plot_iq_scatter instead.', 
+                  DeprecationWarning)
+    return plot_iq_scatter(lf, return_ro_mat=return_ro_mat)
+
+def plot_visibility_kmeans(lf, return_ro_mat=False):
+    warnings.warn('state_disc.KMeans has been removed due to its instability. '
+                  'Use state_disc.NCenter instead.', DeprecationWarning)
+    return plot_iq_scatter(lf, return_ro_mat=return_ro_mat)
+
+def plot_visibility_scatter(logf, **kwargs):
+    """Plot visibility, for iq_scatter experiments only."""
+    return rt.basic.IQScatter.from_logfile(logf).plot()
+
 
 def plot_xtalk(logf, slope=-0.01, offset=0.0, ax=None, **kwargs):
     """Plot 2d with a guide line. For xtalk data.
@@ -678,3 +702,66 @@ def plot_2q_qpt(dir, start, ref_start=None, ro_mat=None, plot_all=False):
     ax.get_figure().suptitle(lf_name.as_plot_title())
 
     return ax, lf_name
+
+def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0):
+    fig, (ax, ax2) = plt.subplots(nrows=2, figsize=(5,5), sharex=True)
+
+    if isinstance(x_name, int): x_name = lf.indeps[x_name]
+    if isinstance(y_name, int): y_name = lf.indeps[y_name]
+    if isinstance(z_name, int): z_name = lf.deps[z_name]
+
+    lf.plot2d(x_name, y_name, z_name, ax=ax2, colorbar=False)
+    # ax2.set_xscale('log')
+    fig.suptitle(ax2.get_title())
+    ax2.set_title(None)
+
+    df = lf.df.groupby(x_name).filter(lambda x: len(x) > 1)
+    records = []
+    for x, gp in df.groupby(x_name):
+        phi = misc.guess_phase(gp[y_name].values, gp[z_name].values, 1/(2*np.pi))
+        records.append({x_name: x, 'phi': phi})
+    df = pd.DataFrame.from_records(records)
+    df['phi'] = np.unwrap(df['phi'].values)
+    ax.plot(x_name, 'phi', data=df, marker='.', label='')
+    # ax.set_xscale('log')
+    ax.set_ylabel('phi')
+    ax2.autoscale_view()
+    return fig, df
+
+def fit_distortion(xdata, ydata, taus=(1e3, 1e2)):
+    prefixs = 'abcdefghijklmn'
+
+    mod = models.OffsetFeature()
+    def exp(x, tau=1, amp=1):
+        return amp * np.exp(-x/tau)
+    for i in range(len(taus)):
+        mod = mod + models.MyModel(exp, prefix=prefixs[i]+'_')
+
+    for i in range(len(taus)):
+        mod.set_param_hint(prefixs[i]+'_tau', min=0, value=taus[i])
+        # mod.set_param_hint(prefixs[i]+'_amp', min=0)
+
+    mod.set_param_hint('offset', value=-10)
+
+    cfit = fitter.CurveFit(xdata, ydata, model=mod)
+
+    fig = plt.figure()
+    gs = fig.add_gridspec(2, 1, hspace=0, height_ratios=[1,4])
+    ax2, ax = gs.subplots(sharex=True)
+
+    fx, fy = cfit.fdata(500)
+    ax.plot(xdata, ydata, marker='.')
+    ax.plot(fx, fy)
+    ylims = ax.get_ylim()
+    for pre, comp in cfit.result.eval_components(x=fx).items():
+        if pre == 'const_offset': continue
+        ax.plot(fx, comp + cfit['offset'], ls='--',
+                label='tau={:.0f}, amp={:.0f}'.format(cfit[pre+'tau'], cfit[pre+'amp']))
+    ax.set_ylim(ylims)
+    ax.set_xscale('log')
+    ax.legend()
+
+    ax2.plot(xdata, cfit.result.residual, 'o', label='residual')
+    ax2.axhline(y=0, color='k')
+    ax2.legend()
+    return cfit, fig

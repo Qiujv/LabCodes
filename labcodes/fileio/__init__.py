@@ -7,6 +7,7 @@ from labcodes.fileio.base import LogFile, LogName
 
 try:
     from labcodes.fileio.labrad import read_labrad, LabradRead
+    from labcodes.fileio import labrad
 except:
     print('WARNING: Fail to import fileio.labrad.')
 
