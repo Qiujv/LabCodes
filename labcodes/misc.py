@@ -432,6 +432,36 @@ def estr(num: float, places: int = None, sep: str = "") -> str:
         pow10 += 3
 
     prefix = ENG_PREFIXES[int(pow10)]
+    formatted = "{mant:{fmt}}{sep}{prefix}".format(
+        mant=mant, sep=sep, prefix=prefix, fmt=fmt)
+
+    return formatted
+
+def remove_background(df, x_name, y_name, z_name):
+    """Remove the background of Z which varies along X and constant along Y.
+    yyyyyy
+    Assumes rectangle grid sampling.
+
+    Example:
+        remove_background(lf.df, 'ro_freq_GHz', 'z_pulse_offset', ['iq_amp', 'abs(s21)_dB', 'iq_phase_rad'])
+    """
+    background = df.groupby(x_name)[z_name].mean()
+    def trans(df):
+        df[z_name] = df[z_name].values - background.values
+        return df
+    return df.groupby(y_name).apply(trans).reset_index(drop=True)
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
+    def f(x, r):
+        return x + r*np.sin(x)
+    x = np.linspace(0, 2*np.pi)
+    y = f(x, r=1)
+    plt.plot(x, y, label='original one')
+    plt.plot(inverse(f, y, r=1), y, label='inversed one')  # shold have the same shape as above.
+    plt.legend()
+    plt.show()
     return f"{mant:{fmt}}{sep}{prefix}"
 
 
