@@ -103,7 +103,7 @@ class qpt_tele_state:
         
         probs = self.df.query(f'run == {run} & init_state == "{init_state}"')
         probs = probs.set_index('tomo_op').loc[self.TOMO_OPS, [f'p{select}0', f'p{select}1']]
-        p_select = probs.sum(axis='columns')  # TODO: include this in result.
+        p_select = probs.sum(axis='columns').replace({0:np.inf})  # TODO: include this in result.
         probs = probs.divide(p_select, axis='index')
         return probs
 
@@ -299,7 +299,7 @@ class qpt_tele_gate:
         ro_mat: np.matrix = ((1, 0, 0, 0),(0, 1, 0, 0),(0, 0, 1, 0),(0, 0, 0, 1)),
     ):
         self.lf = lf
-        df = lf.df
+        df = lf.df.copy()
         if 'run' not in df: df['run'] = 0  # For data with only one run.
         df = df.groupby('run').filter(lambda df: len(df) == 144)
         tomo_ops = [i.lower() for i in lf.conf['parameter']['-tomo_ops']]
@@ -324,12 +324,13 @@ class qpt_tele_gate:
         else:
             raise ValueError(f'kind {kind} not recognized')
         
+        self.rho_in = "0xy1"
         self.ro_mat = np.asarray(ro_mat)
         self.selects = ('00', '01', '10', '11')
         self._rho = {select: {} for select in self.selects}
         self._chi = {select: {} for select in self.selects}
         try:
-            self.constuct_all()
+            self.build_all()
         except:
             logger.exception(f'failed to construct rho and chi for {self.lf.name}')
 
@@ -350,7 +351,7 @@ class qpt_tele_gate:
         
         probs = self.df.query(f'run == {run} & init_state == "{init_state}"')
         probs = probs.set_index('tomo_op').loc[self.TOMO_OPS, [f'p0{select}0', f'p0{select}1', f'p1{select}0', f'p1{select}1']]
-        p_select = probs.sum(axis='columns')  # TODO: include this in result.
+        p_select = probs.sum(axis='columns').replace({0:np.inf})  # TODO: include this in result.
         probs = probs.divide(p_select, axis='index')
         if ro_mat is None:
             ro_mat = self.ro_mat
@@ -394,9 +395,10 @@ class qpt_tele_gate:
         if run == 'ideal':
             return self.chi_ideal[select]
         
-        return tomo.qpt([self.rho(run, init, select) for init in self.QPT_INITS])
+        return tomo.qpt([self.rho(run, init, select) for init in self.QPT_INITS],
+                        self.rho_in)
     
-    def constuct_all(self) -> None:
+    def build_all(self) -> None:
         for run in tqdm(self.df['run'].unique()):
             if len(self.df.query(f'run == {run}')) != 144:
                 logger.warning(f'run {run} does not have 144 tomo points')
@@ -454,8 +456,7 @@ class qpt_tele_gate:
         for i, (select, mat) in enumerate(chi_dict.items()):
             ax_r:plt.Axes = fig.add_subplot(2, 4, 2*i+1, projection='3d')
             ax_i:plt.Axes = fig.add_subplot(2, 4, 2*i+2, projection='3d')
-            plotter.plot_complex_mat3d(mat, [ax_r, ax_i], cmin=-.25, cmax=.25, 
-                                    colorbar=False, label=False)
+            plotter.plot_complex_mat3d(mat, [ax_r, ax_i], cmin=-.25, cmax=.25, label=False)
             # Ok for run=='mean' because `fid` is linear.
             fid = tomo.fid_overlap(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}', y=0.92)

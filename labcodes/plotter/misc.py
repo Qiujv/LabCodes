@@ -1,10 +1,26 @@
 """Functions not fitting elsewhere."""
 
 import matplotlib as mpl
+import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
 
-def plot_iq(data, ax=None, n_pt_max=6000, **kwargs):
+
+def txt_effect(color='w', linewidth=1, alpha=0.5) -> patheffects.withStroke:
+    """Text effect for better visibility.
+    
+    Usage:
+    >>> plt.text(0, 0, 'Hello world', color='w', path_effects=[txt_effect('k')])
+    Text(0, 0, 'Hello world')
+    """
+    return patheffects.withStroke(linewidth=linewidth, foreground=color, alpha=alpha)
+
+def plot_iq(
+    data:np.ndarray,
+    ax: plt.Axes = None,
+    n_pt_max: int = 6000, 
+    **kw_to_scatter_or_hist2d
+) -> plt.Axes:
     """Plot data on complex plane. 
     Scatter when points is few, otherwise hist2d."""
     if ax is None:
@@ -12,16 +28,16 @@ def plot_iq(data, ax=None, n_pt_max=6000, **kwargs):
     else:
         fig = ax.get_figure()
 
-    data = np.ravel(data)
+    data = np.asarray(data).ravel()
 
     if data.size <= n_pt_max:
         kw = dict(marker='.', alpha=0.3, linewidth=0)
-        kw.update(kwargs)
+        kw.update(kw_to_scatter_or_hist2d)
         col = ax.scatter(np.real(data), np.imag(data), **kw)
         if data.size >= 100: col.set_rasterized(True)
     else:
         kw = dict(bins=100, norm=mpl.colors.PowerNorm(0.5))
-        kw.update(kwargs)
+        kw.update(kw_to_scatter_or_hist2d)
         ax.hist2d(np.real(data), np.imag(data), **kw)
     ax.set(
         aspect='equal',
@@ -30,8 +46,18 @@ def plot_iq(data, ax=None, n_pt_max=6000, **kwargs):
     )
     return ax
 
-def cursor(ax, x=None, y=None, text=None, line_style={}, text_style={}):
+def cursor(
+    ax: plt.Axes,
+    x: float = None,
+    y: float = None,
+    text: str = None,
+    line_style: dict = None,
+    text_style: dict = None,
+):
     """Point out given coordinate with axhline and axvline."""
+    if line_style is None: line_style = {}
+    if text_style is None: text_style = {}
+
     xline, yline = None, None
     ls = dict(color='k', alpha=0.3, ls='--'); ls.update(line_style)
     if x is not None: xline = ax.axvline(x, **ls)
@@ -60,23 +86,30 @@ def cursor(ax, x=None, y=None, text=None, line_style={}, text_style={}):
         pass
     return xline, yline, txt
 
-def get_norm(data, cmin=None, cmax=None, symmetric=False):
-    """Get norm that work with cmap.
+def get_norm(
+    data: np.ndarray,
+    cmin: float = None,
+    cmax: float = None,
+    symmetric: bool = False,
+):
+    """Get norm that works with cmap.
     
-    norm(data) -> data in [0,1]
-    cmap(norm_data) -> colors
-    fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax) -> a colorbar.
+    Usage:
+        norm(data) -> data in [0,1]
+
+        cmap(norm_data) -> colors
+
+        fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax) -> a colorbar.
+
+        norm.vmax, norm.vmin to get the value limits.
 
     Args:
-        data: np.array, used to determine the min and max.
-        cmin, cmax: float, if None, determined from data.
+        data: used to determine the min and max.
+        cmin, cmax: if None, determined from data.
         symmetric: boolean, if True, cmin = -cmax.
 
     Returns:
         norm, extend_cbar, useful in creating colorbar.
-    
-    Notes:
-        norm.vmax, norm.vmin can get the value limits.
     """
     vmin, vmax = np.min(data), np.max(data)
 
@@ -101,9 +134,11 @@ def get_norm(data, cmin=None, cmax=None, symmetric=False):
     norm = mpl.colors.Normalize(cmin, cmax)
     return norm, extend_cbar
 
-# from https://stackoverflow.com/a/53586826
+
 def multiple_formatter(denominator=2, number=np.pi, latex='\mathrm{\pi}'):
     """Format axis tick labels like: 1/2pi, pi, 3/2pi.
+
+    Copied from https://stackoverflow.com/a/53586826
     
     Usage:
     ```
@@ -116,6 +151,7 @@ def multiple_formatter(denominator=2, number=np.pi, latex='\mathrm{\pi}'):
         while b:
             a, b = b, a%b
         return a
+    
     def _multiple_formatter(x, pos):
         den = denominator
         num = np.int(np.rint(den*x/number))
@@ -138,26 +174,3 @@ def multiple_formatter(denominator=2, number=np.pi, latex='\mathrm{\pi}'):
             else:
                 return f'${num}{latex}/{den}$'
     return plt.FuncFormatter(_multiple_formatter)
-
-class Multiple:
-    """Provide locator and formatter for axis ticks.
-    
-    Usage:
-    ```
-        major = Multiple(60, np.pi*2)
-        minor = Multiple(60*4, np.pi*2)
-        ax.xaxis.set_major_locator(major.locator())
-        ax.xaxis.set_minor_locator(minor.locator())
-        ax.xaxis.set_major_formatter(major.formatter())
-    ```
-    """
-    def __init__(self, denominator=2, number=np.pi, latex='\pi'):
-        self.denominator = denominator
-        self.number = number
-        self.latex = latex
-
-    def locator(self):
-        return plt.MultipleLocator(self.number / self.denominator)
-
-    def formatter(self):
-        return plt.FuncFormatter(multiple_formatter(self.denominator, self.number, self.latex))
