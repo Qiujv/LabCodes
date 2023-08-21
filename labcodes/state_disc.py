@@ -12,7 +12,7 @@ class NCenter:
     >>> np.random.seed(0)
     >>> n_pts = 500
     >>> centers = [(0, 0), (1, 1), (0, 1)]
-    >>> list_pts = [np.random.multivariate_normal(center, np.eye(len(centers[0])) * 0.1, n_pts) 
+    >>> list_pts = [np.random.multivariate_normal(center, np.eye(len(centers[0])) * 0.1, n_pts)
     ...             for center in centers]
     >>> stater, fig = NCenter.fit(list_pts, plot=True)
     >>> stater.flags(centers)
@@ -27,6 +27,7 @@ class NCenter:
            [0.004, 0.94 , 0.056],
            [0.044, 0.044, 0.912]])
     """
+
     def __init__(self, centers: list[np.ndarray[float]]):
         clf = NearestCentroid()
         clf.centroids_ = np.asarray(centers)
@@ -41,40 +42,43 @@ class NCenter:
     def fit(cls, list_points: list[np.ndarray[float]], plot: bool = False):
         clf = NearestCentroid()
         clf.fit(
-            np.vstack(list_points), 
-            np.repeat(np.arange(len(list_points)), [len(p) for p in list_points])
+            np.vstack(list_points),
+            np.repeat(np.arange(len(list_points)), [len(p) for p in list_points]),
         )
-        
+
         self = cls(clf.centroids_)
         self._clf = clf
 
-        if not plot: return self
+        if not plot:
+            return self
 
         stater = self
         n_clusters = len(self.centers)
 
-        figsize = (6,3) if len(list_points) == 2 else (8,3)
-        fig, axs = plt.subplots(ncols=n_clusters, figsize=figsize, sharex=True, sharey=True)
+        figsize = (6, 3) if len(list_points) == 2 else (8, 3)
+        fig, axs = plt.subplots(
+            ncols=n_clusters, figsize=figsize, sharex=True, sharey=True
+        )
         for i, pts in enumerate(list_points):
-            axs[i].scatter(pts[:,0], pts[:,1], marker=f"${i}$", color=f'C{i}')
-            axs[i].set_aspect('equal')
-            axs[i].set_title(f'|{i}>')
-            
+            axs[i].scatter(pts[:, 0], pts[:, 1], marker=f"${i}$", color=f"C{i}")
+            axs[i].set_aspect("equal")
+            axs[i].set_title(f"|{i}>")
+
         for i, pts in enumerate(list_points):
             stater.plot_regions(axs[i], label=False)
             probs = stater.probs(pts)
             for j in range(n_clusters):
                 center = stater.centers[j]
-                axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', (center[0], center[1]), ha='center')
+                axs[i].annotate(f"p{j}{i}={probs[j]:.1%}", center, ha="center")
         return stater, fig
-    
+
     def flags(self, points: np.ndarray[float]) -> np.ndarray[int]:
         return self._clf.predict(np.vstack(points))
-    
+
     def probs(self, points: np.ndarray[float]) -> np.ndarray[float]:
         flags = self.flags(points)
         return probs_from_flags(flags, len(self.centers), 1)
-    
+
     def plot_regions(self, ax: plt.Axes, label=True) -> None:
         """Plot the region of each state.
 
@@ -98,9 +102,9 @@ class NCenter:
 
 
 def probs_from_flags(
-    flags: np.ndarray[int], 
-    nlevels: int, 
-    n_qbs: int, 
+    flags: np.ndarray[int],
+    nlevels: int,
+    n_qbs: int,
     return_labels: bool = False,
 ):
     """Calculate probabilities from flags.
@@ -138,22 +142,24 @@ def probs_from_flags(
         return probs, str_from_flags(np.arange(nlevels**n_qbs), n_qbs, nlevels)
     else:
         return probs
-    
+
 
 def prob_labels(nlevels: int, n_qbs: int) -> np.ndarray[str]:
     """Returns string labels for probs_from_flags.
-    
+
     >>> prob_labels(nlevels=2, n_qbs=3)
     array(['000', '001', '010', '011', '100', '101', '110', '111'],
           dtype='<U3')
     """
     return str_from_flags(np.arange(nlevels**n_qbs), n_qbs, nlevels)
 
+
 bitstrings = prob_labels  # Actually same as misc.bitstrings.
 
+
 def flags_mq_from_1q(
-    list_flags: list[np.ndarray[int]], 
-    nlevels: int, 
+    list_flags: list[np.ndarray[int]],
+    nlevels: int,
 ) -> np.ndarray[int]:
     """Convert flags from 1 qubit to multi-qubit.
 
@@ -183,9 +189,10 @@ def flags_mq_from_1q(
 
     return flags_mq
 
+
 def str_from_flags(
-    flags: np.ndarray[int], 
-    n_qbs: int, 
+    flags: np.ndarray[int],
+    n_qbs: int,
     nlevels: int = 2,
 ) -> np.ndarray[str]:
     """Convert flags to str.
@@ -204,10 +211,11 @@ def str_from_flags(
     array(['000', '001', '010', '011', '100', '101', '110', '111'],
           dtype='<U3')
     """
-    if isinstance(flags, int): flags = [flags]
+    if isinstance(flags, int):
+        flags = [flags]
     flags = np.asarray(flags)
     str_flags = np.zeros_like(flags, dtype=f"<U{n_qbs}")
-    for i in range(nlevels ** n_qbs):
+    for i in range(nlevels**n_qbs):
         str_flags[flags == i] = np.base_repr(i, base=nlevels).zfill(n_qbs)
     return str_flags
 
@@ -225,15 +233,20 @@ def flags_from_str(
     >>> flags_from_str(['000', '001', '010', '011', '100', '101', '110', '111'], 2)
     array([0, 1, 2, 3, 4, 5, 6, 7])
     """
-    if isinstance(str_flags, str): str_flags = [str_flags]
+    if isinstance(str_flags, str):
+        str_flags = [str_flags]
     str_flags = np.asarray(str_flags)
     n_qbs = len(str_flags[0])
     flags = np.zeros_like(str_flags, dtype=int)
-    for i in range(nlevels ** n_qbs):
+    for i in range(nlevels**n_qbs):
         flags[str_flags == np.base_repr(i, base=nlevels).zfill(n_qbs)] = i
     return flags
 
 
-if __name__ == '__main__':
+
+
+
+if __name__ == "__main__":
     import doctest
+
     doctest.testmod()

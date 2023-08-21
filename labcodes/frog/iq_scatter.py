@@ -14,7 +14,7 @@ class IQScatter:
     lf: fileio.LogFile
     df: pd.DataFrame
     angle: float
-    bins: field(default=50)
+    bins: int = 50
     thres: float = field(init=False)
     p00: float = field(init=False)
     p11: float = field(init=False)
