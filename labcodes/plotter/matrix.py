@@ -154,7 +154,7 @@ def _plot_mat3d(
         bar_col = ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=(0,0,0,0), alpha=None, 
                            edgecolor='black', linewidth=0.5)
 
-    if label is True:
+    if label:
         for x, y, z in zip(xpos, ypos, dz):
             if omit_below is not None:
                 if np.abs(z) <= omit_below: continue
@@ -208,7 +208,7 @@ def plot_mat3d(
             ax, np.abs(mat), cval=np.angle(mat), omit_below=omit_below, cmap=cmap,
             label=label, fmt=fmt, cmin=-np.pi, cmax=np.pi,
         )
-        if colorbar is True:
+        if colorbar:
             cbar = fig.colorbar(col, shrink=0.6, fraction=0.1, pad=0.05, extend=extend)
             cbar.set_ticks(np.linspace(-np.pi, np.pi, 5))
             cbar.set_ticklabels((r'$-\pi$', r'$-\pi/2$', r'$0$', r'$\pi/2$', r'$\pi$'))

@@ -35,7 +35,7 @@ def auto_rotate(data: np.ndarray[complex], return_rad: bool = False):
     # Minimize imag(var(data)), by Kaho
     rad = -0.5 * np.angle(np.mean(data**2) - np.mean(data) ** 2)
 
-    if return_rad is True:
+    if return_rad:
         return data * np.exp(1j * rad), rad  # counter-clockwise
     else:
         return data * np.exp(1j * rad)
@@ -316,7 +316,6 @@ def inverse_interp(
             f"Failed to find inverse for {np.sum(~mask_tol)} points"
             f" (except extrapolate) within tolerance {tol}."
         )
-    
     if is_scalar:
         return x.item()
     else:

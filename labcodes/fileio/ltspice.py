@@ -5,7 +5,6 @@ or https://pypi.org/project/ltspice/.
 
 
 import os
-from typing import List
 import numpy as np
 import re
 
@@ -26,7 +25,7 @@ class LTSpiceRead:
     def __init__(self, file_path: str):
         self.file_path = file_path
         self.dsamp = 1
-        self.tags : List[str]= ['Title:', 'Date:', 'Plotname:', 'Flags:', 'No. Variables:', 'No. Points:', 'Offset:']
+        self.tags : list[str]= ['Title:', 'Date:', 'Plotname:', 'Flags:', 'No. Variables:', 'No. Points:', 'Offset:']
         self.x_raw = []
         self.y_raw = []
         self._case_split_point = []

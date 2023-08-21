@@ -63,7 +63,7 @@ class MatEditor:
         xgrid, ygrid = np.meshgrid(xax, yax)
         xlabels, ylabels = self.xlabels, self.ylabels
 
-        if omit_diag is True:
+        if omit_diag:
             for i in range(min(xdim, ydim)):
                 vals[i, i] = 0
         mask = np.abs(vals) >= 0.2
@@ -119,10 +119,10 @@ class MatEditor:
             return
         plt.close(self.fig)
         self.fig = None
-        if self._interactive is False:
-            plt.ioff()
-        elif self._interactive is True:
+        if self._interactive:
             plt.ion()
+        else:
+            plt.ioff()
 
 
 if __name__ == "__main__":
