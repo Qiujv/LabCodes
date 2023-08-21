@@ -5,10 +5,10 @@ with open('README.md', 'r') as fh:
 
 setup(
     name="labcodes",
-    version="0.1",
+    version="0.2",
     author='Qiujv',
     author_email='qiujv@outlook.com',
-    description='Set of codes used in SUSTech cQED lab.',
+    description='Codes used in SUSTech superconducting quantum lab.',
     long_description=readme,
     packages=find_packages(),
     install_requires=[
@@ -22,5 +22,6 @@ setup(
         # 'dpath',
         # 'PyQt5',  # requirements of Labber API here and below.
         'json-numpy',
+        'cvxpy',  # for tomography.
     ],
 )
