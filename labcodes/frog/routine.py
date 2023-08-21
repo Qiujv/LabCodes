@@ -8,9 +8,8 @@ import numpy as np
 import pandas as pd
 import scipy.io
 
-import labcodes.routine as rt
 from labcodes import fileio, fitter, misc, models, plotter, state_disc, tomo
-from labcodes.frog import tele
+from labcodes.frog import tele, iq_scatter
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -233,7 +232,7 @@ def plot_visibility_kmeans(lf, return_ro_mat=False):
 
 def plot_visibility_scatter(logf, **kwargs):
     """Plot visibility, for iq_scatter experiments only."""
-    return rt.basic.IQScatter.from_logfile(logf).plot()
+    return iq_scatter.IQScatter.from_logfile(logf).plot()
 
 
 def plot_xtalk(logf, slope=-0.01, offset=0.0, ax=None, **kwargs):
@@ -638,7 +637,7 @@ def plot_2q_qpt(dir, start, ref_start=None, ro_mat=None, plot_all=False):
     # ax, _ = plotter.plot_complex_mat3d(chi_ideal, label=False)
     ax, _ = plotter.plot_complex_mat3d(chi_out, label=False)
 
-    fid = tele.fidelity(chi_ideal, chi_out)
+    fid = tomo.fid_overlap(chi_ideal, chi_out)
     lf_name = fileio.LabradRead(dir, start).name
     lf_name.id = f'{start}-{start+15}'
     lf_name.title += f', F={fid*100:.2f}%'

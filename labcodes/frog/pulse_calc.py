@@ -243,7 +243,7 @@ def _check_within_tol(name, val, target, tol, mask=None):
     if mask is not None:
         val = np.array(val)[mask]  # In case val is a scalar.
         target = np.array(target)[mask]
-    if np.allclose(val, target, atol=tol) is False:
+    if not np.allclose(val, target, atol=tol):
         logger.info(f'inverse {name} out of tol={tol}', stacklevel=2)
 
 

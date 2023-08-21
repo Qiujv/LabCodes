@@ -79,7 +79,7 @@ class NCenter:
         flags = self.flags(points)
         return probs_from_flags(flags, len(self.centers), 1)
 
-    def plot_regions(self, ax: plt.Axes, label=True) -> None:
+    def plot_regions(self, ax: plt.Axes, label: bool = True) -> None:
         """Plot the region of each state.
 
         Keeps the ax lims unchanges, so plot your data points before calling this method.
@@ -96,7 +96,7 @@ class NCenter:
             extent=[xmin, xmax, ymin, ymax],
         )
 
-        if label is True:
+        if label:
             for i, center in enumerate(self.centers):
                 ax.annotate(str(i), (center[0], center[1]))
 
@@ -138,7 +138,7 @@ def probs_from_flags(
     counts = np.bincount(flags, minlength=nlevels**n_qbs)
     probs = counts / np.sum(counts)
 
-    if return_labels is True:
+    if return_labels:
         return probs, str_from_flags(np.arange(nlevels**n_qbs), n_qbs, nlevels)
     else:
         return probs
@@ -241,9 +241,6 @@ def flags_from_str(
     for i in range(nlevels**n_qbs):
         flags[str_flags == np.base_repr(i, base=nlevels).zfill(n_qbs)] = i
     return flags
-
-
-
 
 
 if __name__ == "__main__":
