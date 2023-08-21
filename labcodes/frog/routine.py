@@ -1,14 +1,16 @@
 """Script provides functions dealing with routine experiment datas."""
 
+import math
 import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.io
-import labcodes.frog.pyle_tomo as tomo
-from labcodes import fileio, fitter, misc, models, plotter, state_disc
-from labcodes.frog import tele
+
 import labcodes.routine as rt
+from labcodes import fileio, fitter, misc, models, plotter, state_disc, tomo
+from labcodes.frog import tele
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -280,9 +282,7 @@ def plot_cramsey(cfit0, cfit1, ax=None):
     return ax
 
 def plot_ro_mat(logf, ax=None, return_all=False):
-    """Plot assignment fidelity matrix along with the labels.
-    For data produced by visibility experiment.
-    """
+    """Plot assignment fidelity matrix with data from visibility experiment."""
     se = logf.df[logf.deps].mean()  # Remove the 'Runs' columns
     n_qs = int(np.sqrt(se.size))
     labels = se.index.values.reshape(n_qs,n_qs).T  # Transpose to assignment matrix we usually use. Check Carefully.
@@ -298,69 +298,45 @@ def plot_ro_mat(logf, ax=None, return_all=False):
     else:
         return ro_mat
 
-def plot_tomo_probs(logf, ro_mat=None, n_ops_n_sts=None, return_all=False, figsize=(8,6), plot=True):
-    """Plot probabilities after tomo operations along with labels, 
-    For data produced by tomo experiment.
+def plot_tomo_probs(logf: fileio.LogFile, ro_mat=None, ax=None) -> np.ndarray:
+    """Plot probabilities after tomo operations, with data from tomo experiment."""
+    se:pd.Series = logf.df[logf.deps].mean()
 
-    Args:
-        n_ops_n_sts: (int, int), shape for the returned matrix.
-        if None, inferred from data size.
-        ro_mat: matrix (n_sts*n_sts), assgiment fidelity matrix to correct state 
-        readout probabilities.
-    """
-    se = logf.df[logf.deps].mean()
-    if n_ops_n_sts is None:
-        # Total number of probs should be: (n_ops_1q ** n_qs) * (n_sts_1q ** n_qs)
-        n_ops_1q = 3
-        n_sts_1q = 2
-        n_qs = int(np.log(se.size) / (np.log(n_ops_1q)+np.log(n_sts_1q)))
-        n_ops = int(n_ops_1q ** n_qs)
-        n_sts = int(n_sts_1q ** n_qs)
-    else:
-        n_ops, n_sts = n_ops_n_sts
+    # Total number of probs should be: (n_ops_1q ** n_qs) * (n_sts_1q ** n_qs)
+    n_ops_1q = 3
+    n_sts_1q = 2
+    n_qs = int(np.log(se.size) / (np.log(n_ops_1q)+np.log(n_sts_1q)))
+    n_ops = int(n_ops_1q ** n_qs)
+    n_sts = int(n_sts_1q ** n_qs)
 
-    labels = se.index.values.reshape(n_ops, n_sts)  # State labels runs faster
-
+    # State labels runs faster.
+    labels = se.index.values.reshape(n_ops, n_sts)
     probs = se.values.reshape(n_ops, n_sts)
     if ro_mat is not None:
         for i, ps in enumerate(probs):
             probs[i] = np.dot(np.linalg.inv(ro_mat), ps)
 
-    if plot:
-        fig, (ax, ax2) = plt.subplots(ncols=2, figsize=figsize)
-        fig.suptitle(logf.name.as_plot_title())
-        ax.set_title('probs')
-        ax2.set_title('labels')
+    if ax:
+        ax.set_title(logf.name.as_plot_title())
         plotter.plot_mat2d(probs, ax=ax, fmt=lambda n: f'{n*100:.1f}%')
-        plotter.plot_mat2d(np.zeros(labels.shape), labels, ax=ax2)
-    else:
-        ax = None
-        ax2 = None
+        print('Matrix labels:\n', labels)
 
-    if return_all:
-        return probs, labels, ax, ax2
-    else:
-        return probs
+    return probs
 
-def plot_qst(dir, id, ro_mat=None, fid=None, normalize=False):
+def plot_qst(dir, id, ro_mat=None, fid=None):
     lf = fileio.LabradRead(dir, id)
-    probs = plot_tomo_probs(lf, ro_mat=ro_mat, plot=False)
-    n_ops_1q = 3
-    n_sts_1q = 2
-    n_qs = int(np.log(probs.size) / (np.log(n_ops_1q)+np.log(n_sts_1q)))
-
-    if n_qs == 1:
-        rho = tomo.qst(probs, 'tomo')
-    else:
-        rho = tomo.qst(probs, f'tomo{n_qs}')
-    labels = misc.bitstrings(n_qs)
-    rho_abs = np.abs(rho)
-    if normalize is True: rho = rho / np.trace(rho_abs)
+    probs = plot_tomo_probs(lf, ro_mat=ro_mat)
+    rho = tomo.qst(probs)
+    labels = misc.bitstrings(int(math.log2(len(rho))))
     ax = plotter.plot_mat3d(rho)
+    ax.get_figure().suptitle(lf.name.as_plot_title())
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
 
+    # Annotate fiedlity.
     if fid is None:
         # Calculate fidelity with guessed state.
-        rho_sort = np.sort(rho_abs.ravel())
+        rho_sort = np.sort(np.abs(rho).ravel())
         if rho_sort[-1]-rho_sort[-4] > 0.3:
             # Guess it is a simple state.
             fid = rho_sort[-1]
@@ -371,70 +347,37 @@ def plot_qst(dir, id, ro_mat=None, fid=None, normalize=False):
             msg = 'sum(highest bars)/2'
     else:
         msg = 'Fidelity'
-    ax.text2D(0.0,0.9, f'abs($\\rho$), {msg}={fid*100:.1f}%', 
-        transform=ax.transAxes, fontsize='x-large')
-    cbar = ax.collections[0].colorbar
-    ax.set(
-        title=lf.name.as_plot_title(),
-        xticklabels=labels,
-        yticklabels=labels,
-    )
+    ax.text2D(0, .9, f'abs($\\rho$), {msg}={fid:.1%}', transform=ax.transAxes, 
+              fontsize='x-large')
+    
     name = lf.name.copy()
     return rho, name, ax
 
+
 def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
     def qst(id, ro_mat):
-        lf = fileio.LabradRead(dir, id)
-        probs = plot_tomo_probs(lf, ro_mat=ro_mat, plot=False)
-        rho = tomo.qst(probs, 'tomo')
+        lf = fileio.read_labrad(dir, id)
+        probs = plot_tomo_probs(lf, ro_mat=ro_mat)
+        rho = tomo.qst(probs)
         return rho
-    if in_ids is None:
-        rho_in = {
-            '0': np.array([
-                [1,0],
-                [0,0],
-            ]),
-            '1': np.array([
-                [0,0],
-                [0,1],
-            ]),
-            'x': np.array([
-                [.5, .5j],
-                [-.5j, .5],
-            ]),
-            'y': np.array([
-                [.5, .5],
-                [.5, .5]
-            ])
-        }
-    else:
-        rho_in = {k: qst(id, ro_mat_in) for k, id in in_ids.items()}
     
-    rho_out = {k: qst(id, ro_mat_out) for k, id in out_ids.items()}
-    rho_out['0']
+    rho_in = [qst(in_ids[init], ro_mat_in) for init in "0xy1"] if in_ids is not None else "0xy1"
+    rho_out = [qst(out_ids[init], ro_mat_out) for init in "0xy1"]
+    chi = tomo.qpt(rho_out, rho_in)
 
-    chi = tomo.qpt(
-        [rho_in[k] for k in ('0', 'x', 'y', '1')], 
-        [rho_out[k] for k in ('0', 'x', 'y', '1')], 
-        'sigma',
-    )
-
-    # Resolve plot titles.
-    lf = fileio.LabradRead(dir, out_ids['0'])
+    ax = plotter.plot_mat3d(chi)
+    fid = np.abs(chi[0,0])
+    ax.text2D(0, .9, f'abs($\\chi$), Fidelity={fid:.1%}', transform=ax.transAxes, 
+              fontsize='x-large')
+    
+    lf = fileio.read_labrad(dir, out_ids['0'])
     name = lf.name.copy()
-    if in_ids:
-        sid = (f'{min(in_ids.values())}-{max(in_ids.values())}'
-            f'-> #{min(out_ids.values())}-{max(out_ids.values())}')
+    if in_ids is not None:
+        sid = (f'#{min(out_ids.values())}-{max(out_ids.values())}'
+               f'<- {min(in_ids.values())}-{max(in_ids.values())}')
     else:
         sid = f'{min(out_ids.values())}-{max(out_ids.values())} <- ideal'
     name.id = sid
-
-    ax = plotter.plot_mat3d(np.abs(chi))
-    fid = np.abs(chi[0,0])
-    ax.text2D(0.0,0.9, f'abs($\\chi$), Fidelity={fid*100:.1f}%', 
-        transform=ax.transAxes, fontsize='x-large')
-    cbar = ax.collections[0].colorbar
-    cbar.set_label('$|\\chi|$')
     ax.get_figure().suptitle(name.as_plot_title())
 
     return chi, rho_in, rho_out, name, ax
