@@ -4,6 +4,7 @@ import math
 import warnings
 
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as font_manager
 import numpy as np
 import pandas as pd
 import scipy.io
@@ -181,11 +182,6 @@ def plot_iq_scatter(lf, return_ro_mat=False):
     nlevels = 0
     while f'i{nlevels}' in df: nlevels += 1
 
-    qb = lf.conf['parameter']['measure'][0]
-    stater = state_disc.NCenter(
-        [lf.conf['parameter'][f'Device.{qb}.|{i}> center'] for i in range(nlevels)])
-    list_points = [df[[f'i{i}', f'q{i}']].values for i in range(nlevels)]
-
     if '|0> center new' in lf.conf['parameter']:
         new = np.array([lf.conf['parameter'][f'|{i}> center new'] for i in range(nlevels)])
         old = np.array([lf.conf['parameter'][f'|{i}> center old'] for i in range(nlevels)])
@@ -193,11 +189,17 @@ def plot_iq_scatter(lf, return_ro_mat=False):
         new = np.array([lf.conf['parameter'][f'-|{i}> center new'] for i in range(nlevels)])
         old = np.array([lf.conf['parameter'][f'-|{i}> center old'] for i in range(nlevels)])
     else:
-        new = np.zeros((2,2))
+        qb = lf.conf['parameter']['measure'][0]
+        # This parameter could be old.
+        new = [lf.conf['parameter'][f'Device.{qb}.|{i}> center'] for i in range(nlevels)]
         old = np.zeros((2,2))
 
+    stater = state_disc.NCenter(new)
+    list_points = [df[[f'i{i}', f'q{i}']].values for i in range(nlevels)]
+
     figsize = (6,3) if len(list_points) == 2 else (8,3)
-    fig, axs = plt.subplots(ncols=nlevels, figsize=figsize, sharex=True, sharey=True)
+    fig = plt.figure(figsize=figsize, layout='none')
+    axs = fig.subplots(ncols=nlevels, sharex=True, sharey=True)
     fig.suptitle(lf.name.as_plot_title())
     for i, pts in enumerate(list_points):
         axs[i].scatter(pts[:,0], pts[:,1], marker=f"${i}$", color=f'C{i}')
@@ -206,6 +208,7 @@ def plot_iq_scatter(lf, return_ro_mat=False):
         axs[i].plot(old[:,0], old[:,1], ls='--', color='gray')
         axs[i].plot(new[:,0], new[:,1], ls=':', color='k')
         
+    label_font = font_manager.FontProperties(family='Arial', stretch='condensed')
     ro_mat = []
     for i, pts in enumerate(list_points):
         stater.plot_regions(axs[i], label=False)
@@ -213,7 +216,7 @@ def plot_iq_scatter(lf, return_ro_mat=False):
         ro_mat.append(probs)
         for j in range(nlevels):
             center = stater.centers[j]
-            axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', (center[0], center[1]), ha='center')
+            axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', center, ha='center', font=label_font)
     
     if return_ro_mat:
         return fig, ro_mat
@@ -425,7 +428,7 @@ def plot_rb(dir, id, id_ref, residue=None):
     def rb_decay(x, amp=0.5, fid=0.99, residue=0.5):
         return amp * fid**x + residue
 
-    mod = models.MyModel(rb_decay)
+    mod = models.Model(rb_decay)
     if residue: mod.set_param_hint('residue', vary=False, value=residue)
 
     cfit = fitter.CurveFit(
@@ -486,7 +489,7 @@ def plot_rb_multi(dir, ids, id_ref, residue=None):
     def rb_decay(x, amp=0.5, fid=0.99, residue=0.5):
         return amp * fid**x + residue
 
-    mod = models.MyModel(rb_decay)
+    mod = models.Model(rb_decay)
     if residue: mod.set_param_hint('residue', vary=False, value=residue)
 
     cfits = [fitter.CurveFit(
@@ -673,11 +676,12 @@ def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0):
 def fit_distortion(xdata, ydata, taus=(1e3, 1e2)):
     prefixs = 'abcdefghijklmn'
 
-    mod = models.OffsetFeature()
+    def offset(x, offset=0): return np.ones_like(x) * offset
+    mod = models.Model(offset)
     def exp(x, tau=1, amp=1):
         return amp * np.exp(-x/tau)
     for i in range(len(taus)):
-        mod = mod + models.MyModel(exp, prefix=prefixs[i]+'_')
+        mod = mod + models.Model(exp, prefix=prefixs[i]+'_')
 
     for i in range(len(taus)):
         mod.set_param_hint(prefixs[i]+'_tau', min=0, value=taus[i])

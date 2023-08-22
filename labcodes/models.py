@@ -93,6 +93,40 @@ class GaussianDecayModel(Model):
         return self.make_params(amp=amp, offset=offset, rate=1/tau)
 
 
+class GaussianModel(Model):
+    """amp * np.exp(-(x - center)**2 / (2 * width**2)) + offset"""
+
+    def __init__(self, **kwargs):
+        def exp(x, amp=1, center=0, width=1, offset=0):
+            return amp * np.exp(-(x-center)**2/(2*width**2)) + offset
+        super().__init__(exp, **kwargs)
+        
+    def guess(self, y:np.ndarray, x:np.ndarray):
+        iy_min = np.argmin(y)
+        iy_max = np.argmax(y)
+        ix_max = np.argmax(x)
+        ix_min = np.argmin(x)
+        offset = y[0]
+        width = 0.1 * (x[ix_max] - x[ix_min])
+        if offset - y[iy_min] < y[iy_max] - offset:
+            # If peak
+            peak_i = iy_max
+            center = x[peak_i]
+            amp = y[peak_i] - offset  # Positive value
+        else:
+            # If dip
+            dip_i = iy_min
+            center = x[dip_i]
+            amp = y[dip_i] - offset  # Negative value
+
+        return self.make_params(
+            amp=amp,
+            center=center,
+            width=width,
+            offset=offset,
+        )
+
+
 class ResonatorModel_inverse(Model):
 
     def __init__(self, s21_inverse=True, **kwargs):

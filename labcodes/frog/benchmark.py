@@ -23,7 +23,7 @@ class XEB:
         cfit = fitter.CurveFit(
             xdata=df['m'].values,
             ydata=df['fidelity_per_round'].values,
-            model=models.MyModel(rb_decay),
+            model=models.Model(rb_decay),
         )
         df['fitted_y'] = cfit.fdata(x=df['m'])[1]
 
