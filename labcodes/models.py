@@ -309,7 +309,7 @@ class TransmonModel(Model):
         divider = make_axes_locatable(ax)
         ax2 = divider.append_axes('bottom', size='10%', pad=0.05, sharex=ax)
 
-        ax2.plot(cfit.xdata, cfit.fdata() - cfit.ydata, 'x')
+        ax2.plot(cfit.xdata, cfit.fdata()[1] - cfit.ydata, 'x')
         ax2.axhline(0, color='C0')
         ax2.set_ylabel('residues')
         ax2.tick_params(axis='y', labelsize='small')

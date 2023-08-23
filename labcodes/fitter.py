@@ -91,7 +91,9 @@ class CurveFit(object):
             params = None
 
         if params is not None:
-            params.set(**self.model.param_hints)
+            for hint in self.model.param_hints:
+                if 'value' in hint:
+                    params[hint['name']].set(value=hint['value'])
 
         _kws = self.fit_kws.copy()
         _kws.update(kws)
