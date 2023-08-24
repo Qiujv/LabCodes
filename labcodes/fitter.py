@@ -79,6 +79,11 @@ class CurveFit(object):
     @property
     def fit_report(self):
         return self.result.fit_report()
+    
+    @property
+    def kws(self):
+        """For quick access to fit parameters."""
+        return {k: v.value for k, v in self.result.params.items() if v.expr is None}
 
     def fit(self, **kws) -> None:
         """Perform fit with given kws as initial values of parameters."""
@@ -209,8 +214,8 @@ class BatchFit(object):
         if not hold:
             try:
                 self.fit()
-            except Exception as exc:
-                print(f'WARNING: Fit failed. Error reports \n{exc}')
+            except:
+                logger.exception("Error in fitting.")
         else:
             self.result = None
 
@@ -376,8 +381,8 @@ class BatchFit(object):
         self.result = []
         for i in trange(self.num_of_fits, desc='Fitting'):
             try:
-                result = self.model.fit(self.ybatch[i], x=self.xbatch[i], **kwargs)
-                self.result.append(result)
+                cfit = CurveFit(self.xbatch[i], self.ybatch[i], self.model)
+                self.result.append(cfit.result)
             except Exception as error:
                 raise Exception(f'Something went wrong at fit#{i}') from error
         self._params = self.get_params()

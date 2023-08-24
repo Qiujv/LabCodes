@@ -96,7 +96,7 @@ def fit_coherence(logf, ax=None, model=None, kind=None, xmax=None, **kwargs):
         ax = logf.plot1d(ax=ax, y_name='s1_prob')
 
     fig = ax.get_figure()
-    fig.set_size_inches(5,3)
+    fig.set_size_inches(5,2.5)
 
     if kind is None: kind = str(logf.name)
     if 'T1' in kind:
@@ -133,8 +133,8 @@ def fit_coherence(logf, ax=None, model=None, kind=None, xmax=None, **kwargs):
 
     fdata = np.linspace(logf.df[xname].min(), logf.df[xname].max(), 5*logf.df.shape[0])
     ax.plot(*cfit.fdata(fdata), 'r-', lw=1)
-    ax.annotate(f'${symbol}\\approx {cfit["tau"]:,.2f}\\pm{cfit["tau_err"]:,.4f} {xname[-2:]}$', 
-        (0.6,0.9), xycoords='axes fraction')
+    ax.annotate(f'${symbol}= {cfit["tau"]:,.2f}\\pm{cfit["tau_err"]:,.3f}${xname[-2:]}', 
+        (1,1), xycoords='axes fraction', fontsize='large', ha='right', va='top')
     # ax.annotate(f'offset={cfit["offset"]:.2f}$\\pm${cfit["offset_err"]:.2f}', 
     #     (0.95,0.1), xycoords='axes fraction', ha='right')
     return cfit, ax
