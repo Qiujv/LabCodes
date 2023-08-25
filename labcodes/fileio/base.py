@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from attrs import define
 
+from labcodes.fileio.misc import data_from_json, data_to_json
 from labcodes import plotter
 
 PATH_LEGAL = {
@@ -120,7 +121,7 @@ class LogFile:
         dir = Path(dir)
         path = cls.find(dir, id, ".feather")
         df = pd.read_feather(path)
-        conf = json.load(path.with_suffix(".json"))
+        conf = data_from_json(path.with_suffix(".json"))
         name = LogName.from_path(path)
         indeps = conf["indeps"]
         deps = conf["deps"]
@@ -129,7 +130,7 @@ class LogFile:
     def save(self, dir: Path) -> Path:
         """Save a logfile into a .feather file and a .json files."""
         dir = Path(dir).resolve()
-        p = dir / self.name.fname()
+        p = dir / (self.name.fname() + '.no_suffix')
         self.df.to_feather(p.with_suffix(".feather"))
 
         conf = self.conf.copy()
@@ -137,7 +138,7 @@ class LogFile:
             conf["deps"] = self.deps
         if "indeps" not in conf:
             conf["indeps"] = self.indeps
-        json.dump(conf, p.with_suffix(".json"))
+        data_to_json(conf, p.with_suffix(".json"))
         return p
 
     @staticmethod
@@ -221,10 +222,12 @@ class LogName:
 
     ptitle = as_plot_title
 
-    def as_file_name(self) -> str:
+    def as_file_name(self, suffix: str = '') -> str:
         s = f"#{self.id}, {self.title}"
         for k, v in PATH_LEGAL.items():
             s = s.replace(k, v)
+        if suffix:
+            s += suffix
         return s
 
     fname = as_file_name
