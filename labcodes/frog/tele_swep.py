@@ -26,7 +26,12 @@ class qpt_tele_state:
     """
     TOMO_OPS = tuple('0xy')
     QPT_INITS = tuple('0xy1')
-    def __init__(self, lf:fileio.LogFile, kind: Literal['fb', 'ps'] = None):
+    def __init__(
+        self,
+        lf:fileio.LogFile,
+        kind: Literal['fb', 'ps'] = None,
+        ro_mat: np.matrix = ((1,0),(0,1)),
+    ):
         self.lf = lf
         df = lf.df
         if 'run' not in df: df['run'] = 0  # For data with only one run.
@@ -53,6 +58,7 @@ class qpt_tele_state:
         else:
             raise ValueError(f'kind {kind} not recognized')
         
+        self.ro_mat = np.asarray(ro_mat)
         self.selects = ('00', '01', '10', '11')
         self._rho = {select: {} for select in self.selects}
         self._chi = {select: {} for select in self.selects}
@@ -92,6 +98,7 @@ class qpt_tele_state:
         run: Union[int, Literal['mean', 'ideal']] = 0, 
         init_state: Literal['0', 'x', 'y', '1'] = '0', 
         select: Literal['00', '01', '10', '11'] = '00',
+        ro_mat: np.matrix = None,
     ) -> pd.DataFrame:
         if run == 'mean':
             vals = np.mean([self.probs(run, init_state, select).values 
@@ -105,6 +112,11 @@ class qpt_tele_state:
         probs = probs.set_index('tomo_op').loc[self.TOMO_OPS, [f'p{select}0', f'p{select}1']]
         p_select = probs.sum(axis='columns').replace({0:np.inf})  # TODO: include this in result.
         probs = probs.divide(p_select, axis='index')
+        if ro_mat is None:
+            ro_mat = self.ro_mat
+        else:
+            ro_mat = np.asarray(ro_mat)
+        probs = probs @ np.linalg.inv(ro_mat).T
         return probs
 
     def rho(
@@ -201,7 +213,7 @@ class qpt_tele_state:
         for i, (select, mat) in enumerate(chi_dict.items()):
             ax_r:plt.Axes = fig.add_subplot(2, 4, 2*i+1, projection='3d')
             ax_i:plt.Axes = fig.add_subplot(2, 4, 2*i+2, projection='3d')
-            plotter.plot_complex_mat3d(mat, [ax_r, ax_i], cmin=-1, cmax=1, colorbar=False)
+            plotter.plot_complex_mat3d(mat, [ax_r, ax_i], cmin=-1, cmax=1)
             # Ok for run=='mean' because `fid` is linear.
             fid = tomo.fid_overlap(mat, self.chi_ideal[select])
             ax_r.set_title(f'select={select}, Fchi={fid:.2%}')
