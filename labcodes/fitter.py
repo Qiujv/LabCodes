@@ -576,7 +576,7 @@ class BatchFit_withDots(BatchFit):
         self.y_name = y_name
         # if verbose:
         #     print(f'{len(ybatch)} traces are loaded.')
-        super().__init__(np.array(xbatch), np.array(ybatch), model, hold)
+        super().__init__(xbatch, ybatch, model, hold)
 
     def get_params(self):
         params = super().get_params()

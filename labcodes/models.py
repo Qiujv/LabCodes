@@ -371,7 +371,7 @@ class GmonModel(Model):
 
         dip_y = cfit['offset'] + cfit['max_y_shift']
         ax.axhline(y=dip_y, **gs)
-        ax.annotate(f"$\\Delta y_\\mathrm{{max}}={cfit['max_y_shift']:.4f}\\pm{cfit['max_y_shift_err']:.4f}$", 
+        ax.annotate(f"$\\Delta y_\\mathrm{{max}}={cfit['max_y_shift']:.4f}±{cfit['max_y_shift_err']:.4f}$", 
             (ax.get_xlim()[0], dip_y), va='bottom', ha='left')
 
         xmin, xmax = ax.get_xlim()
@@ -400,7 +400,7 @@ class GmonModel(Model):
                 ax.annotate(f"x={zero2:.3f}", 
                     (zero2, cfit['offset']), va='top', ha='left', rotation='vertical')
 
-        ax.annotate(f"$R=L_\\mathrm{{linear}}/L_{{j0}}={cfit['r']:.3f}\\pm{cfit['r_err']:.4f}$", 
+        ax.annotate(f"$R=L_\\mathrm{{linear}}/L_{{j0}}={cfit['r']:.3f}±{cfit['r_err']:.4f}$", 
             (1,0), xycoords=ax.transAxes, va='bottom', ha='right')
 
         return ax
