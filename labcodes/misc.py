@@ -237,6 +237,29 @@ def zigzag_arange(n):
     return idx
 
 
+def exclude_regions(
+    xdata: np.ndarray,
+    regions: list[tuple[float]],
+    exclude_endpoints: bool = False,
+) -> np.ndarray:
+    """Exclude regions from xdata.
+    
+    >>> exclude_regions(np.arange(10), [(2, 5), (7, 9)])
+    array([0, 1, 2, 5, 6, 7, 9])
+    >>> exclude_regions(np.arange(10), [(2, 5), (7, 9)], True)
+    array([0, 1, 6, 8])
+    """
+    xdata = np.asarray(xdata)
+    mask = np.ones_like(xdata, dtype=bool)
+    for x0, x1 in regions:
+        if x0 > x1: x0, x1 = x1, x0
+        if exclude_endpoints:
+            mask = mask & ((xdata < x0) | (xdata > x1))
+        else:
+            mask = mask & ((xdata <= x0) | (xdata >= x1))
+    return xdata[mask]
+
+
 def multiples(period, shift, vmin, vmax) -> np.ndarray:
     """Returns multiples of period with shift within [vmin, vmax].
 
