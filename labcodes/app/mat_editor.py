@@ -84,10 +84,9 @@ class MatrixEditor(tk.Frame):
         for i in range(ndim):
             for j in range(ndim):
                 val = matrix[i,j]
-                bg_color = self.cmap(self.norm(val))
-                txt_color = 'black' if mpl.colors.rgb_to_hsv(bg_color[:3])[2] > 0.5 else 'white'
-                bg_color = mpl.colors.to_hex(bg_color)
-                element_entry = tk.Entry(self.matrix_frame, width=4, background=bg_color, foreground=txt_color)
+                bg_color, txt_color = self.get_color(val)
+                element_entry = tk.Entry(self.matrix_frame, width=4, 
+                                         background=bg_color, foreground=txt_color)
                 element_entry.insert(0, val)
                 element_entry.bind('<Key-Return>', self.update_color)
                 element_entry.bind("<Button-3>", self.context_menu)
@@ -157,10 +156,19 @@ class MatrixEditor(tk.Frame):
     def update_color(self, event: tk.Event):
         element_entry = event.widget
         val = float(element_entry.get())
-        bg_color = self.cmap(self.norm(val))
-        txt_color = 'black' if mpl.colors.rgb_to_hsv(bg_color[:3])[2] > 0.5 else 'white'
-        bg_color = mpl.colors.to_hex(bg_color)
+        bg_color, txt_color = self.get_color(val)
         element_entry.config(background=bg_color, foreground=txt_color)
+    
+    def get_color(self, val: float):
+        bg_color = self.cmap(self.norm(val))
+        if np.isclose(val, 0):
+            txt_color = 'lightgrey'
+        elif mpl.colors.rgb_to_hsv(bg_color[:3])[2] > 0.5:
+            txt_color = 'black'
+        else:
+            txt_color = 'white'
+        bg_color = mpl.colors.to_hex(bg_color)
+        return bg_color, txt_color
 
 class ToolTip:
     def __init__(self, widget, text):
