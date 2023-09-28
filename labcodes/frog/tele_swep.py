@@ -309,6 +309,7 @@ class qpt_tele_gate:
         lf:fileio.LogFile,
         kind: Literal['fb', 'ps'] = None,
         ro_mat: np.matrix = ((1, 0, 0, 0),(0, 1, 0, 0),(0, 0, 1, 0),(0, 0, 0, 1)),
+        parallel: bool = False,
     ):
         self.lf = lf
         df = lf.df.copy()
@@ -342,7 +343,10 @@ class qpt_tele_gate:
         self._rho = {select: {} for select in self.selects}
         self._chi = {select: {} for select in self.selects}
         try:
-            self.build_all()
+            if parallel:
+                self.build_all_parallel()
+            else:
+                self.build_all()
         except:
             logger.exception(f'failed to construct rho and chi for {self.lf.name}')
 
@@ -420,6 +424,29 @@ class qpt_tele_gate:
                 self._rho[select][run] = rho
                 chi = self.chi(run, select)
                 self._chi[select][run] = chi
+
+    def build_all_parallel(self) -> None:
+        from joblib import Parallel, delayed
+        def job(run, select) -> None:
+            if len(self.df.query(f'run == {run}')) != 144:
+                logger.warning(f'run {run} does not have 144 tomo points')
+                return None, None
+            
+            rho = {init: self.rho(run, init, select) for init in self.QPT_INITS}
+            self._rho[select][run] = rho
+            chi = self.chi(run, select)
+            self._chi[select][run] = chi
+            return rho, chi
+
+        results = Parallel(n_jobs=-3, verbose=3)(
+            delayed(job)(run, select) 
+            for run, select in product(self.df['run'].unique(), self.selects)
+        )
+        for (rho, chi), (run, select) in zip(results, product(self.df['run'].unique(), 
+                                                              self.selects)):
+            if rho is None: continue
+            self._rho[select][run] = rho
+            self._chi[select][run] = chi
 
     @property
     def Frho(self) -> pd.DataFrame:
