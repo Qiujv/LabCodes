@@ -2,15 +2,22 @@
 
 import math
 import warnings
+import copy
+import logging
+from functools import cached_property
 
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 import numpy as np
 import pandas as pd
 import scipy.io
+from tqdm import tqdm
 
 from labcodes import fileio, fitter, misc, models, plotter, state_disc, tomo
 from labcodes.frog import tele, iq_scatter
+
+
+logger = logging.getLogger(__name__)
 
 
 def plot2d_multi(dir, ids, sid=None, title=None, x_name=0, y_name=1, z_name=0, ax=None, **kwargs):
@@ -392,6 +399,207 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
     return chi, rho_in, rho_out, name, ax
     
 
+class QPT_1Q:
+    """Processing single qubit process tomography data.
+    
+    The dataframe should include columns: 'run', 'tomo_op', 'init_state', 'p0', 'p1'.
+    """
+    TOMO_OPS = ('0', 'x', 'y')
+    QPT_INITS = ('0', 'x', 'y', '1')
+    def __init__(
+        self,
+        lf: fileio.LogFile,
+        ro_mat: np.matrix = ((1,0),(0,1)),
+        rho_in: dict[str, np.matrix] = None,
+    ) -> None:
+        self.lf = lf
+        df = lf.df.copy()
+        if 'run' not in df: df['run'] = 0
+        self.df = df
+        self.mean_after_tomo = True
+
+        self.ro_mat = np.asarray(ro_mat)
+        self.rho_ideal = dict(zip("0xy1", tomo.get_rho_in("0xy1")))
+        self.rho_in = self.rho_ideal if rho_in is None else rho_in
+        self.chi_ideal = np.zeros((4, 4), dtype=np.complex128)
+        self.chi_ideal[0, 0] = 1
+        self._rho = {}  # run: rho
+        self._chi = {}  # run: chi
+        try:
+            self.build_all()
+        except:
+            logger.exception("Failed to build all")
+
+    def probs(self, run=0, init_state='0') -> pd.DataFrame:
+        if run == 'mean':
+            vals = np.mean([self.probs(run, init_state).values 
+                            for run in self.df['run'].unique()], axis=0)
+            return pd.DataFrame(vals, index=self.probs().index, 
+                                columns=self.probs().columns)
+        elif run == 'ideal':
+            raise ValueError('run="ideal" not supported for probs')
+        
+        probs = self.df.query(f'run == {run} and init_state == "{init_state}"')
+        probs = probs.set_index('tomo_op').loc[self.TOMO_OPS, ['p0', 'p1']]
+        probs = probs @ self.ro_mat.T
+        assert np.allclose(probs.sum(axis=1), 1), "ro_mat is correct"
+        return probs
+    
+    def rho(self, run=0, init_state='0') -> np.matrix:
+        if run in self._rho:
+            if init_state in self._rho[run]:
+                return self._rho[run][init_state]
+        
+        if run == 'mean' and self.mean_after_tomo:
+            return np.mean([self.rho(run, init_state) 
+                            for run in self.df['run'].unique()], axis=0)
+        
+        if run == 'ideal':
+            return self.rho_ideal[init_state]
+        
+        probs = self.probs(run, init_state)
+        return tomo.qst(probs.values)
+    
+    def chi(self, run=0) -> np.matrix:
+        if run in self._chi:
+            return self._chi[run]
+        
+        if run == 'mean' and self.mean_after_tomo:
+            return np.mean([self.chi(run) 
+                            for run in self.df['run'].unique()], axis=0)
+        
+        if run == 'ideal':
+            return self.chi_ideal
+        
+        return tomo.qpt([self.rho(run, init) for init in self.QPT_INITS],
+                        [self.rho_in[init] for init in self.QPT_INITS])
+    
+    def build_all(self) -> None:
+        for run in tqdm(self.df['run'].unique()):
+            self._rho[run] = {init: self.rho(run, init) for init in self.QPT_INITS}
+            self._chi[run] = self.chi(run)
+
+    @cached_property
+    def Fchi(self) -> pd.DataFrame:
+        records = []
+        for run in self.df['run'].unique():
+            rec = {'run': run}
+            rec['Fchi'] = tomo.fid_overlap(self.chi_ideal, self.chi(run))
+            for init in self.QPT_INITS:
+                rec[f'F{init}'] = tomo.fid_overlap(self.rho_ideal[init], 
+                                                   self.rho(run, init))
+            records.append(rec)
+        return pd.DataFrame.from_records(records)
+    
+    @property
+    def fname(self) -> fileio.LogName:
+        fname = self.lf.name.copy()
+        fname.title = fname.title[12:]
+        fchi_mean = self.Fchi['Fchi'].mean()
+        fchi_std = self.Fchi['Fchi'].std()
+        fname.title += f' Fchi_mean={fchi_mean:.2%}±{fchi_std:.2%},runs{self.df.run.max()+1}'
+        return fname
+    
+    def plot_chi(self, run='mean'):
+        chi = self.chi(run)
+        ax = plotter.plot_mat3d(chi)
+        ax.set_title(self.fname.ptitle())
+        ax.tick_params('z', pad=-0.1)
+        ax.set_xticklabels('IXYZ')
+        ax.set_yticklabels('IXYZ')
+        fig = ax.get_figure()
+        fig.set_size_inches(5,5)
+        return fig
+    
+    def plot_rho(self, run='mean'):
+        fig = plt.figure(figsize=(6, 3))
+        fig.set_layout_engine('none')
+        for i, init in enumerate(self.QPT_INITS):
+            ax_r: plt.Axes = fig.add_subplot(2, 4, 2*i+1, projection='3d')
+            ax_i: plt.Axes = fig.add_subplot(2, 4, 2*i+2, projection='3d')
+            rho = self.rho(run, init)
+            plotter.plot_complex_mat3d(rho, [ax_r, ax_i], cmin=-.5, cmax=.5, label=False)
+            fid = tomo.fid_overlap(self.rho_ideal[init], rho)
+            ax_r.set_title(f'F{init}={fid:.2%}', y=0.92)
+            ax_r.set_zlim(0, 1)
+            ax_i.set_zlim(-.5, .5)
+            for ax in ax_r, ax_i:
+                ax.set_xticklabels([])
+                ax.set_yticklabels([])
+                ax.tick_params('z', pad=0, labelsize='x-small')
+        fig.suptitle(self.fname.ptitle())
+        fig.subplots_adjust(wspace=0.25, hspace=0)
+        return fig
+    
+    @classmethod
+    def from_st_data(
+        cls,
+        lf0: fileio.LogFile,
+        lfx: fileio.LogFile,
+        lfy: fileio.LogFile,
+        lf1: fileio.LogFile,
+        ro_mat: np.matrix = ((1,0),(0,1)),
+        rho_in: dict[str, np.matrix] = None,
+    ):
+        """Adapter for old data format, for state transfer tomo."""
+        qa = lf0.conf['parameter']['-qb_a'].lower()
+        qb = lf0.conf['parameter']['-qb_b'].lower()
+        if ro_mat is None: ro_mat = lf0.conf['parameter'][f"Device.{qb.upper()}.ro_mat"]
+        dfs = []
+        for lf, init in zip((lf0, lfx, lfy, lf1), '0xy1'):
+            records = []
+            for _, row in lf.df.iterrows():
+                records.extend([
+                    {'run': int(row['runs']), 'tomo_op': '0', 'p0': row[f'{qa}_i,_{qb}_s0'], 'p1': row[f'{qa}_i,_{qb}_s1']},
+                    {'run': int(row['runs']), 'tomo_op': 'x', 'p0': row[f'{qa}_x/2,_{qb}_s0'], 'p1': row[f'{qa}_x/2,_{qb}_s1']},
+                    {'run': int(row['runs']), 'tomo_op': 'y', 'p0': row[f'{qa}_y/2,_{qb}_s0'], 'p1': row[f'{qa}_y/2,_{qb}_s1']},
+                ])
+            _df = pd.DataFrame.from_records(records)
+            _df['init_state'] = init
+            _df = _df[['run', 'init_state', 'tomo_op', 'p0', 'p1']]
+            dfs.append(_df)
+        df = pd.concat(dfs, ignore_index=True)
+        lf = copy.copy(lf0)
+        lf.df = df
+        all_id = {lf0.name.id, lfx.name.id, lfy.name.id, lf1.name.id}
+        lf.name.id = f'{min(all_id)}-{max(all_id)}'
+        lf.name.title = lf.name.title.replace(' 0 state tomo', '')[1:]
+        return cls(lf, ro_mat, rho_in)
+    
+    @classmethod
+    def from_1q_data(
+        cls,
+        lf0: fileio.LogFile,
+        lfx: fileio.LogFile,
+        lfy: fileio.LogFile,
+        lf1: fileio.LogFile,
+        ro_mat: np.matrix = ((1,0),(0,1)),
+        rho_in: dict[str, np.matrix] = None,
+    ):
+        """Adapter for old data format, for single qubit process tomo."""
+        qb = lf0.conf['parameter']['-qubit'].lower()
+        if ro_mat is None: ro_mat = lf0.conf['parameter'][f"Device.{qb.upper()}.ro_mat"]
+        dfs = []
+        for lf, init in zip((lf0, lfx, lfy, lf1), '0xy1'):
+            records = []
+            for _, row in lf.df.iterrows():
+                records.extend([
+                    {'run': int(row['runs']), 'tomo_op': '0', 'p0': row[f'{qb}_i,_s0'], 'p1': row[f'{qb}_i,_s1']},
+                    {'run': int(row['runs']), 'tomo_op': 'x', 'p0': row[f'{qb}_x/2,_s0'], 'p1': row[f'{qb}_x/2,_s1']},
+                    {'run': int(row['runs']), 'tomo_op': 'y', 'p0': row[f'{qb}_y/2,_s0'], 'p1': row[f'{qb}_y/2,_s1']},
+                ])
+            _df = pd.DataFrame.from_records(records)
+            _df['init_state'] = init
+            _df = _df[['run', 'init_state', 'tomo_op', 'p0', 'p1']]
+            dfs.append(_df)
+        df = pd.concat(dfs, ignore_index=True)
+        lf = copy.copy(lf0)
+        lf.df = df
+        all_id = {lf0.name.id, lfx.name.id, lfy.name.id, lf1.name.id}
+        lf.name.id = f'{min(all_id)}-{max(all_id)}'
+        lf.name.title = lf.name.title.replace(' 0 state tomo', '')[1:]
+        return cls(lf, ro_mat, rho_in)
+
 
 def df2mat(df, fname=None, xy_name=None):
     """Save dataframe to .mat file. For internal communication.
@@ -655,7 +863,7 @@ def plot_2q_qpt(dir, start, ref_start=None, ro_mat=None, plot_all=False):
 
     return ax, lf_name
 
-def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0):
+def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0, use_fit=False):
     fig, (ax, ax2) = plt.subplots(nrows=2, figsize=(5,5), sharex=True)
 
     if isinstance(x_name, int): x_name = lf.indeps[x_name]
@@ -667,16 +875,25 @@ def plot_ramsey_phase(lf:fileio.LogFile, x_name=0, y_name=1, z_name=0):
     fig.suptitle(ax2.get_title())
     ax2.set_title(None)
 
+    if use_fit:
+        mod = models.SineModel()
+        mod.set_param_hint('freq', value=1/(2*np.pi), vary=False)
+        mod.set_param_hint('amp', min=0)
+
     df = lf.df.groupby(x_name).filter(lambda x: len(x) > 1)
     records = []
     for x, gp in df.groupby(x_name):
-        phi = misc.guess_phase(gp[y_name].values, gp[z_name].values, 1/(2*np.pi))
+        if use_fit:
+            phi = fitter.CurveFit(gp[y_name].values, gp[z_name].values, mod)['phase']
+        else:
+            phi = misc.guess_phase(gp[y_name].values, gp[z_name].values, 1/(2*np.pi))
         records.append({x_name: x, 'phi': phi})
     df = pd.DataFrame.from_records(records)
-    df['phi'] = np.unwrap(df['phi'].values)
+    # df['phi'] = np.unwrap(df['phi'].values); print('unwrapped')
     ax.plot(x_name, 'phi', data=df, marker='.', label='')
     # ax.set_xscale('log')
     ax.set_ylabel('phi')
+    ax.secondary_yaxis('right', functions=(np.rad2deg, np.deg2rad))
     ax2.autoscale_view()
     return fig, df
 
