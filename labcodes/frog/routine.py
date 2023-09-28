@@ -321,6 +321,12 @@ def plot_tomo_probs(logf: fileio.LogFile, ro_mat=None, ax=None) -> np.ndarray:
     # State labels runs faster.
     labels = se.index.values.reshape(n_ops, n_sts)
     probs = se.values.reshape(n_ops, n_sts)
+    if isinstance(ro_mat, str):
+        if ro_mat == 'from_conf':
+            ro_mat = tomo.tensor([
+                logf.conf['parameter']['Device.Q5.ro_mat'],
+                logf.conf['parameter']['Device.Q2.ro_mat'],
+            ])
     if ro_mat is not None:
         for i, ps in enumerate(probs):
             probs[i] = np.dot(np.linalg.inv(ro_mat), ps)
@@ -382,7 +388,7 @@ def plot_qpt(dir, out_ids, in_ids=None, ro_mat_out=None, ro_mat_in=None):
     lf = fileio.read_labrad(dir, out_ids['0'])
     name = lf.name.copy()
     if in_ids is not None:
-        sid = (f'#{min(out_ids.values())}-{max(out_ids.values())}'
+        sid = (f'{min(out_ids.values())}-{max(out_ids.values())}'
                f'<- {min(in_ids.values())}-{max(in_ids.values())}')
     else:
         sid = f'{min(out_ids.values())}-{max(out_ids.values())} <- ideal'
