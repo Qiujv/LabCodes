@@ -199,7 +199,7 @@ def plot_iq_scatter(lf, return_ro_mat=False):
     else:
         qb = lf.conf['parameter']['measure'][0]
         # This parameter could be old.
-        new = [lf.conf['parameter'][f'Device.{qb}.|{i}> center'] for i in range(nlevels)]
+        new = np.array([lf.conf['parameter'][f'Device.{qb}.|{i}> center'] for i in range(nlevels)])
         old = np.zeros((2,2))
 
     stater = state_disc.NCenter(new)

@@ -352,11 +352,12 @@ class qpt_tele_gate:
 
     def probs(
         self, 
-        run: Union[int, Literal['mean', 'ideal']] = 0, 
+        run: Union[int, Literal['mean', 'ideal']] = None, 
         init_state: str = '00', 
         select: Literal['00', '01', '10', '11'] = '00',
         ro_mat: np.matrix = None,
     ) -> pd.DataFrame:
+        if run is None: run = self.df['run'].unique()[0]
         if run == 'mean':
             vals = np.mean([self.probs(run, init_state, select, ro_mat).values 
                             for run in self.df['run'].unique()], axis=0)
@@ -378,10 +379,11 @@ class qpt_tele_gate:
 
     def rho(
         self, 
-        run: Union[int, Literal['mean', 'ideal']] = 0,
+        run: Union[int, Literal['mean', 'ideal']] = None,
         init_state: str = '00',
         select: Literal['00', '01', '10', '11'] = '00',
     ) -> np.ndarray:
+        if run is None: run = self.df['run'].unique()[0]
         if run in self._rho[select]:
             if init_state in self._rho[select][run]:
                 return self._rho[select][run][init_state]
@@ -398,9 +400,10 @@ class qpt_tele_gate:
 
     def chi(
         self, 
-        run: Union[int, Literal['mean', 'ideal']] = 0, 
+        run: Union[int, Literal['mean', 'ideal']] = None, 
         select: Literal['00', '01', '10', '11'] = '00',
     ) -> np.ndarray:
+        if run is None: run = self.df['run'].unique()[0]
         if run in self._chi[select]:
             return self._chi[select][run]
         
@@ -514,7 +517,7 @@ class qpt_tele_gate:
         fig.subplots_adjust(wspace=0, hspace=0)
         return fig
     
-    def plot_truth_table(self, run: Union[int, Literal['mean', 'ideal']] = 0) -> plt.Figure:
+    def plot_truth_table(self, run: Union[int, Literal['mean', 'ideal']] = 'mean') -> plt.Figure:
         fig, axs = plt.subplots(ncols=4, figsize=(8, 3), sharex=True, sharey=True)
         fig.set_layout_engine('compressed')
         for ax, select in zip(axs, ['00', '01', '10', '11']):
