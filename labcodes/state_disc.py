@@ -2,7 +2,17 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 from sklearn.neighbors import NearestCentroid
+
+try:
+    from adjustText import adjust_text
+except ImportError:
+    print("adjustText not found, txt label may overlap.")
+
+    # Make a fake null function.
+    def adjust_text(*args, **kwargs):
+        return None
 
 
 class NCenter:
@@ -31,8 +41,10 @@ class NCenter:
     def __init__(self, centers: list[np.ndarray[float]]):
         clf = NearestCentroid()
         clf.centroids_ = np.asarray(centers)
-        clf.classes_ = np.arange(len(centers))
+        n_centers = len(centers)
+        clf.classes_ = np.arange(n_centers)
         self._clf = clf
+        self.cmap = ListedColormap([f"C{i}" for i in range(n_centers)])
 
     @property
     def centers(self):
@@ -67,9 +79,19 @@ class NCenter:
         for i, pts in enumerate(list_points):
             stater.plot_regions(axs[i], label=False)
             probs = stater.probs(pts)
+            txts = []
             for j in range(n_clusters):
                 center = stater.centers[j]
-                axs[i].annotate(f"p{j}{i}={probs[j]:.1%}", center, ha="center")
+                txt = axs[i].annotate(f"p{j}{i}={probs[j]:.1%}", center, ha="center")
+                txts.append(txt)
+            adjust_text(
+                txts,
+                ax=axs[i],
+                only_move=dict(text="y"),
+                autoalign=False,
+                x=[stater.centers.mean(axis=0)[0]],
+                y=[stater.centers.mean(axis=0)[1]],
+            )
         return stater, fig
 
     def flags(self, points: np.ndarray[float]) -> np.ndarray[int]:
@@ -91,14 +113,25 @@ class NCenter:
         ax.imshow(
             self.flags(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape),
             interpolation="nearest",
-            cmap=plt.cm.Paired,
+            cmap=self.cmap,
             origin="lower",
             extent=[xmin, xmax, ymin, ymax],
+            alpha=0.5,
         )
 
         if label:
+            txts = []
             for i, center in enumerate(self.centers):
-                ax.annotate(str(i), (center[0], center[1]))
+                txt = ax.annotate(str(i), center)
+                txts.append(txt)
+            adjust_text(
+                txts,
+                ax=ax,
+                only_move=dict(text="y"),
+                autoalign=False,
+                x=[self.centers.mean(axis=0)[0]],
+                y=[self.centers.mean(axis=0)[1]],
+            )
 
 
 def probs_from_flags(
