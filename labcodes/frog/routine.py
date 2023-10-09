@@ -208,7 +208,7 @@ def plot_iq_scatter(lf: fileio.LogFile, return_ro_mat=False):
     list_points = [df[[f'i{i}', f'q{i}']].values for i in range(nlevels)]
 
     figsize = (6,3) if len(list_points) == 2 else (8,3)
-    fig = plt.figure(figsize=figsize, layout='none')
+    fig = plt.figure(figsize=figsize, layout='compressed')
     axs: list[plt.Axes] = fig.subplots(ncols=nlevels, sharex=True, sharey=True)
     fig.suptitle(lf.name.as_plot_title())
     for i, pts in enumerate(list_points):

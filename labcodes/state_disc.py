@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+import matplotlib.patheffects as patheffects
 from sklearn.neighbors import NearestCentroid
 
 try:
@@ -13,6 +14,8 @@ except ImportError:
     # Make a fake null function.
     def adjust_text(*args, **kwargs):
         return None
+
+txt_effects = patheffects.withStroke(linewidth=1, foreground='w', alpha=0.5)
 
 
 class NCenter:
@@ -68,13 +71,13 @@ class NCenter:
         n_clusters = len(self.centers)
 
         figsize = (6, 3) if len(list_points) == 2 else (8, 3)
-        fig, axs = plt.subplots(
-            ncols=n_clusters, figsize=figsize, sharex=True, sharey=True
-        )
+        fig, axs = plt.subplots(figsize=figsize)
+        axs: list[plt.Axes] = fig.subplots(ncols=n_clusters, sharex=True, sharey=True)
         for i, pts in enumerate(list_points):
             axs[i].scatter(pts[:, 0], pts[:, 1], marker=f"${i}$", color=f"C{i}")
             axs[i].set_aspect("equal")
-            axs[i].set_title(f"|{i}>")
+            axs[i].annotate(f'|{i}⟩', (0.05,1), ha='left', va='top', 
+                            xycoords='axes fraction', path_effects=[txt_effects])
 
         for i, pts in enumerate(list_points):
             stater.plot_regions(axs[i], label=False)
@@ -82,7 +85,8 @@ class NCenter:
             txts = []
             for j in range(n_clusters):
                 center = stater.centers[j]
-                txt = axs[i].annotate(f"p{j}{i}={probs[j]:.1%}", center, ha="center")
+                txt = axs[i].annotate(f"p{j}{i}={probs[j]:.1%}", center, ha="center",
+                                      path_effects=[txt_effects])
                 txts.append(txt)
             adjust_text(
                 txts,
