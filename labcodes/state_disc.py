@@ -1,5 +1,6 @@
 """State discrimination routines for qubit states."""
 
+import logging
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
@@ -15,7 +16,9 @@ except ImportError:
     def adjust_text(*args, **kwargs):
         return None
 
-txt_effects = patheffects.withStroke(linewidth=1, foreground='w', alpha=0.5)
+
+txt_effects = patheffects.withStroke(linewidth=1, foreground="w", alpha=0.5)
+logger = logging.getLogger(__name__)
 
 
 class NCenter:
@@ -67,36 +70,60 @@ class NCenter:
         if not plot:
             return self
 
-        stater = self
+        try:
+            fig = self.plot(list_points)
+        except:
+            logger.exception("Failed to plot.")
+            fig = None
+        return self, fig
+
+    def plot(self, list_points: list[np.ndarray[float]], return_ro_mat: bool = False):
         n_clusters = len(self.centers)
 
         figsize = (6, 3) if len(list_points) == 2 else (8, 3)
-        fig, axs = plt.subplots(figsize=figsize)
+        fig = plt.figure(figsize=figsize, layout="compressed")
         axs: list[plt.Axes] = fig.subplots(ncols=n_clusters, sharex=True, sharey=True)
         for i, pts in enumerate(list_points):
             axs[i].scatter(pts[:, 0], pts[:, 1], marker=f"${i}$", color=f"C{i}")
             axs[i].set_aspect("equal")
-            axs[i].annotate(f'|{i}⟩', (0.05,1), ha='left', va='top', 
-                            xycoords='axes fraction', path_effects=[txt_effects])
+            axs[i].annotate(
+                f"|{i}⟩",
+                (0.03, 0.98),
+                ha="left",
+                va="top",
+                xycoords="axes fraction",
+                path_effects=[txt_effects],
+            )
+            axs[i].tick_params("both", direction="in")
 
+        ro_mat = []
         for i, pts in enumerate(list_points):
-            stater.plot_regions(axs[i], label=False)
-            probs = stater.probs(pts)
+            self.plot_regions(axs[i], label=False)
+            probs = self.probs(pts)
+            ro_mat.append(probs)
             txts = []
             for j in range(n_clusters):
-                center = stater.centers[j]
-                txt = axs[i].annotate(f"p{j}{i}={probs[j]:.1%}", center, ha="center",
-                                      path_effects=[txt_effects])
+                center = self.centers[j]
+                txt = axs[i].annotate(
+                    f"p{j}{i}={probs[j]:.1%}",
+                    center,
+                    ha="center",
+                    path_effects=[txt_effects],
+                )
                 txts.append(txt)
             adjust_text(
                 txts,
                 ax=axs[i],
                 only_move=dict(text="y"),
                 autoalign=False,
-                x=[stater.centers.mean(axis=0)[0]],
-                y=[stater.centers.mean(axis=0)[1]],
+                x=[self.centers.mean(axis=0)[0]],
+                y=[self.centers.mean(axis=0)[1]],
             )
-        return stater, fig
+
+        if return_ro_mat:
+            return fig, np.asarray(ro_mat)
+        else:
+            return fig
 
     def flags(self, points: np.ndarray[float]) -> np.ndarray[int]:
         return self._clf.predict(np.vstack(points))

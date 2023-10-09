@@ -159,7 +159,7 @@ def fit_spec(spec_map, ax=None, **kwargs):
     ax = cfit.model.plot(cfit, ax=ax, **kwargs)
     return cfit, ax
 
-def plot_iq_vs_freq(logf, axs=None):
+def plot_iq_vs_freq(logf: fileio.LogFile, axs=None):
     if axs is None:
         fig, (ax, ax2) = plt.subplots(tight_layout=True, figsize=(5,5), nrows=2, sharex=True)
         ax3 = ax2.twinx()
@@ -206,30 +206,12 @@ def plot_iq_scatter(lf: fileio.LogFile, return_ro_mat=False):
 
     stater = state_disc.NCenter(new)
     list_points = [df[[f'i{i}', f'q{i}']].values for i in range(nlevels)]
-
-    figsize = (6,3) if len(list_points) == 2 else (8,3)
-    fig = plt.figure(figsize=figsize, layout='compressed')
-    axs: list[plt.Axes] = fig.subplots(ncols=nlevels, sharex=True, sharey=True)
+    fig, ro_mat = stater.plot(list_points, return_ro_mat=True)
     fig.suptitle(lf.name.as_plot_title())
-    for i, pts in enumerate(list_points):
-        axs[i].scatter(pts[:,0], pts[:,1], marker=f"${i}$", color=f'C{i}')
-        axs[i].set_aspect('equal')
-        axs[i].annotate(f'|{i}⟩', (0.05,1), ha='left', va='top', 
-                        xycoords='axes fraction', path_effects=[txt_effects])
-        axs[i].plot(old[:,0], old[:,1], ls='--', color='gray')
-        axs[i].plot(new[:,0], new[:,1], ls=':', color='k')
-        
-    label_font = font_manager.FontProperties(family='Arial', stretch='condensed')
-    ro_mat = []
-    for i, pts in enumerate(list_points):
-        stater.plot_regions(axs[i], label=False)
-        probs = stater.probs(pts)
-        ro_mat.append(probs)
-        for j in range(nlevels):
-            center = stater.centers[j]
-            axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', center, ha='center', 
-                            font=label_font, path_effects=[txt_effects])
-    
+    for ax in fig.axes:
+        ax.plot(old[:,0], old[:,1], ls='--', color='gray')
+        ax.plot(new[:,0], new[:,1], ls=':', color='k')
+
     if return_ro_mat:
         return fig, ro_mat
     else:
