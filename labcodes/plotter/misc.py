@@ -66,18 +66,21 @@ def cursor(
     txt = None
     if (x is not None) and (y is not None):
         if text is None: text = 'x={:.3f}, y={:.3f}'
-        ts = dict(); ts.update(text_style)
+        ts = dict(path_effects=[txt_effect()])
+        ts.update(text_style)
         txt = ax.annotate(text.format(x, y), (x,y), **ts)
     elif x is not None:
         if text is None: text = 'x={}'
-        ts = dict(rotation='vertical', va='top'); ts.update(text_style)
+        ts = dict(rotation='vertical', va='top', path_effects=[txt_effect()])
+        ts.update(text_style)
         if ts.get('va') == 'bottom':
             txt = ax.annotate(text.format(x), (x, ax.get_ylim()[0]), **ts)
         else:
             txt = ax.annotate(text.format(x), (x, ax.get_ylim()[1]), **ts)
     elif y is not None:
         if text is None: text = 'y={}'
-        ts = dict(); ts.update(text_style)
+        ts = dict(path_effects=[txt_effect()])
+        ts.update(text_style)
         if ts.get('ha') == 'right':
             txt = ax.annotate(text.format(y), (ax.get_xlim()[1], y), **ts)
         else:

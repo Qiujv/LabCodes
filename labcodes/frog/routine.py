@@ -8,6 +8,7 @@ from functools import cached_property
 
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
+import matplotlib.patheffects as patheffects
 import numpy as np
 import pandas as pd
 import scipy.io
@@ -17,6 +18,7 @@ from labcodes import fileio, fitter, misc, models, plotter, state_disc, tomo
 from labcodes.frog import tele, iq_scatter
 
 
+txt_effects = patheffects.withStroke(linewidth=1, foreground='w', alpha=0.5)
 logger = logging.getLogger(__name__)
 
 
@@ -185,7 +187,7 @@ def plot_iq_vs_freq(logf, axs=None):
     fig.suptitle(logf.name.as_plot_title())
     return ax, ax2, ax3
 
-def plot_iq_scatter(lf, return_ro_mat=False):
+def plot_iq_scatter(lf: fileio.LogFile, return_ro_mat=False):
     df:pd.DataFrame = lf.df
     nlevels = 0
     while f'i{nlevels}' in df: nlevels += 1
@@ -207,12 +209,13 @@ def plot_iq_scatter(lf, return_ro_mat=False):
 
     figsize = (6,3) if len(list_points) == 2 else (8,3)
     fig = plt.figure(figsize=figsize, layout='none')
-    axs = fig.subplots(ncols=nlevels, sharex=True, sharey=True)
+    axs: list[plt.Axes] = fig.subplots(ncols=nlevels, sharex=True, sharey=True)
     fig.suptitle(lf.name.as_plot_title())
     for i, pts in enumerate(list_points):
         axs[i].scatter(pts[:,0], pts[:,1], marker=f"${i}$", color=f'C{i}')
         axs[i].set_aspect('equal')
-        axs[i].set_title(f'|{i}>')
+        axs[i].annotate(f'|{i}⟩', (0.05,1), ha='left', va='top', 
+                        xycoords='axes fraction', path_effects=[txt_effects])
         axs[i].plot(old[:,0], old[:,1], ls='--', color='gray')
         axs[i].plot(new[:,0], new[:,1], ls=':', color='k')
         
@@ -224,7 +227,8 @@ def plot_iq_scatter(lf, return_ro_mat=False):
         ro_mat.append(probs)
         for j in range(nlevels):
             center = stater.centers[j]
-            axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', center, ha='center', font=label_font)
+            axs[i].annotate(f'p{j}{i}={probs[j]:.1%}', center, ha='center', 
+                            font=label_font, path_effects=[txt_effects])
     
     if return_ro_mat:
         return fig, ro_mat
