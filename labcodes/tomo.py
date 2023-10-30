@@ -71,7 +71,8 @@ import math
 from typing import Literal, Union
 
 import numpy as np
-import scipy
+import scipy.linalg
+import scipy.stats
 
 from labcodes import misc
 
@@ -82,16 +83,16 @@ def Rmat(axis: np.matrix, angle: float) -> np.matrix:
     """Return the rotation matrix.
 
     >>> Rmat(np.array([[0, -1j], [1j, 0]]), np.pi / 2)
-    array([[ 0.70710678+0.j, -0.70710678+0.j],
-           [ 0.70710678+0.j,  0.70710678+0.j]])
+    matrix([[ 0.70710678+0.j, -0.70710678+0.j],
+            [ 0.70710678+0.j,  0.70710678+0.j]])
     """
-    return scipy.linalg.expm(-1j * angle / 2 * axis)
+    return np.matrix(scipy.linalg.expm(-1j * angle / 2 * axis))
 
 
 sigmaI = np.eye(2, dtype=complex)
-sigmaX = np.array([[0, 1], [1, 0]], dtype=complex)
-sigmaY = np.array([[0, -1j], [1j, 0]], dtype=complex)
-sigmaZ = np.array([[1, 0], [0, -1]], dtype=complex)
+sigmaX = np.matrix([[0, 1], [1, 0]], dtype=complex)
+sigmaY = np.matrix([[0, -1j], [1j, 0]], dtype=complex)
+sigmaZ = np.matrix([[1, 0], [0, -1]], dtype=complex)
 
 sigmaP = (sigmaX - 1j * sigmaY) / 2
 sigmaM = (sigmaX + 1j * sigmaY) / 2

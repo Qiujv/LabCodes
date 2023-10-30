@@ -118,6 +118,7 @@ def plot2d_imshow(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
     norm, extend_cbar = misc.get_norm(z, cmin=cmin, cmax=cmax)
     cmap = plt.cm.get_cmap(cmap)
     colors = cmap(norm(z))
+    # TODO: inform the interpolation method.
     img = ax.imshow(colors, cmap=cmap, extent=[xmin, xmax, ymin, ymax], origin='lower', aspect='auto')
 
     ax.set(
@@ -125,6 +126,7 @@ def plot2d_imshow(df, x_name, y_name, z_name, ax=None, cmin=None, cmax=None,
         ylabel=y_name, 
     )
     if colorbar:
+        # BUG: this color bar seems have wrong clims.
         # Way to remove colorbar: ax.images[-1].colorbar.remove()
         cbar = fig.colorbar(img, ax=ax, label=z_name, extend=extend_cbar, fraction=0.05)
     return ax
