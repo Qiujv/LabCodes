@@ -157,8 +157,8 @@ if __name__ == '__main__':
     x = x.ravel()
     y = y.ravel()
 
-    z = np.sin(x * 2 * np.pi) * np.cos(y * 2 * np.pi)
+    z = np.sin(x * 2 * np.pi) + np.cos(y * 2 * np.pi)
     df = pd.DataFrame({"x": x, "y": y, "z": z})
     plot2d_imshow(df, "x", "y", "z")
-    plot2d_collection(df.iloc[:-5,], "x", "y", "z")
+    plot2d_collection(df.iloc[:-15,], "x", "y", "z")
     plt.show()
