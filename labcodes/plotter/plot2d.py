@@ -143,6 +143,7 @@ def plot2d_imshow(
         ylabel=y_name, 
     )
     if colorbar:
+        # BUG: this color bar seems have wrong clims.
         # Way to remove colorbar: ax.images[-1].colorbar.remove()
         cbar = fig.colorbar(img, ax=ax, label=z_name, extend=extend_cbar, fraction=0.03)
     return ax

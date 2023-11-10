@@ -1,6 +1,7 @@
 import functools
 import logging
 import math
+import warnings
 from collections.abc import Hashable
 from typing import Optional, Union
 
@@ -16,7 +17,8 @@ def fidelity(a: np.ndarray, b: np.ndarray):
     >>> fidelity([[1,0],[0,0]], [[.5,.5],[.5,.5]])
     0.5
     """
-    logger.critical("This function is wrong, use tomo.fidelity instead.")
+    warnings.warn("This function is wrong, use tomo.fidelity instead.", 
+                  DeprecationWarning, stacklevel=2)
     a, b = np.asarray(a), np.asarray(b)
     return np.real(np.trace(a @ b))
 
@@ -247,7 +249,7 @@ def exclude_regions(
     >>> exclude_regions(np.arange(10), [(2, 5), (7, 9)])
     array([0, 1, 2, 5, 6, 7, 9])
     >>> exclude_regions(np.arange(10), [(2, 5), (7, 9)], True)
-    array([0, 1, 6, 8])
+    array([0, 1, 6])
     """
     xdata = np.asarray(xdata)
     mask = np.ones_like(xdata, dtype=bool)
@@ -314,31 +316,33 @@ def inverse_interp(
     finv = scipy.interpolate.UnivariateSpline(yp, xp, k=1, s=0)
     x = finv(y)
 
-    # Check extrapolation.
-    mask_low = y < yp[0]
-    mask_high = y > yp[-1]
-    msgs = ["Extrapolation detected. "]
-    if np.any(mask_low):
-        msgs.append(
-            f"{np.sum(mask_low)} points are below the lower bound f({xp[0]})={yp[0]}"
-            f" by:\n{(y[mask_low] - yp[0])[:10]}"
-        )
-    if np.any(mask_high):
-        msgs.append(
-            f"{np.sum(mask_high)} points are above the upper bound f({xp[-1]})={yp[-1]}"
-            f" by:\n{(y[mask_high] - yp[-1])[:10]}"
-        )
-    if len(msgs) > 1:
-        logging.warning("\n".join(msgs))
+    if np.size(y) > 0:  # Avoiding error of indexing empty array.
+        # Check extrapolation.
+        mask_low = y < yp[0]
+        mask_high = y > yp[-1]
+        msgs = ["Extrapolation detected. "]
+        if np.any(mask_low):
+            msgs.append(
+                f"{np.sum(mask_low)} points are below the lower bound f({xp[0]})={yp[0]}"
+                f" by:\n{(y[mask_low] - yp[0])[:10]}"
+            )
+        if np.any(mask_high):
+            msgs.append(
+                f"{np.sum(mask_high)} points are above the upper bound f({xp[-1]})={yp[-1]}"
+                f" by:\n{(y[mask_high] - yp[-1])[:10]}"
+            )
+        if len(msgs) > 1:
+            logging.warning("\n".join(msgs))
 
-    # Check tolerance.
-    mask_extrap = mask_low | mask_high
-    mask_tol = np.abs(y[~mask_extrap] - func(x[~mask_extrap])) < tol
-    if not np.all(mask_tol):
-        logging.warning(
-            f"Failed to find inverse for {np.sum(~mask_tol)} points"
-            f" (except extrapolate) within tolerance {tol}."
-        )
+        # Check tolerance.
+        mask_extrap = mask_low | mask_high
+        mask_tol = np.abs(y[~mask_extrap] - func(x[~mask_extrap])) < tol
+        if not np.all(mask_tol):
+            logging.warning(
+                f"Failed to find inverse for {np.sum(~mask_tol)} points"
+                f" (except extrapolate) within tolerance {tol}."
+            )
+
     if is_scalar:
         return x.item()
     else:

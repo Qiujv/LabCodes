@@ -10,8 +10,9 @@ JUDGE_TOL = 8
 
 def get_center(conf, qubit, state):
     """Get |0> center or |1> center fron logf.conf, return in a complex number."""
-    center = conf['parameter'][f'Device.{qubit.upper()}.|{state}> center'][20:-2].split(', ')
-    center = [float(i) for i in center]
+    # center = conf['parameter'][f'Device.{qubit.upper()}.|{state}> center'][20:-2].split(', ')
+    # center = [float(i) for i in center]
+    center = conf['parameter'][f'Device.{qubit.upper()}.|{state}> center']
     center = center[0] + 1j*center[1]
     return center
 
