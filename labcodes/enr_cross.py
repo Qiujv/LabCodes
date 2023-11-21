@@ -44,13 +44,13 @@ class EnrCross(Calculator):
 
 
 class FitEnrCross:
-    def __init__(self, upper: pd.DataFrame = None, lower: pd.DataFrame = None):
-        mod = EnrCross()  # An arbitrary model to get example datas.
-        if upper is None:
-            upper = pd.DataFrame({"x": mod.x, "freq": mod["coupled_freqs"][1]})
-        if lower is None:
-            lower = pd.DataFrame({"x": mod.x, "freq": mod["coupled_freqs"][0]})
+    def __init__(self, upper: pd.DataFrame, lower: pd.DataFrame):
+        """upper, lower with columns "x" and "freq".
 
+        e.g. `upper = pd.DataFrame(dict(x=[-1, 0, 1], freq=[4,5,6])))`
+
+        e.g. `lower = pd.DataFrame(dict(x=[-0.5, 0.5, 1], freq=[5,5,5])))`
+        """
         self.upper = upper[["x", "freq"]]
         self.lower = lower[["x", "freq"]]
         self.params = None
@@ -67,7 +67,7 @@ class FitEnrCross:
         resi_up = self.upper["freq"] - model.coupled_freqs(x=self.upper["x"])[1]
         return np.concatenate([resi_dn, resi_up])
 
-    def fit(self):
+    def fit(self) -> lmfit.minimizer.MinimizerResult:
         self.result = lmfit.minimize(self.residue, self.params)
         return self.result
 
@@ -224,15 +224,17 @@ class FitEnrCross:
 
 
 if __name__ == "__main__":
-    xfit = FitEnrCross()
+    mod = EnrCross()  # An arbitrary model to get example datas.
+    upper = pd.DataFrame({"x": mod.x, "freq": mod["coupled_freqs"][1]})
+    lower = pd.DataFrame({"x": mod.x, "freq": mod["coupled_freqs"][0]})
+
+    xfit = FitEnrCross(upper, lower)
     # xfit2.params.set(g=dict(min=0, max=1))
     xfit.plot()
     xfit.result
 
-    upper = xfit.upper.copy()
-    lower = xfit.lower.copy()
-    upper["x"] = -1 * upper["x"]
-    lower["x"] = -1 * lower["x"]
+    upper = pd.DataFrame({"x": -mod.x, "freq": mod["coupled_freqs"][1]})
+    lower = pd.DataFrame({"x": -mod.x, "freq": mod["coupled_freqs"][0]})
     xfit2 = FitEnrCross(upper, lower)
     xfit2.plot(plot_bare=True)
     xfit2.result

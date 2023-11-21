@@ -63,6 +63,49 @@ def remove_e_delay(phase, freq, i_start=0, i_end=-1):
     return phase - e_phase
 
 
+def remove_background(
+    y: np.ndarray,
+    x: np.ndarray = None,
+    n: int = None,
+    y0: float = None,
+):
+    """Remove linear background from data.
+    
+    Args:
+        n: number of points to use for background estimation
+        y0: offset after background removal, if None, use y[0].
+
+    Examples:
+    >>> np.round(remove_background([0,3,1], n=1), decimals=2)
+    array([0. , 2.5, 0. ])
+    """
+    y = np.asarray(y)
+    if x is None: x = np.arange(len(y))
+    if y0 is None: y0 = y[0]
+    if n is None:
+        x_fit, y_fit = x, y
+    else:
+        x_fit = np.r_[x[:n], x[-n:]]
+        y_fit = np.r_[y[:n], y[-n:]]
+    bg_params = np.polyfit(x_fit, y_fit, 1)  # Linear fit.
+    return y - np.polyval(bg_params, x) + y0
+
+
+def remove_background_2d(df, x_name, y_name, z_name):
+    """Remove the background of Z which varies along X and constant along Y.
+    yyyyyy
+    Assumes rectangle grid sampling.
+
+    Example:
+        remove_background_2d(lf.df, 'ro_freq_GHz', 'z_pulse_offset', ['iq_amp', 'abs(s21)_dB', 'iq_phase_rad'])
+    """
+    background = df.groupby(x_name)[z_name].mean()
+    def trans(df):
+        df[z_name] = df[z_name].values - background.values
+        return df
+    return df.groupby(y_name).apply(trans).reset_index(drop=True)
+
+
 def guess_freq(x: np.ndarray[float], y: np.ndarray[float]) -> float:
     """Finds the dominant fft component for input (x, y) data.
 
@@ -482,21 +525,6 @@ ENG_PREFIXES = {
     21: "Z",
     24: "Y",
 }
-
-
-def remove_background(df, x_name, y_name, z_name):
-    """Remove the background of Z which varies along X and constant along Y.
-    yyyyyy
-    Assumes rectangle grid sampling.
-
-    Example:
-        remove_background(lf.df, 'ro_freq_GHz', 'z_pulse_offset', ['iq_amp', 'abs(s21)_dB', 'iq_phase_rad'])
-    """
-    background = df.groupby(x_name)[z_name].mean()
-    def trans(df):
-        df[z_name] = df[z_name].values - background.values
-        return df
-    return df.groupby(y_name).apply(trans).reset_index(drop=True)
 
 
 def cache_with_bypass(
