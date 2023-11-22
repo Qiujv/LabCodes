@@ -47,58 +47,43 @@ class LogFile:
     def plot1d(self, x_name=0, y_name=0, ax: plt.Axes = None, **kwargs):
         """Quick line plot."""
         if ax is None:
-            fig, ax = plt.subplots()
-        else:
-            fig = ax.get_figure()
+            _, ax = plt.subplots()
 
         if isinstance(x_name, int):
             x_name = self.indeps[x_name]
-
-        # convert y_name from int, str or list -> list(str)
+        # convert y_name to list(str)
         if not isinstance(y_name, list):
-            y_name = [
-                y_name,
-            ]
+            y_name = [y_name]
         if isinstance(y_name[0], int):
             y_name = [self.deps[i] for i in y_name]
 
         prefix = kwargs.pop("label", "")
         if len(y_name) == 1:
-            lbs = [str(prefix) + ""]
+            labels = [str(prefix) + ""]
         else:
-            lbs = [str(prefix) + i for i in y_name]
+            labels = [str(prefix) + i for i in y_name]
 
         kw = dict(marker=".")
         kw.update(kwargs)
 
-        df = self.df
-        for yn, lb in zip(y_name, lbs):
-            ax.plot(df[x_name], df[yn], label=lb, **kw)
+        for yn, lb in zip(y_name, labels):
+            ax.plot(x_name, yn, data=self.df, label=lb, **kw)
+
         if np.size(y_name) > 1:
             ax.legend()
-
         ax.grid(True)
-        ax.set(
-            xlabel=x_name,
-            ylabel=y_name[0],
-            title=self.name.ptitle(),
-        )
+        ax.set_title(self.name.ptitle())
+        ax.set_xlabel(x_name)
+        ax.set_ylabel(y_name[0])
         return ax
 
-    def plot2d(
-        self,
-        x_name=0,
-        y_name=1,
-        z_name=0,
-        ax: plt.Axes = None,
-        kind: Union[str, Literal["collection", "imshow"]] = "collection",
-        **kwargs,
-    ):
+    def plot2d(self, x_name=0, y_name=1, z_name=0, ax: plt.Axes = None, **kwargs):
         """Quick 2d plot with plotter.plot2d_[kind]."""
         if ax is None:
-            fig, ax = plt.subplots()
-        else:
-            fig = ax.get_figure()
+            _, ax = plt.subplots()
+            ax.set_title(self.name.as_plot_title())
+            ax.set_xlabel(x_name)
+            ax.set_ylabel(y_name)
 
         if isinstance(x_name, int):
             x_name = self.indeps[x_name]
@@ -107,14 +92,8 @@ class LogFile:
         if isinstance(z_name, int):
             z_name = self.deps[z_name]
 
-        plot_func = getattr(plotter, f"plot2d_{kind}")
-        plot_func(self.df, x_name=x_name, y_name=y_name, z_name=z_name, ax=ax, **kwargs)
+        plotter.plot2d_auto(self.df, x_name=x_name, y_name=y_name, z_name=z_name, ax=ax, **kwargs)
 
-        ax.set(
-            xlabel=x_name,
-            ylabel=y_name,
-            title=self.name.as_plot_title(),
-        )
         return ax
 
     @classmethod
@@ -187,14 +166,6 @@ class LogFile:
         p = dir / name.as_file_name()
         p.with_suffix(".json").touch(exist_ok=False)  # Make a placeholder.
         return cls(df=None, conf=dict(), name=name, indeps=[], deps=[])
-
-    # def to_labrad(self, dir):
-    #     """Save data mimic labrad. Not guaranteeing readibility by labrad.
-
-    #     It risks damaging program files in saving files by this function instead
-    #     of native API by labrad.
-    #     """
-    #     pass
 
 
 @define(slots=False)
