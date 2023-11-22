@@ -5,22 +5,11 @@ import warnings
 from collections.abc import Hashable
 from typing import Optional, Union
 
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.interpolate
 
 logger = logging.getLogger(__name__)
-
-
-def fidelity(a: np.ndarray, b: np.ndarray):
-    """Returns fidelity between two matrices.
-
-    >>> fidelity([[1,0],[0,0]], [[.5,.5],[.5,.5]])
-    0.5
-    """
-    warnings.warn("This function is wrong, use tomo.fidelity instead.", 
-                  DeprecationWarning, stacklevel=2)
-    a, b = np.asarray(a), np.asarray(b)
-    return np.real(np.trace(a @ b))
 
 
 def auto_rotate(data: np.ndarray[complex], return_rad: bool = False):
@@ -43,57 +32,99 @@ def auto_rotate(data: np.ndarray[complex], return_rad: bool = False):
         return data * np.exp(1j * rad)
 
 
-def remove_e_delay(phase, freq, i_start=0, i_end=-1):
-    """Returns phase without linear freq dependence.
-
-    Args:
-        phase: array of angle in rads, with linear dependence to freq.
-        freq: array of same shape as phase.
-        i_start, i_end: region where linear fit applied.
-
-    >>> remove_e_delay([0, np.pi], [0, 1])
-    array([0., 0.])
+def remove_e_delay(
+    phase_rad: np.ndarray,
+    freq: np.ndarray = None,
+    e_delay: float = None,
+    offset: float = None,
+    fit_mask: int | slice | np.ndarray = 10,
+    return_delay: bool = False,
+    plot: bool = False,
+):
+    """Remove electrical delay from phase_rad.
+    
+    Examples:
+    >>> phase = np.linspace(0, 10, 101) % (2*np.pi)
+    >>> np.allclose(np.zeros_like(phase), remove_e_delay(phase))
+    True
     """
-    phase = np.asarray(phase)
+    if freq is None:
+        freq = np.arange(len(phase_rad))
+
+    phase_rad = np.asarray(phase_rad)
     freq = np.asarray(freq)
 
-    phase = np.unwrap(phase)
-    e_delay = (phase[i_end] - phase[i_start]) / (freq[i_end] - freq[i_start])
-    e_phase = e_delay * (freq - freq[i_start]) + phase[i_start]
-    return phase - e_phase
+    if isinstance(fit_mask, int):
+        fit_mask = slice(fit_mask)
+    p1, p0 = np.polyfit(freq[fit_mask], phase_rad[fit_mask], 1)
+    if e_delay is None:
+        e_delay = p1
+    if offset is None:
+        offset = p0
+    if return_delay:
+        return e_delay, offset
+    
+    e_phase = freq * e_delay + offset
+    new_rad = np.angle(np.exp(1j * (phase_rad - e_phase)))
+    if plot:
+        _, ax = plt.subplots()
+        ax.plot(freq, phase_rad, '.-', label='raw')
+        ax.plot(freq, e_phase, label='e_phase')
+        ax.plot(freq, new_rad, label='new_rad')
+        ax.legend()
+        plt.show()
+    return new_rad
 
 
 def remove_background(
     y: np.ndarray,
     x: np.ndarray = None,
-    n: int = None,
-    y0: float = None,
+    fit_mask: int | slice | np.ndarray = None,
+    offset: float = None,
+    plot: bool = False,
 ):
     """Remove linear background from data.
     
     Args:
-        n: number of points to use for background estimation
-        y0: offset after background removal, if None, use y[0].
+        fit_mask: mask of data to use for background estimation.
+            if int, use the first and last fit_mask points.
+        offset: offset after background removal.
+            if None, use y[0].
 
     Examples:
-    >>> np.round(remove_background([0,3,1], n=1), decimals=2)
+    >>> np.round(remove_background([0,3,1], fit_mask=1), decimals=2)
     array([0. , 2.5, 0. ])
     """
-    y = np.asarray(y)
     if x is None: x = np.arange(len(y))
-    if y0 is None: y0 = y[0]
-    if n is None:
-        x_fit, y_fit = x, y
+    y = np.asarray(y)
+    x = np.asarray(x)
+    
+    if fit_mask is None:
+        x_to_fit, y_to_fit = x, y
+    elif isinstance(fit_mask, int):
+        x_to_fit = np.r_[x[:fit_mask], x[-fit_mask:]]
+        y_to_fit = np.r_[y[:fit_mask], y[-fit_mask:]]
     else:
-        x_fit = np.r_[x[:n], x[-n:]]
-        y_fit = np.r_[y[:n], y[-n:]]
-    bg_params = np.polyfit(x_fit, y_fit, 1)  # Linear fit.
-    return y - np.polyval(bg_params, x) + y0
+        x_to_fit, y_to_fit = x[fit_mask], y[fit_mask]
+
+    if offset is None: offset = y[0]
+
+    bg_params = np.polyfit(x_to_fit, y_to_fit, 1)  # Linear fit.
+    y_fit = np.polyval(bg_params, x)
+    new_y = y - y_fit + offset
+    if plot:
+        _, ax = plt.subplots()
+        ax.plot(x, y, '.-', label='raw')
+        ax.plot(x, y_fit, label='bg')
+        ax.plot(x, new_y, label='new')
+        ax.legend()
+        plt.show()
+    return new_y
 
 
 def remove_background_2d(df, x_name, y_name, z_name):
     """Remove the background of Z which varies along X and constant along Y.
-    yyyyyy
+
     Assumes rectangle grid sampling.
 
     Example:
@@ -138,6 +169,7 @@ def guess_freq(x: np.ndarray[float], y: np.ndarray[float]) -> float:
 find_freq_guess = guess_freq  # Old name, for backward compatibility.
 
 
+# TODO: remove this function.
 def guess_phase(
     x: np.ndarray,
     y: np.ndarray,
@@ -167,6 +199,10 @@ def guess_phase(
     >>> guess_phase(x, y, freq)  # Given accurate freq. makes it robust.
     1.0053096491487343
     """
+    logger.warning(
+        "guess_phase works right only if osci has zero offset."
+        "but similar accuracy can be achieved by fitting with given offset."
+    )
     if freq is None:
         freq = find_freq_guess(x, y)  # Could be inaccurate.
     if phi_space is None:
@@ -174,15 +210,6 @@ def guess_phase(
     integral = [np.sum(y * np.sin(2 * np.pi * freq * x + phase)) for phase in phi_space]
     imax = np.argmax(integral)
     return phi_space[imax]
-
-
-def round(x: float, roundto: float) -> float:
-    """Round x to given precision.
-
-    >>> round(3.141592653, 1e-3)
-    3.142
-    """
-    return np.round(x / roundto) * roundto
 
 
 def start_stop(start, stop, step=None, n=None) -> np.ndarray:
@@ -412,6 +439,7 @@ def num2bstr(num: int, n_bits: int, base: int = 2) -> str:
         )
         return old
 
+# TODO: remove this function.
 def _old_num2bstr(num: int, n_bits: int, base: int = 2) -> str:
     if num >= base**n_bits:
         msg = "num {} requires more than {} bits with base {} to store."
