@@ -4,6 +4,7 @@ import lmfit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy.constants as const
 
 from labcodes import misc, plotter
 
@@ -11,7 +12,11 @@ logger = logging.getLogger(__file__)
 
 
 def s21m1(x, Qi=1e6, Qc=1e3, f0=4, phi=0, alpha=-50, phiv=10, phi0=0, amp=1):
-    """Normalized s21^-1 for linear resonator."""
+    """Normalized s21^-1 for linear resonator.
+    
+    Original paper see https://doi.org/10.1063/1.3693409
+    Improved by Xiayu Linpeng.
+    """
     Qc = Qc * np.exp(1j * phi)
     s21m1 = 1 + (Qi / Qc / (1 + 2j * Qi * (x - f0) / f0))
     bg_amp = amp / (1 + alpha * (x - f0) / f0)
@@ -22,11 +27,29 @@ def s21m1(x, Qi=1e6, Qc=1e3, f0=4, phi=0, alpha=-50, phiv=10, phi0=0, amp=1):
 model = lmfit.Model(s21m1)
 
 
+def n_photon(f0_Hz, Qi, Qc, p_dBm):
+    """Returns photon number in the resonator.
+    
+    See https://doi.org/10.1063/1.4919761
+    """
+    p_watt = 10 ** (p_dBm / 10) / 1000
+    wr = 2 * np.pi * f0_Hz
+    n = 2 / (const.hbar * wr**2) * Qc * (Qi / (Qi + Qc))**2 * p_watt
+    return n
+
+
 class FitResonator:
+    """Fit the s21 data of linear resonator side loaded to feedline.
+    
+    Adapted from:
+    1. https://lmfit.github.io/lmfit-py/examples/example_complex_resonator_model.html
+    2. programs by Xiayu Linpeng.
+    """
     def __init__(self, freq: np.ndarray, s21_dB: np.ndarray, s21_rad: np.ndarray, **fit_kws):
+        """fit(Qi=1e6) to overwrite initial guess."""
         # Normalize data with y0=0.
-        s21_dB = misc.remove_background(s21_dB, freq, n=100, y0=0)
-        s21_rad = misc.remove_background(s21_rad, freq, n=100, y0=0)
+        s21_dB = misc.remove_background(s21_dB, freq, fit_mask=100, offset=0)
+        s21_rad = misc.remove_background(s21_rad, freq, fit_mask=100, offset=0)
         s21_cplx = 10 ** (s21_dB / 20) * np.exp(1j * s21_rad)
         s21m1_cplx = 1 / s21_cplx
         self.df = pd.DataFrame(
@@ -106,6 +129,19 @@ class FitResonator:
                 return self.result.params[key].value
         else:
             return self.params[key].value
+        
+    def n_photon(self, p_dBm, f0_Hz=None, Qi=None, Qc=None):
+        """Returns photon number in the resonator.
+        
+        See https://doi.org/10.1063/1.4919761
+        """
+        if f0_Hz is None:
+            f0_Hz = self["f0"]
+        if Qi is None:
+            Qi = self["Qi"]
+        if Qc is None:
+            Qc = self["Qc"]
+        return n_photon(f0_Hz, Qi, Qc, p_dBm)
 
     def plot_cplx(
         self,
