@@ -135,6 +135,7 @@ class FitEnrCross:
         self,
         ax: plt.Axes = None,
         x: np.ndarray = None,
+        plot_data: bool = True,
         plot_init: bool = True,
         plot_center: bool = True,
         plot_bare: bool = False,
@@ -148,8 +149,9 @@ class FitEnrCross:
             xmax = max(self.upper["x"].max(), self.lower["x"].max())
             x = np.linspace(xmin, xmax, 1001)
 
-        ax.scatter("x", "freq", data=self.lower, color="C0")
-        ax.scatter("x", "freq", data=self.upper, color="C1")
+        if plot_data:
+            ax.scatter("x", "freq", data=self.lower, color="C0")
+            ax.scatter("x", "freq", data=self.upper, color="C1")
 
         if self.result is not None:
             freqs = self.result_model.coupled_freqs(x=x)
@@ -171,9 +173,7 @@ class FitEnrCross:
             else:
                 model = self.init_model
             x, y = model.center()
-            fup, fdown = model.coupled_freqs(x=x)
             ax.annotate(f'g={self["g"]:.3f}\n({x:.3f}, {y:.3f})', [x, y])
-            ax.plot([x, x], [fup, fdown], "k-")
         return ax
 
     @staticmethod
