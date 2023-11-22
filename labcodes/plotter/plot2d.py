@@ -214,7 +214,7 @@ def plot2d_pcolor(
     return ax
 
 
-def plot2d(
+def plot2d_auto(
     df: pd.DataFrame,
     x_name: str | int = 0,
     y_name: str | int = 1,

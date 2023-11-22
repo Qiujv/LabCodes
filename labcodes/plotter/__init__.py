@@ -1,11 +1,16 @@
 """Data plotting routines."""
 
-from labcodes.plotter.plot2d import plot2d_collection, plot2d_imshow
-from labcodes.plotter.matrix import plot_mat3d, plot_complex_mat3d, plot_mat2d, plot_mat
-from labcodes.plotter.misc import plot_iq, cursor, txt_effect
-
-
 import matplotlib as mpl
+
+from labcodes.plotter.matrix import plot_complex_mat3d, plot_mat, plot_mat2d, plot_mat3d
+from labcodes.plotter.misc import cursor, plot_iq, txt_effect
+from labcodes.plotter.plot2d import (
+    plot2d_auto,
+    plot2d_collection,
+    plot2d_imshow,
+    plot2d_pcolor,
+)
+
 # https://matplotlib.org/stable/tutorials/introductory/customizing.html#the-default-matplotlibrc-file
 mpl.rcParams['pdf.fonttype'] = 42  # Make saved pdf text editable.
 mpl.rcParams['svg.fonttype'] = 'none'  # Make saved svg text editable. Assume fonts are installed on the machine where the SVG will be viewed.

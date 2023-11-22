@@ -1,6 +1,6 @@
 """Module for processing data of Quantum State Tomography (QST) and Quantum Processs Tomography (QPT)
 
-Adapted from pyle_tomo and the matlab code from Youpeng Zhong.
+Adapted from pyle_tomo (see https://web.physics.ucsb.edu/~martinisgroup/) and the matlab code from Youpeng Zhong.
 
 
 # Explanation of QST
