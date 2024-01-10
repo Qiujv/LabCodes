@@ -4,7 +4,7 @@ import lmfit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from labcodes import misc
+from labcodes import misc, plotter
 from labcodes.calc import Calculator, dept
 from scipy.signal import find_peaks
 
@@ -13,6 +13,7 @@ logger = logging.getLogger(__file__)
 
 class EnrCross(Calculator):
     """Model for the avoid level crossing on spectrums."""
+
     x = np.linspace(3.5, 4.5, 21)
     g = 0.1
     k1 = 0
@@ -155,17 +156,17 @@ class FitEnrCross:
 
         if self.result is not None:
             freqs = self.result_model.coupled_freqs(x=x)
-            ax.plot(x, freqs[0], color="C0")
-            ax.plot(x, freqs[1], color="C1")
+            ax.plot(x, freqs[0], color="C0", scaley=False)
+            ax.plot(x, freqs[1], color="C1", scaley=False)
 
         if plot_init:
             freqs = self.init_model.coupled_freqs(x=x)
-            ax.plot(x, freqs[0], color="C0", ls=":")
-            ax.plot(x, freqs[1], color="C1", ls=":")
+            ax.plot(x, freqs[0], color="C0", ls=":", scaley=False)
+            ax.plot(x, freqs[1], color="C1", ls=":", scaley=False)
 
         if plot_bare:
-            ax.plot(x, self["k1"] * x + self["b1"])
-            ax.plot(x, self["k2"] * x + self["b2"])
+            ax.plot(x, self["k1"] * x + self["b1"], scaley=False)
+            ax.plot(x, self["k2"] * x + self["b2"], scaley=False)
 
         if plot_center:
             if self.result is not None:
@@ -173,7 +174,26 @@ class FitEnrCross:
             else:
                 model = self.init_model
             x, y = model.center()
-            ax.annotate(f'g={self["g"]:.3f}\n({x:.3f}, {y:.3f})', [x, y])
+            fup, fdown = model.coupled_freqs(x=x)
+            ax.plot([x, x], [fdown, fup], "k-", scaley=False)
+            if self["k1"] + self["k2"] > 0:
+                ax.annotate(
+                    f'g={self["g"]:.3f}\n({x:.3f}, {y:.3f})',
+                    (1, 0),
+                    xycoords="axes fraction",
+                    ha="right",
+                    va="bottom",
+                    path_effects=[plotter.txt_effect()],
+                )
+            else:
+                ax.annotate(
+                    f'g={self["g"]:.3f}\n({x:.3f}, {y:.3f})',
+                    (0, 0),
+                    xycoords="axes fraction",
+                    ha="left",
+                    va="bottom",
+                    path_effects=[plotter.txt_effect()],
+                )
         return ax
 
     @staticmethod

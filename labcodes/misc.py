@@ -381,6 +381,7 @@ def inverse_interp(
     _dy = np.diff(yp)
     if np.all(_dy < 0):
         yp, xp = yp[::-1], xp[::-1]
+        _dy = -_dy
     if np.any(_dy <= 0):
         raise ValueError("f(xp) must be monolithic.")
     finv = scipy.interpolate.UnivariateSpline(yp, xp, k=1, s=0)
@@ -406,11 +407,15 @@ def inverse_interp(
 
         # Check tolerance.
         mask_extrap = mask_low | mask_high
-        mask_tol = np.abs(y[~mask_extrap] - func(x[~mask_extrap])) < tol
-        if not np.all(mask_tol):
+        y_in = y[~mask_extrap]
+        x_in = x[~mask_extrap]
+        f_in = func(x_in)
+        mask_tol = np.abs(y_in - f_in) > tol
+        if np.any(mask_tol):
             logging.warning(
-                f"Failed to find inverse for {np.sum(~mask_tol)} points"
+                f"Failed to find inverse for {np.sum(mask_tol)} points"
                 f" (except extrapolate) within tolerance {tol}."
+                f" at x={x_in[mask_tol][:10]}, y={y_in[mask_tol][:10]}, f(x)={f_in[mask_tol][:10]},"
             )
 
     if is_scalar:
