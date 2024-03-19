@@ -1,5 +1,6 @@
 """Functions for general 2d plot."""
 
+import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -10,10 +11,26 @@ from matplotlib.patches import Rectangle
 from labcodes.plotter import misc
 
 
-def _shift_left(arr):
-    arr = np.array(arr)
-    shifted = np.hstack((arr[0] * 2 - arr[1], arr[:-1]))
-    return (arr + shifted) / 2
+def cut(cell_centers: list[float] | np.ndarray) -> np.ndarray:
+    """Returns borders of segments with center around cell_centers.
+
+    Accepts N-element 1d array, returns (N+1)-element 1d array.
+
+    >>> cut([0, 2, 4])
+    array([-1.,  1.,  3.,  5.])
+    """
+    cell_centers = np.asarray(cell_centers)
+    dx = np.diff(cell_centers) / 2
+    if not (np.all(dx > 0) or np.all(dx < 0)):
+        warnings.warn(
+            "Cell_centers is not monotonically increasing or decreasing."
+            "This may lead to incorrect calculated cell."
+        )
+    # From https://github.com/matplotlib/matplotlib/blob/9e18a343fb58a2978a8e27df03190ed21c61c343/lib/matplotlib/axes/_axes.py#L5774
+    cut = np.hstack(
+        [cell_centers[0] - dx[0], cell_centers[:-1] + dx, cell_centers[-1] + dx[-1]]
+    )
+    return cut
 
 
 def plot2d_collection(
@@ -58,15 +75,12 @@ def plot2d_collection(
     df = df.groupby(x_name).filter(lambda x: len(x) > 1)
 
     xunic = df[x_name].unique()
-    mapping = {x: w for x, w in zip(xunic, np.gradient(xunic))}
-    df["width"] = df[x_name].map(mapping)
+    xcut = cut(xunic)
+    df["width"] = df[x_name].map({x: w for x, w in zip(xunic, np.diff(xcut))})
+    df["xshift"] = df[x_name].map({x: s for x, s in zip(xunic, xcut[:-1])})
 
-    xshift = _shift_left(xunic)
-    mapping = {x: s for x, s in zip(xunic, xshift)}
-    df["xshift"] = df[x_name].map(mapping)
-
-    df["height"] = df.groupby(x_name)[y_name].transform(np.gradient)
-    df["yshift"] = df.groupby(x_name)[y_name].transform(_shift_left)
+    df["height"] = df.groupby(x_name)[y_name].transform(lambda y: np.diff(cut(y)))
+    df["yshift"] = df.groupby(x_name)[y_name].transform(lambda y: cut(y)[:-1])
     rects = [
         Rectangle((x, y), w, h)
         for x, y, w, h in df[["xshift", "yshift", "width", "height"]].itertuples(
@@ -79,7 +93,7 @@ def plot2d_collection(
         norm, extend_cbar = misc.get_norm(z, cmin=cmin, cmax=cmax)
     else:
         extend_cbar = "neither"
-    cmap = plt.cm.get_cmap(cmap)
+    cmap = plt.get_cmap(cmap)
     colors = cmap(norm(z))
 
     col = PatchCollection(
@@ -126,22 +140,22 @@ def plot2d_imshow(
     else:
         fig = ax.get_figure()
 
-    df = df[[x_name, y_name, z_name]].sort_values([x_name, y_name])  # copy df.
-    xuni = df[x_name].unique()
-    yuni = df[y_name].unique()
-    xsize = xuni.size
-    ysize = yuni.size
-    dx2 = (xuni[1] - xuni[0]) / 2
-    dy2 = (yuni[1] - yuni[0]) / 2
-    xmax, xmin = xuni.max(), xuni.min()
-    ymax, ymin = yuni.max(), yuni.min()
-    extent = [xmin - dx2, xmax + dx2, ymin - dy2, ymax + dy2]
-    z = df[z_name].values.reshape(xsize, ysize).T
+    # fill missing data with nan.
+    tab = df.pivot(index=y_name, columns=x_name, values=z_name)
+    z = tab.values
+    dx = (tab.columns[1] - tab.columns[0]) / 2
+    dy = (tab.index[1] - tab.index[0]) / 2
+    extent = [
+        tab.columns[0] - dx,
+        tab.columns[-1] + dx,
+        tab.index[0] - dy,
+        tab.index[-1] + dy,
+    ]
     if norm is None:
         norm, extend_cbar = misc.get_norm(z, cmin=cmin, cmax=cmax)
     else:
         extend_cbar = "neither"
-    cmap = plt.cm.get_cmap(cmap)
+    cmap = plt.get_cmap(cmap)
     colors = cmap(norm(z))
     img = ax.imshow(
         colors,
@@ -152,7 +166,7 @@ def plot2d_imshow(
         interpolation="none",
         **kwargs,
     )
-    img.set_norm(norm)  # Messages for colorbar.
+    img.set_norm(norm)  # For colorbar.
 
     if colorbar:
         # Way to remove colorbar: ax.images[-1].colorbar.remove()

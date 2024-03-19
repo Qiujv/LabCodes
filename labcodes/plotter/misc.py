@@ -114,7 +114,7 @@ def get_norm(
     Returns:
         norm, extend_cbar, useful in creating colorbar.
     """
-    vmin, vmax = np.min(data), np.max(data)
+    vmin, vmax = np.nanmin(data), np.nanmax(data)
 
     if cmin is None:
         cmin = vmin
