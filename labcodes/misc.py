@@ -130,9 +130,8 @@ def remove_background_2d(df, x_name, y_name, z_name):
     Example:
         remove_background_2d(lf.df, 'ro_freq_GHz', 'z_pulse_offset', ['iq_amp', 'abs(s21)_dB', 'iq_phase_rad'])
     """
-    background = df.groupby(x_name)[z_name].mean()
     def trans(df):
-        df[z_name] = df[z_name].values - background.values
+        df[z_name] = df[z_name].values - df[z_name].median()
         return df
     return df.groupby(y_name).apply(trans).reset_index(drop=True)
 

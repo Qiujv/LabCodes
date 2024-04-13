@@ -1,6 +1,7 @@
 """Functions for general 2d plot."""
 
 import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -44,6 +45,7 @@ def plot2d_collection(
     colorbar: bool = True,
     cmap: str = "RdBu_r",
     norm: Normalize = None,
+    transpose: bool = False,
     **kwargs,
 ):
     """Plot z in color versus x and y.
@@ -64,8 +66,12 @@ def plot2d_collection(
 
     if ax is None:
         fig, ax = plt.subplots()
-        ax.set_xlabel(x_name)
-        ax.set_ylabel(y_name)
+        if transpose:
+            ax.set_xlabel(y_name)
+            ax.set_ylabel(x_name)
+        else:
+            ax.set_xlabel(x_name)
+            ax.set_ylabel(y_name)
     else:
         fig = ax.get_figure()
 
@@ -81,12 +87,12 @@ def plot2d_collection(
 
     df["height"] = df.groupby(x_name)[y_name].transform(lambda y: np.diff(cut(y)))
     df["yshift"] = df.groupby(x_name)[y_name].transform(lambda y: cut(y)[:-1])
-    rects = [
-        Rectangle((x, y), w, h)
-        for x, y, w, h in df[["xshift", "yshift", "width", "height"]].itertuples(
-            index=False
-        )
-    ]
+
+    if transpose:
+        xywh = df[["yshift", "xshift", "height", "width"]].itertuples(index=False)
+    else:
+        xywh = df[["xshift", "yshift", "width", "height"]].itertuples(index=False)
+    rects = [Rectangle((x, y), w, h) for x, y, w, h in xywh]
 
     z = df[z_name]
     if norm is None:
@@ -185,6 +191,7 @@ def plot2d_pcolor(
     colorbar: bool = True,
     cmap: str = "RdBu_r",
     norm: Normalize = None,
+    transpose: bool = False,
     **kwargs,
 ):
     """Plot z in color versus x and y with plt.pcolormesh, with each data as a pixel.
@@ -200,8 +207,12 @@ def plot2d_pcolor(
 
     if ax is None:
         fig, ax = plt.subplots(tight_layout=True)
-        ax.set_xlabel(x_name)
-        ax.set_ylabel(y_name)
+        if transpose:
+            ax.set_xlabel(y_name)
+            ax.set_ylabel(x_name)
+        else:
+            ax.set_xlabel(x_name)
+            ax.set_ylabel(y_name)
     else:
         fig = ax.get_figure()
 
@@ -214,14 +225,24 @@ def plot2d_pcolor(
         extend_cbar = "neither"
 
     # https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.pcolormesh.html#differences-pcolor-pcolormesh
-    mesh = ax.pcolormesh(
-        df[x_name].values.reshape(xsize, -1),
-        df[y_name].values.reshape(xsize, -1),
-        df[z_name].values.reshape(xsize, -1),
-        norm=norm,
-        cmap=cmap,
-        **kwargs,
-    )
+    if transpose:
+        mesh = ax.pcolormesh(
+            df[y_name].values.reshape(xsize, -1),
+            df[x_name].values.reshape(xsize, -1),
+            df[z_name].values.reshape(xsize, -1),
+            norm=norm,
+            cmap=cmap,
+            **kwargs,
+        )
+    else:
+        mesh = ax.pcolormesh(
+            df[x_name].values.reshape(xsize, -1),
+            df[y_name].values.reshape(xsize, -1),
+            df[z_name].values.reshape(xsize, -1),
+            norm=norm,
+            cmap=cmap,
+            **kwargs,
+        )
     if colorbar:
         # Way to remove colorbar: ax.images[-1].colorbar.remove()
         fig.colorbar(mesh, ax=ax, label=z_name, extend=extend_cbar, fraction=0.03)
@@ -239,6 +260,7 @@ def plot2d_auto(
     colorbar: bool = True,
     cmap: str = "RdBu_r",
     norm: Normalize = None,
+    verbose: bool = True,
     **kwargs,
 ):
     """Plot z in color versus x and y.
@@ -279,10 +301,13 @@ def plot2d_auto(
     )
 
     if len(df) == xsize * ysize:
+        if verbose: print('imshow')
         return plot2d_imshow(**kwargs)
     elif len(df) % xsize == 0:
+        if verbose: print('pcolor')
         return plot2d_pcolor(**kwargs)
     else:
+        if verbose: print('collection')
         return plot2d_collection(**kwargs)
 
 
@@ -298,7 +323,7 @@ if __name__ == "__main__":
     z = np.sin(x * 2 * np.pi) + np.cos(y * 2 * np.pi)
     y2 = x**2 + y
     df = pd.DataFrame(dict(x=x, y=y, z=z, y2=y2))
-    plot2d_imshow(df)
-    plot2d_pcolor(df, "x", "y2", "z")
-    plot2d_collection(df.iloc[:-10, :], "x", "y2", "z")  # Missing data.
+    plot2d_imshow(df.iloc[:-10, :])
+    plot2d_pcolor(df, "x", "y2", "z", transpose=True)
+    plot2d_collection(df.iloc[:-10, :], "x", "y2", "z", transpose=True)  # Missing data.
     plt.show()

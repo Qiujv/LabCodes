@@ -199,12 +199,18 @@ class FitEnrCross:
     @staticmethod
     def extract_from_2d_spec(
         df: pd.DataFrame,
-        xname: str,
-        yname: str,
-        zname: str,
+        xname: str | int = 0,
+        yname: str | int = 1,
+        zname: str | int = 2,
         div_x: float = None,
         upper_at_left: bool = True,
     ):
+        if isinstance(xname, int):
+            xname = df.columns[xname]
+        if isinstance(yname, int):
+            yname = df.columns[yname]
+        if isinstance(zname, int):
+            zname = df.columns[zname]
         if div_x is None:
             div_x = df[xname].mean()
 
@@ -234,9 +240,9 @@ class FitEnrCross:
     def from_2d_spec(
         cls,
         df: pd.DataFrame,
-        xname: str,
-        yname: str,
-        zname: str,
+        xname: str | int = 0,
+        yname: str | int = 1,
+        zname: str | int = 2,
         div_x: float = None,
     ):
         upper, lower = cls.extract_from_2d_spec(df, xname, yname, zname, div_x)
