@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import labcodes.frog.pyle_tomo as tomo
+# import labcodes.frog.pyle_tomo as tomo
 from labcodes import fileio, misc, plotter
 
 

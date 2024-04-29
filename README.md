@@ -1,6 +1,6 @@
 # LabCodes
 
-Codes used in SUSTech superconducting quantum lab.
+Simple routines for superconducting quantum circuits.
 
 # Contents
 
@@ -22,12 +22,8 @@ Codes used in SUSTech superconducting quantum lab.
 
 # Installation
 
-To use LabCodes,
-download this repository,
-go to the directory (make sure `ls` shows `setup.py`)
-and run:
 ```powershell
-pip install --editable .
+pip install labcodes
 ```
 
 # Documentation

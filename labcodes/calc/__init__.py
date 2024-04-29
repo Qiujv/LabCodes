@@ -11,6 +11,8 @@ Usage:
 Feel free to copy and make your own calculators.
 """
 
+import scipy.constants as const
+
 from labcodes.calc.base import Calculator, dept
 from labcodes.calc.qubits import (
     Capacitor,

@@ -1,0 +1,41 @@
+[project]
+name = "labcodes"
+dynamic = ["version"]
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pandas",
+    "lmfit>=0.9.5",
+    # 'h5py>=2.6',
+    "tqdm",
+    "attrs",
+    # 'dpath',
+    # 'PyQt5',  # requirements of Labber API here and below.
+    "json-numpy",
+    "cvxpy",  # for tomography.
+    "scikit-learn",  # for state_disc.
+    "cmocean",  # for matrix plot.
+]
+requires-python = ">=3.9"
+authors = [{ name = "Qiujv", email = "qiujv@outlook.com" }]
+description = "Simple routines for superconducting quantum circuits."
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    # "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/Qiujv/LabCodes"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["labcodes"]
+
+[tool.hatch.version]
+path = "labcodes/__about__.py"

@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from labcodes import misc, fileio, plotter
-import labcodes.frog.pyle_tomo as tomo
+# import labcodes.frog.pyle_tomo as tomo
 
 JUDGE_TOL = 8
 

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from labcodes import fileio, misc, plotter
-import labcodes.frog.pyle_tomo as tomo
+# import labcodes.frog.pyle_tomo as tomo
 from joblib import Parallel, delayed
 from labcodes.frog import state_list
 from labcodes.frog.tele_state import single_shot_data, fidelity, rho
