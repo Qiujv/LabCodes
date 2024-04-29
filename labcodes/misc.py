@@ -76,52 +76,6 @@ def remove_e_delay(
     return new_rad
 
 
-def remove_background(
-    y: np.ndarray,
-    x: np.ndarray = None,
-    fit_mask: int | slice | np.ndarray = None,
-    offset: float = None,
-    plot: bool = False,
-):
-    """Remove linear background from data.
-    
-    Args:
-        fit_mask: mask of data to use for background estimation.
-            if int, use the first and last fit_mask points.
-        offset: offset after background removal.
-            if None, use y[0].
-
-    Examples:
-    >>> np.round(remove_background([0,3,1], fit_mask=1), decimals=2)
-    array([0. , 2.5, 0. ])
-    """
-    if x is None: x = np.arange(len(y))
-    y = np.asarray(y)
-    x = np.asarray(x)
-    
-    if fit_mask is None:
-        x_to_fit, y_to_fit = x, y
-    elif isinstance(fit_mask, int):
-        x_to_fit = np.r_[x[:fit_mask], x[-fit_mask:]]
-        y_to_fit = np.r_[y[:fit_mask], y[-fit_mask:]]
-    else:
-        x_to_fit, y_to_fit = x[fit_mask], y[fit_mask]
-
-    if offset is None: offset = y[0]
-
-    bg_params = np.polyfit(x_to_fit, y_to_fit, 1)  # Linear fit.
-    y_fit = np.polyval(bg_params, x)
-    new_y = y - y_fit + offset
-    if plot:
-        _, ax = plt.subplots()
-        ax.plot(x, y, '.-', label='raw')
-        ax.plot(x, y_fit, label='bg')
-        ax.plot(x, new_y, label='new')
-        ax.legend()
-        plt.show()
-    return new_y
-
-
 def remove_background_2d(df, x_name, y_name, z_name):
     """Remove the background of Z which varies along X and constant along Y.
 
