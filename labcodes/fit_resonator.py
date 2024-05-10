@@ -7,8 +7,9 @@ import pandas as pd
 import scipy.constants as const
 
 from labcodes import misc, plotter
+from labcodes.peak_find import PeakFinder
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 def s21m1(x, Qi=1e6, Qc=1e3, f0=4, phi=0, alpha=-50, phiv=10, phi0=0, amp=1):
@@ -47,55 +48,93 @@ class FitResonator:
     """
 
     def __init__(
-        self, freq: np.ndarray, s21_dB: np.ndarray, s21_rad: np.ndarray, **fit_kws
+        self,
+        freq: np.ndarray = None,
+        s21_dB: np.ndarray = None,
+        s21_rad: np.ndarray = None,
+        df: pd.DataFrame = None,
+        hold: bool = False,
+        **fit_kws,
     ):
-        """fit(Qi=1e6) to overwrite initial guess."""
-        # Normalize data with y0=0.
-        s21_rad = np.unwrap(s21_rad)
-        s21_dB = remove_background(s21_dB, freq, fit_mask=100, offset=0)
-        s21_rad = remove_background(s21_rad, freq, fit_mask=100, offset=0)
-        s21_cplx = 10 ** (s21_dB / 20) * np.exp(1j * s21_rad)
-        s21m1_cplx = 1 / s21_cplx
-        self.df = pd.DataFrame(
-            dict(
-                freq=freq,
-                s21_dB=s21_dB,
-                s21_rad=s21_rad,
-                s21_cplx=s21_cplx,
-                s21m1_cplx=s21m1_cplx,
-            )
-        )
+        """Prepare data, guess initial parameters, then fit.
+        
+        Usage:
+
+        - To skip data preparation, provide `df`.
+
+        - To manually set initial guess, pass values like `fit(Qi=1e6)`.
+
+        - One can always modify `df`, `init_params` then call `fit()` again to custom the fit.
+        """
+        if df is None:
+            self.df = self.prepare_data(freq, s21_dB, s21_rad)
+        else:
+            self.df = df.copy()[['freq', 's21_dB', 's21_rad']]
+
         self.init_params = None
-        self.guess_and_update_params()
+        self.init_params = self.guess_params()
+
         self.result: lmfit.minimizer.MinimizerResult = None
-        try:
-            self.fit(**fit_kws)
-        except:
-            logger.exception("Error in fitting.")
+        if not hold:
+            try:
+                self.fit(**fit_kws)
+            except:
+                logger.exception("Error in fitting.")
+
+    @staticmethod
+    def prepare_data(freq: np.ndarray, s21_dB: np.ndarray, s21_rad: np.ndarray):
+        freq = np.asarray(freq)
+        s21_dB = np.asarray(s21_dB)
+        s21_rad = np.asarray(s21_rad)
+
+        n_pts_bg = freq.size // 10
+        s21_rad = np.unwrap(s21_rad)
+        s21_dB = remove_background(s21_dB, freq, fit_mask=n_pts_bg, offset=0)
+        s21_rad = remove_background(s21_rad, freq, fit_mask=slice(0, n_pts_bg), 
+                                    offset=0)
+
+        return pd.DataFrame(dict(freq=freq, s21_dB=s21_dB, s21_rad=s21_rad))
+    
+    @property
+    def s21_cplx(self) -> np.ndarray:
+        return self.df.eval('10 ** (s21_dB / 20) * exp(1j * s21_rad)').values
 
     def fit(self, **fit_kws) -> lmfit.minimizer.MinimizerResult:
         """fit(Qi=1e6) to overwrite initial guess."""
         freq = self.df.freq.values
-        s21m1_cplx = self.df.s21m1_cplx.values
+        s21_cplx = self.s21_cplx
+        s21m1_cplx = 1 / s21_cplx
+
+        if 'weights' not in fit_kws:
+            # Lower weight around dip, for improved robustness with noisy data.
+            # pass weights=None to disable any weights.
+            fit_kws['weights'] = np.abs(s21_cplx)
 
         self.result = model.fit(
             s21m1_cplx,
             x=freq,
             params=self.init_params,
-            # weights=np.abs(s21m1_cplx),  # not necessary.
             method="Powell",
             **fit_kws,
         )
         return self.result
 
-    def guess_and_update_params(self):
+    def guess_params(self):
         freq = self.df.freq.values
         s21_dB = self.df.s21_dB.values
-        s21_cplx = self.df.s21_cplx.values
-        s21m1_cplx = self.df.s21m1_cplx.values
+        s21_cplx = self.s21_cplx
+        s21m1_cplx = 1 / s21_cplx
 
         idip = np.argmin(s21_dB)
         fr = freq[idip]
+
+        # pf = PeakFinder(freq, -np.abs(s21_cplx))
+        # Qc = abs(pf['center'] / pf['hwhm']) / 2
+
+        # pf = PeakFinder(freq, np.abs(s21m1_cplx))
+        # Qi = abs(pf['center'] / pf['hwhm'])
+        # if np.sum(np.real(s21m1_cplx)) < 1:
+        #     Qi = -Qi
 
         Qc = guess_Qc(s21_cplx, freq, fr, idip, s21_dB)
         Qi = guess_Qi(s21m1_cplx, freq, fr, idip)
@@ -107,7 +146,6 @@ class FitResonator:
         params = lmfit.Parameters()
         params.set(Qi=Qi, Qc=Qc, f0=fr, phi=0, alpha=alpha, phiv=phiv, phi0=0, amp=1)
         params.set(phiv=dict(min=-np.pi / freq_span, max=np.pi / freq_span))
-        self.init_params = params
         return params
 
     def __getitem__(self, key: str):
@@ -150,24 +188,26 @@ class FitResonator:
         f0 = self["f0"]
         Qi = self["Qi"]
         Qc = self["Qc"]
-        dfi = f0 / Qi / 2
-        dfc = f0 / Qc / 2
+        dfi = abs(f0 / Qi / 2)
+        dfc = abs(f0 / Qc / 2)
 
         def plot(ax: plt.Axes, x: np.ndarray, y: np.ndarray, sty="-", **kw):
             dx = np.abs(x - f0)
             mask1 = dx <= dfi
-            mask3 = dx >= dfi * 10
+            mask3 = dx >= dfc
             mask2 = np.logical_not(mask1 | mask3)
             ax.plot(y.real[mask1], y.imag[mask1], sty, color="C0", **kw)
             ax.plot(y.real[mask2], y.imag[mask2], sty, color="C1", **kw)
             ax.plot(y.real[mask3], y.imag[mask3], sty, color="C2", **kw)
 
-        plot(ax, self.df.freq.values, self.df.s21m1_cplx.values, ".", alpha=0.5)
+        plot(ax, self.df.freq.values, 1 / self.s21_cplx, ".", alpha=0.5)
 
         if (self.result is not None) and plot_fit:
             plot(ax, freq, self.result.eval(x=freq), "-")
             ax.annotate(
-                f"$f_0$={misc.estr(f0)}\n$Q_i$={misc.estr(Qi)}\n$Q_c$={misc.estr(Qc)}",
+                (f"$f_0={f0:.4g}$\n"
+                 f"$Q_i={Qi:+.4g}$\n"
+                 f"$Q_c={Qc:+.4g}$"),
                 (0.5, 0.5),
                 xycoords="axes fraction",
                 ha="center",
@@ -190,7 +230,7 @@ class FitResonator:
         if axs is None:
             _, (ax, ax2) = plt.subplots(figsize=(6, 2), ncols=2)
             setup_ax_abs(ax)
-            setup_ax_rad(ax2)
+            setup_ax_deg(ax2)
         else:
             ax, ax2 = axs
 
@@ -200,13 +240,13 @@ class FitResonator:
         f0 = self["f0"]
         Qi = self["Qi"]
         Qc = self["Qc"]
-        dfi = f0 / Qi / 2
-        dfc = f0 / Qc / 2
+        dfi = abs(f0 / Qi / 2)
+        dfc = abs(f0 / Qc / 2)
 
         def plot(ax: plt.Axes, x: np.ndarray, y: np.ndarray, sty="-"):
             dx = np.abs(x - f0)
             mask1 = dx <= dfi
-            mask3 = dx >= dfi * 10
+            mask3 = dx >= dfc
             mask2 = np.logical_not(mask1 | mask3)
             mask2a = mask2 & (x < f0)
             mask2b = mask2 & (x >= f0)
@@ -219,18 +259,18 @@ class FitResonator:
             ax.plot(x[mask3b], y[mask3b], sty, color="C2")
 
         plot(ax, self.df.freq.values, self.df.s21_dB.values, ".")
-        plot(ax2, self.df.freq.values, self.df.s21_rad.values, ".")
+        plot(ax2, self.df.freq.values, np.rad2deg(self.df.s21_rad.values), ".")
 
         if (self.result is not None) and plot_fit:
             s21_cplx = 1 / self.result.eval(x=freq)
             ax.plot(freq, 20 * np.log10(np.abs(s21_cplx)), "k-")
-            ax2.plot(freq, np.angle(s21_cplx), "k-")
+            ax2.plot(freq, np.rad2deg(np.unwrap(np.angle(s21_cplx))), "k-")
 
         if plot_init:
             init_param = {k: p.init_value for k, p in self.result.params.items()}
             s21_cplx = 1 / model.eval(x=freq, **init_param)
             ax.plot(freq, 20 * np.log10(np.abs(s21_cplx)), "--", color="gray")
-            ax2.plot(freq, np.angle(s21_cplx), "--", color="gray")
+            ax2.plot(freq, np.rad2deg(np.unwrap(np.angle(s21_cplx))), "--", color="gray")
 
         return ax, ax2
 
@@ -246,7 +286,7 @@ class FitResonator:
                 figsize=(8, 3), ncols=3, layout="constrained"
             )
             setup_ax_abs(ax)
-            setup_ax_rad(ax2)
+            setup_ax_deg(ax2)
             setup_ax_cplx(ax3)
         else:
             ax, ax2, ax3 = axs
@@ -264,9 +304,14 @@ def setup_ax_abs(ax: plt.Axes):
 def setup_ax_rad(ax: plt.Axes):
     ax.set_xlabel("freq")
     ax.set_title("s21_rad")
-    ax.set_ylim(-3.2, 3.2)
+    # ax.set_ylim(-3.2, 3.2)
     ax.yaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
     ax.yaxis.set_major_formatter(plotter.misc.multiple_formatter(2, np.pi))
+
+
+def setup_ax_deg(ax: plt.Axes):
+    ax.set_xlabel("freq")
+    ax.set_title("s21_deg")
 
 
 def setup_ax_cplx(ax: plt.Axes):

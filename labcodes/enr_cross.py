@@ -8,7 +8,7 @@ from labcodes import misc, plotter
 from labcodes.calc import Calculator, dept
 from scipy.signal import find_peaks
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 class EnrCross(Calculator):

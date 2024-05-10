@@ -645,6 +645,41 @@ def df_to_traces(df, index, columns, values):
     return xbatch, ybatch, stepper_value
 
 
+def resample(y: np.ndarray, n_pts: int) -> np.ndarray:
+    """Return yp by resampling y for n_pts points.
+
+    >>> resample([0, 3, 33], 7)
+    array([ 0.,  1.,  2.,  3., 13., 23., 33.])
+    """
+    y = np.ravel(y)
+    x = np.linspace(0, 1, num=len(y))
+    xp = np.linspace(0, 1, num=n_pts)
+    return np.interp(xp, x, y)
+
+
+def getitem_from_fit_result(res: lmfit.model.ModelResult, k: str) -> float:
+    """Get parameter value or stderr from a fit result.
+
+    For quick implementation of __getitem__ of fitters.
+    """
+    if res is None:
+        raise ValueError("No valid result yet.")
+
+    if k == "chi":
+        return np.sqrt(res.chisqr)
+    elif k in res.model.param_names:
+        return res.params[k].value
+    elif k.removesuffix("_err") in res.model.param_names:
+        k = k.removesuffix("_err")
+        v = res.params[k].stderr
+        if v is None:
+            return np.nan
+        else:
+            return v
+    else:
+        raise KeyError("Invalid key: %s", k)
+
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
