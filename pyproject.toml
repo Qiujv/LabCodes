@@ -11,7 +11,6 @@ dependencies = [
     "tqdm",
     "attrs",
     # 'dpath',
-    # 'PyQt5',  # requirements of Labber API here and below.
     "json-numpy",
     "cvxpy",  # for tomography.
     "scikit-learn",  # for state_disc.
@@ -39,3 +38,10 @@ packages = ["labcodes"]
 
 [tool.hatch.version]
 path = "labcodes/__about__.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/data",
+  "/examples",
+  "/tests",
+]

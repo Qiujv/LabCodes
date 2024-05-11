@@ -100,7 +100,10 @@ class FitResonator:
         return self.df.eval('10 ** (s21_dB / 20) * exp(1j * s21_rad)').values
 
     def fit(self, **fit_kws) -> lmfit.minimizer.MinimizerResult:
-        """fit(Qi=1e6) to overwrite initial guess."""
+        """fit(Qi=1e6) to overwrite initial guess.
+        
+        Defaultly uses `weights=np.abs(s21_cplx)`. Pass `weights=None` to disable any weights.
+        """
         freq = self.df.freq.values
         s21_cplx = self.s21_cplx
         s21m1_cplx = 1 / s21_cplx
@@ -128,16 +131,13 @@ class FitResonator:
         idip = np.argmin(s21_dB)
         fr = freq[idip]
 
-        # pf = PeakFinder(freq, -np.abs(s21_cplx))
-        # Qc = abs(pf['center'] / pf['hwhm']) / 2
+        pf = PeakFinder(freq, -np.abs(s21_cplx))
+        Qc = abs(pf['center'] / pf['hwhm']) / 2
 
-        # pf = PeakFinder(freq, np.abs(s21m1_cplx))
-        # Qi = abs(pf['center'] / pf['hwhm'])
-        # if np.sum(np.real(s21m1_cplx)) < 1:
-        #     Qi = -Qi
-
-        Qc = guess_Qc(s21_cplx, freq, fr, idip, s21_dB)
-        Qi = guess_Qi(s21m1_cplx, freq, fr, idip)
+        pf = PeakFinder(freq, np.abs(s21m1_cplx))
+        Qi = abs(pf['center'] / pf['hwhm'])
+        if np.sum(np.real(s21m1_cplx)) < 1:
+            Qi = -Qi
 
         freq_span = freq[-1] - freq[0]
         alpha = fr * (abs(s21_cplx[-1]) - abs(s21_cplx[0])) / freq_span
@@ -370,104 +370,11 @@ def remove_background(
     return new_y
 
 
-def lorentz(x, center, width, amp, offset):
-    return amp * width / ((x - center) ** 2 + width**2) + offset
-
-
-def lorentz_m1(x, center, width, amp, offset):
-    return 1 - amp * width / ((x - center) ** 2 + width**2) + offset
-
-
-model_lorentz = lmfit.Model(lorentz)
-model_lorentz_m1 = lmfit.Model(lorentz_m1)
-
-
-def guess_Qi(
-    s21m1_cplx: np.ndarray,
-    freq: np.ndarray,
-    fr: float,
-    idip: int = None,
-):
-    s21m1_abs = np.abs(s21m1_cplx)
-    if idip is None:
-        idip = np.argmax(s21m1_abs)
-    if idip == 0:
-        logger.warn("fr <= freq.")
-        idip = 1
-    if idip == np.size(freq):
-        logger.warn("fr >= freq.")
-        idip = -2
-
-    half_maximum = (s21m1_abs[idip] + 1) / 2
-    fwhm = 0.1 * np.abs(  # Emprical value.
-        freq[np.argmin(np.abs(s21m1_abs[:idip] - half_maximum))]
-        - freq[np.argmin(np.abs(s21m1_abs[idip:] - half_maximum))]
-    )
-    Qi = np.abs(fr / fwhm)
-
-    try:
-        res = model_lorentz.fit(
-            s21m1_abs,
-            x=freq,
-            center=fr,
-            width=fwhm / 5,
-            amp=0.1 * (s21m1_abs[idip] - 1),
-            offset=1,
-        )
-        Qi = np.abs(res.params["center"].value / res.params["width"].value)
-    except:
-        logger.warn("Fail to fit Lorentz in guessing Qi.")
-
-    if np.mean(np.real(s21m1_cplx)) < 1:
-        Qi = -Qi
-
-    return Qi
-
-
-def guess_Qc(
-    s21_cplx: np.ndarray,
-    freq: np.ndarray,
-    fr: float,
-    idip: int = None,
-    s21_dB: np.ndarray = None,
-):
-    s21_abs = np.abs(s21_cplx)
-    if idip is None:
-        idip = np.argmin(s21_abs)
-    if idip == 0:
-        logger.warn("fr <= freq.")
-        idip = 1
-    if idip == np.size(freq):
-        logger.warn("fr >= freq.")
-        idip = -2
-
-    if s21_dB is None:
-        s21_dB = 20 * np.log10(s21_abs)
-
-    half_maximum = s21_dB[idip] + 3
-    fwhm = 0.2 * np.abs(  # Emprical value.
-        freq[np.argmin(np.abs(s21_dB[:idip] - half_maximum))]
-        - freq[np.argmin(np.abs(s21_dB[idip:] - half_maximum))]
-    )
-    Qc = np.abs(fr / fwhm)
-
-    try:
-        res = model_lorentz_m1.fit(
-            s21_cplx,
-            x=freq,
-            center=fr,
-            width=fwhm / 2,
-            amp=1 - s21_abs[idip],
-            offset=0,
-        )
-        Qc = np.abs(res.params["center"].value / res.params["width"].value / 2)
-    except:
-        logger.warn("Fail to fit Lorentz in guessing Qc.")
-
-    return Qc
-
 
 if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+
     freq = misc.segments(
         misc.center_span(4, 0.01e-3, n=101),
         misc.center_span(4, 10e-3, n=101),
