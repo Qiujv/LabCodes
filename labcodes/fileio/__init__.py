@@ -1,6 +1,6 @@
 import warnings
 
-from labcodes.fileio.base import LogFile, LogName
+from labcodes.fileio.base import LogFile, LogName, DataDirectory
 
 try:
     from labcodes.fileio.labber import read_labber

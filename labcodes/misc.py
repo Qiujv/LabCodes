@@ -565,6 +565,15 @@ def cache_with_bypass(
     return decorator
 
 
+def random_smooth_line(n: int = 100, n_feat: int = None):
+    if n_feat is None:
+        n_feat = np.random.randint(2, n // 2)
+    x_feat = np.linspace(0, 1, n_feat)
+    y_feat = np.random.normal(size=n_feat)
+    spl = scipy.interpolate.CubicSpline(x_feat, y_feat)
+    return spl(np.linspace(0, 1, n))
+
+
 if __name__ == "__main__":
     import doctest
 
