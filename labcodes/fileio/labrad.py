@@ -111,7 +111,7 @@ def find(dir: Path, id: int, return_all: bool = False) -> Path:
     if not dir.exists():
         raise FileNotFoundError(f"{dir} not exist.")
 
-    prn = f"{str(id).zfill(5)} - *"
+    prn = f"{str(id).zfill(5)} - *.csv"
     all_match = list(dir.glob(prn))
     if len(all_match) == 0:
         raise ValueError(f'Files like "{prn}" not found in {dir}')

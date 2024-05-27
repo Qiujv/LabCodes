@@ -284,6 +284,40 @@ def exclude_regions(
             mask = mask & ((xdata <= x0) | (xdata >= x1))
     return xdata[mask]
 
+def step_iter(*axes: float | list[float] | tuple[list[float], ...]):
+    """Iterate over a grid of values.
+    
+    Usage:
+    >>> list(step_iter(1, [8,9], zip([1,2,3], [4,5,6])))
+    [[1, 8, 1, 4], [1, 8, 2, 5], [1, 8, 3, 6], [1, 9, 1, 4], [1, 9, 2, 5], [1, 9, 3, 6]]
+
+    See also: `step_table`.
+    """
+    from itertools import product
+    axes = list(axes)
+    for i, ax in enumerate(axes):
+        if not np.iterable(ax):
+            axes[i] = [ax]
+    
+    for step_with_bundle in product(*axes):
+        step = []
+        for val in step_with_bundle:
+            if isinstance(val, tuple):
+                step.extend(val)
+            else:
+                step.append(val)
+        yield step
+
+def step_table(*axes: list[float | list[float]]):
+    """Generate a table of steps.
+    
+    Usage:
+    >>> step_table(1, [8,9], zip([1,2,3], [4,5,6]))
+    [[1, 8, 1, 4], [1, 8, 2, 5], [1, 8, 3, 6], [1, 9, 1, 4], [1, 9, 2, 5], [1, 9, 3, 6]]
+
+    See also: `step_iter`.
+    """
+    return list(step_iter(*axes))
 
 def multiples(period, shift, vmin, vmax) -> np.ndarray:
     """Returns multiples of period with shift within [vmin, vmax].
@@ -375,6 +409,19 @@ def inverse_interp(
         return x.item()
     else:
         return x
+    
+
+def remove_wrong_spaces(s: str):
+    """Return a string with multiple spaces replaced with a single space
+    and spaces before punctuation removed.
+
+    >>> remove_wrong_spaces('  a  b  c  .  d  e  f  .  ')
+    'a b c. d e f.'
+    """
+    import re
+    s = re.sub(' +', ' ', s)  # replace multiple spaces with a single space
+    s = re.sub(' +([.,;:])', r'\1', s)  # remove spaces before punctuation
+    return s.strip()
 
 
 def num2bstr(num: int, n_bits: int, base: int = 2) -> str:
