@@ -138,7 +138,7 @@ def get_norm(
     return norm, extend_cbar
 
 
-def multiple_formatter(denominator=2, number=np.pi, latex='\mathrm{\pi}'):
+def multiple_formatter(denominator=2, number=np.pi, latex=r'\mathrm{\pi}'):
     """Format axis tick labels like: 1/2pi, pi, 3/2pi.
 
     Copied from https://stackoverflow.com/a/53586826

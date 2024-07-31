@@ -92,6 +92,7 @@ class FitResonator:
         s21_dB = remove_background(s21_dB, freq, fit_mask=n_pts_bg, offset=0)
         s21_rad = remove_background(s21_rad, freq, fit_mask=slice(0, n_pts_bg), 
                                     offset=0)
+        s21_rad = s21_rad - s21_rad[np.argmin(s21_dB)]  # Move phase of dip to 0.
 
         return pd.DataFrame(dict(freq=freq, s21_dB=s21_dB, s21_rad=s21_rad))
     

@@ -65,6 +65,7 @@ class PeakFinder:
         )
 
     def peaks(self, **kwargs):
+        """Find peaks in the data. kwargs passed to `scipy.signal.find_peaks`."""
         x = self.x
         y = self.y
 
