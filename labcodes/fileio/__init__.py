@@ -11,7 +11,7 @@ except:
     logger.exception("Fail to import fileio.labber.")
 
 try:
-    from labcodes.fileio.labrad import read_labrad, LabradRead
+    from labcodes.fileio.labrad import read_labrad, LabradRead, LabradDirectory
     from labcodes.fileio import labrad
 except:
     logger.exception("Fail to import fileio.labrad.")
