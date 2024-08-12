@@ -194,14 +194,26 @@ class LogName:
     def __str__(self):
         return f"#{self.id}, {self.title}"
 
+    @property
+    def folder(self) -> str:
+        p = Path(self.dir)
+        data_vault_path = [i for i in p.parents if not i.name.endswith('.dir')][0]
+        folder = p.relative_to(data_vault_path).parts
+        folder = [i.removesuffix('.dir') for i in folder]
+
+        import socket
+        folder.insert(0, socket.gethostname())
+        return '/'.join(folder)
+
     def as_plot_title(self, width: int = 60) -> str:
         s = f"#{self.id}, {self.title}"
         s = textwrap.fill(s, width=width)
 
-        f = str(self.dir).replace(".dir", "")
+        # f = str(self.dir).replace(".dir", "")
+        f = self.folder
         # f = textwrap.fill(f, width=width)
 
-        s = f"{f}\\\n{s}"
+        s = f"{f}/\n{s}"
         return s
 
     ptitle = as_plot_title
