@@ -1,12 +1,12 @@
 import functools
 import logging
 import math
-import warnings
 from collections.abc import Hashable
 from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.interpolate
 
 logger = logging.getLogger(__name__)
@@ -76,18 +76,25 @@ def remove_e_delay(
     return new_rad
 
 
-def remove_background_2d(df, x_name, y_name, z_name):
+def remove_background_2d(df: pd.DataFrame, groupby: str | list[str], z_name: str | list[str]):
     """Remove the background of Z which varies along X and constant along Y.
 
     Assumes rectangle grid sampling.
 
     Example:
-        remove_background_2d(lf.df, 'ro_freq_GHz', 'z_pulse_offset', ['iq_amp', 'abs(s21)_dB', 'iq_phase_rad'])
+    ```
+    remove_background_2d(
+        lf.df,
+        'ro_freq_GHz',
+        'z_pulse_offset',
+        ['iq_amp', 'abs(s21)_dB', 'iq_phase_rad'],
+    )
+    ```
     """
-    def trans(df):
+    def trans(df: pd.DataFrame):
         df[z_name] = df[z_name].values - df[z_name].median()
         return df
-    return df.groupby(y_name).apply(trans).reset_index(drop=True)
+    return df.groupby(groupby).apply(trans).reset_index(drop=True)
 
 
 def guess_freq(x: np.ndarray[float], y: np.ndarray[float]) -> float:
