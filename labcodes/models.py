@@ -216,7 +216,7 @@ class TransmonModel(Model):
 class GmonModel(Model):
     """Model fitting Gmon induced tunable coupling.
     WARNING: The fit is sensitive to initial value, which must be provided by user."""
-    _delta_interp = np.linspace(-2*np.pi, 2*np.pi, 10001)
+    _delta_interp = np.linspace(-4*np.pi, 4*np.pi, 20001)
 
     def __init__(self, with_slope=None, **kwargs):
         def gmon(x, r=0.9, amp=1, period=1, shift=0, offset=0, slope=0):
@@ -264,7 +264,7 @@ class GmonModel(Model):
         ax.annotate(f"y0={cfit['offset']:.3f}", 
             (ax.get_xlim()[0], cfit['offset']), ha='left')
 
-        dip_y = cfit['offset'] + cfit['max_y_shift']
+        dip_y = max(cfit['offset'] + cfit['max_y_shift'], ax.get_ylim()[0])
         ax.axhline(y=dip_y, **gs)
         ax.annotate(f"$\\Delta y_\\mathrm{{max}}={cfit['max_y_shift']:.4f}±{cfit['max_y_shift_err']:.4f}$", 
             (ax.get_xlim()[0], dip_y), va='bottom', ha='left')

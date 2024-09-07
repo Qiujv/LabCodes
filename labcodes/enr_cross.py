@@ -178,7 +178,7 @@ class FitEnrCross:
             ax.plot([x, x], [fdown, fup], "k-", scaley=False)
             if self["k1"] + self["k2"] > 0:
                 ax.annotate(
-                    f'g={self["g"]:.3f}\n({x:.3f}, {y:.3f})',
+                    f'g={self["g"]:.3f}±{self["g_err"]:.3f}\n({x:.3f}, {y:.3f})',
                     (1, 0),
                     xycoords="axes fraction",
                     ha="right",
@@ -187,7 +187,7 @@ class FitEnrCross:
                 )
             else:
                 ax.annotate(
-                    f'g={self["g"]:.3f}\n({x:.3f}, {y:.3f})',
+                    f'g={self["g"]:.3f}±{self["g_err"]:.3f}\n({x:.3f}, {y:.3f})',
                     (0, 0),
                     xycoords="axes fraction",
                     ha="left",
