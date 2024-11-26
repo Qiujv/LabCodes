@@ -623,6 +623,39 @@ def random_density_matrix(n_dim: int, pure: bool = False) -> np.matrix:
     warn_if_not_herm_unit_or_pos(rho)
     return rho
 
+def get_tomo_op_labels(
+    n_qbs: int,
+    tomo_ops: Union[list[np.matrix], Literal["ixy", "oct"]] = "ixy",
+) -> list[str] | list[tuple[str]]:
+    """>>> get_tomo_op_labels(2)
+    [('i', 'i'),
+     ('i', 'x'),
+     ('i', 'y'),
+     ('x', 'i'),
+     ('x', 'x'),
+     ('x', 'y'),
+     ('y', 'i'),
+     ('y', 'x'),
+     ('y', 'y')]
+    """
+    if tomo_ops == "ixy":
+        tomo_ops = list("ixy")
+    elif tomo_ops == "oct":
+        tomo_ops = "i,x,y,xm,ym,1".split(",")
+    else:
+        pass
+
+    if n_qbs == 1:
+        return tomo_ops
+    else:
+        return list(itertools.product(tomo_ops, repeat=n_qbs))
+
+# Same as state_disc.prob_labels.
+def get_state_labels(n_qbs: int) -> list[str]:
+    """>>> get_state_labels(3)
+    ['000', '001', '010', '011', '100', '101', '110', '111']
+    """
+    return ["".join(state) for state in itertools.product("01", repeat=n_qbs)]
 
 # TODO: get_rho(state_vector) -> density_matrix
 # TODO: get_chi(operation_matrix) -> chi matrix.
