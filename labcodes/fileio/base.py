@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from attrs import define
+from typing import Callable
 
 from labcodes import plotter
 from labcodes.fileio.misc import data_from_json, data_to_json
@@ -90,6 +91,7 @@ class LogFile:
         y_name: str | int = 1,
         z_name: str | int = 0,
         ax: plt.Axes = None,
+        plot_func: Callable = None,
         **kwargs,
     ):
         """Quick 2d plot with plotter.plot2d_auto."""
@@ -99,8 +101,10 @@ class LogFile:
             y_name = self.indeps[y_name]
         if isinstance(z_name, int):
             z_name = self.deps[z_name]
+        if plot_func is None:
+            plot_func = plotter.plot2d_auto
 
-        ax = plotter.plot2d_auto(
+        ax = plot_func(
             self.df, x_name=x_name, y_name=y_name, z_name=z_name, ax=ax, **kwargs
         )
         ax.set_title(self.name.as_plot_title())

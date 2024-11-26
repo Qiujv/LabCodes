@@ -185,6 +185,9 @@ def probs_from_flags(
             Also available via another function `prob_labels(nlevels, n_qbs)`.
 
     Examples:
+    >>> probs_from_flags([[1,1,0,0],[1,0,1,0]], 2, 2, True)
+    (array([0.25, 0.25, 0.25, 0.25]), ['00', '01', '10', '11'])
+    
     >>> np.random.seed(0)
     >>> n_qbs, nlevels = 3, 2
     >>> flags = [np.random.randint(0, nlevels, 50) for _ in range(n_qbs)]

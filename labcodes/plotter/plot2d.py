@@ -303,7 +303,7 @@ def plot2d_auto(
     if len(df) == xsize * ysize:
         if verbose: print('imshow')
         return plot2d_imshow(**kwargs)
-    elif len(df) % xsize == 0:
+    elif len(df) % xsize == 0:  # BUG: Also triggers in some wrong cases.
         if verbose: print('pcolor')
         return plot2d_pcolor(**kwargs)
     else:

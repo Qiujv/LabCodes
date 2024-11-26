@@ -197,9 +197,12 @@ def read_ini_labrad(
 ) -> dict[Literal["general", "comments", "parameter", "independent", "dependent"]]:
     if isinstance(path, str):
         path = Path(path)
+    path = path.with_suffix(".ini")
+    if not path.exists():
+        raise FileNotFoundError(path)
 
     ini = ConfigParser()
-    ini.read(path.with_suffix(".ini"))
+    ini.read(path)
 
     d = dict()
     d["general"] = dict(ini["General"])
@@ -295,6 +298,7 @@ LABRAD_REG_GLOBLES = {
     "ValueArray": _just_return_args,
     "array": np.array,
     "uint32": int,
+    "int32": int,
 }
 _strange_numbers = {
     "0L": "0",

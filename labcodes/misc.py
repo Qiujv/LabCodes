@@ -192,7 +192,7 @@ def start_stop(start, stop, step=None, n=None) -> np.ndarray:
     """
     if n is None:
         if (start > stop) and (step > 0):
-            logger.warning("start > stop, but step > 0, use step = -step instead.")
+            # logger.warning("start > stop, but step > 0, use step = -step instead.")
             step = -step
         if isinstance(start, int) and isinstance(stop, int) and isinstance(step, int):
             dtype = int

@@ -224,7 +224,7 @@ class QubitSpec:
     def zpa_from_freq(self, f, tol=1e-8):
         # zpa = np.interp(f, *self._f_vs_zpa)
         # Spline handles extropolating case.
-        zpa = UnivariateSpline(*self._f_vs_zpa, k=1, s=0)(f)
+        zpa = UnivariateSpline(*self._f_vs_zpa, k=1, s=0, ext='const')(f)
         mask = _check_extropolate('freq', f, self._f_vs_zpa[0][0],
                                   self._f_vs_zpa[0][-1])
         if tol:
