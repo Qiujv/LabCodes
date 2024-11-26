@@ -201,24 +201,32 @@ class LogName:
     @property
     def folder(self) -> str:
         p = Path(self.dir)
-        data_vault_path = [i for i in p.parents if not i.name.endswith('.dir')][0]
-        folder = p.relative_to(data_vault_path).parts
-        folder = [i.removesuffix('.dir') for i in folder]
 
-        import socket
-        folder.insert(0, socket.gethostname())
-        return '/'.join(folder)
+        dv_path = [i for i in p.parents if not i.name.endswith('.dir')]
+        if dv_path:  # LabRAD style path.
+            short_path = p.relative_to(dv_path[0])
+            parts = [i.removesuffix('.dir') for i in short_path.parts]
+        else:
+            parts = list(p.parts[1:])
+
+        if ":" in p.parts[0]:
+            import socket
+            parts.insert(0, socket.gethostname())
+        else:
+            parts.insert(0, p.parts[0].replace("\\", "/").removesuffix('/'))
+
+        return '/'.join(parts)
 
     def as_plot_title(self, width: int = 60) -> str:
         s = f"#{self.id}, {self.title}"
         s = textwrap.fill(s, width=width)
 
-        # f = str(self.dir).replace(".dir", "")
         f = self.folder
-        # f = textwrap.fill(f, width=width)
-
-        s = f"{f}/\n{s}"
-        return s
+        
+        if len(f) + len(s) <= width:
+            return f"{f}/{s}"
+        else:
+            return f"{f}/\n{s}"
 
     ptitle = as_plot_title
 
