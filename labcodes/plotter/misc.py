@@ -70,7 +70,7 @@ def cursor(
         ts.update(text_style)
         txt = ax.annotate(text.format(x, y), (x,y), **ts)
     elif x is not None:
-        if text is None: text = 'x={}'
+        if text is None: text = 'x={:n}'
         ts = dict(rotation='vertical', va='top', path_effects=[txt_effect()])
         ts.update(text_style)
         if ts.get('va') == 'bottom':
@@ -78,7 +78,7 @@ def cursor(
         else:
             txt = ax.annotate(text.format(x), (x, ax.get_ylim()[1]), **ts)
     elif y is not None:
-        if text is None: text = 'y={}'
+        if text is None: text = 'y={:n}'
         ts = dict(path_effects=[txt_effect()])
         ts.update(text_style)
         if ts.get('ha') == 'right':

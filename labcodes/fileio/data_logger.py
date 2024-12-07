@@ -1,135 +1,153 @@
+"""Data Logger based on pandas DataFrame and json_tricks."""
+
 import inspect
+import itertools
+import warnings
 from datetime import datetime
-from itertools import product
+from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
+import dpath
+from labcodes.fileio.misc import data_to_json, data_from_json
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from labcodes.fileio import LogFile, LogName
+
+def now() -> str:
+    return datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
 
 
-# TODO: Quick temperature solution adapted from DataDirectory branch.
-# TODO: maybe a joblib.parallel version.
-def capture(
-    func: Callable,
-    axes: list[float | list[float]] | dict[str, float | list[float]],
-    title: str = None,
-    indeps: list[str] = None,
-) -> LogFile:
-    """Run a sweep on a grid over the given axes, and capture the data.
+class DataLogger:
+    def __init__(self, path: str = None):
+        self.meta: dict = {}
+        self._records: list[dict] = []
+        self._segs: list[pd.DataFrame] = []
+        self.path = path
 
-    `func` is a function that takes the axes as arguements and returns a dictionary.
-    Fastest last one in the `axes`.
-    if `indeps` is None, all running axes will be used as indeps.
+    @cached_property
+    def df(self) -> pd.DataFrame:
+        self._flush_records()
+        df = pd.concat(self._segs)
+        if df.empty:
+            warnings.warn("No data in DataLogger.")
+        return df
 
-    Axes with single element will be added to the meta data.
-    """
-    fsig = inspect.signature(func)
-    arg_names = [i.removeprefix("_") for i in fsig.parameters.keys()]
+    def _flush_records(self):
+        if self._records:
+            self._segs.append(pd.DataFrame.from_records(self._records))
+            self._records = []
 
-    if isinstance(axes, dict):
-        axes = [axes[k] for k in arg_names]
+    def add_meta(self, meta: dict = None, **kwargs):
+        if meta is None:
+            meta = {}
+        meta.update(kwargs)
+        self.meta = dpath.merge(self.meta, meta)
 
-    # Find running axs.
-    run_idx: dict[str, int] = {}
-    const_axs: dict[str, float] = {}
-    for i, (name, ax) in enumerate(zip(arg_names, axes)):
-        if np.iterable(ax):
-            run_idx[name] = i
+    def add_meta_to_head(self, meta: dict = None, **kwargs):
+        if meta is None:
+            meta = {}
+        meta.update(kwargs)
+        self.meta = dpath.merge(meta, self.meta)
+
+    def add_row(self, **kwargs):
+        if all(np.isscalar(v) for v in kwargs.values()):
+            self._records.append(kwargs)
         else:
-            const_axs[name] = ax
-            axes[i] = [ax]  # Make all axes iterable.
-    meta = {"const": const_axs}
-    meta["create_time"] = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+            self._flush_records()
+            self._segs.append(pd.DataFrame(kwargs))
 
-    if title is None:
-        title = func.__name__
-    if indeps is None:
-        indeps = list(run_idx.keys())
-    else:
-        indeps = [i for i in indeps if i not in const_axs]
+        if hasattr(self, "df"):
+            del self.df
 
-    # Append more message to title
-    dim_info = ",".join(f"{k}{len(axes[i])}" for k, i in run_idx.items())
-    if dim_info:
-        title = title + f" ! {dim_info}"
-    fname = LogName(Path(".").resolve(), 0, title)
+    def capture(
+        self,
+        func: Callable[[float], dict[str, float | list[float]]],
+        axes: list[float | list[float]] | dict[str, float | list[float]],
+    ):
+        if not isinstance(axes, dict):  # Assumes isinstance(axes, list)
+            fsig = inspect.signature(func)
+            axes = dict(zip(fsig.parameters.keys(), axes))
 
-    step_table = list(product(*axes))
-    records = []
-    dfs = []
-    with logging_redirect_tqdm():
-        for step in tqdm(step_table, desc=title, ncols=max(90, len(title) + 50)):
-            ret_kws = func(*step)
-            step_vals = {k: step[i] for k, i in run_idx.items() if k in indeps}
-            is_all_scalar = all(np.isscalar(i) for i in ret_kws.values())
-            if is_all_scalar:
-                records.append({**step_vals, **ret_kws})
+        run_axs: dict[str, list[float]] = {}
+        const_axs: dict[str, float] = {}
+        for k, v in axes.items():
+            if np.iterable(v):
+                run_axs[k] = v
             else:
-                dfs.append(pd.DataFrame({**step_vals, **ret_kws}))
+                const_axs[k] = v
+        self.add_meta_to_head(
+            const=const_axs,
+            dims={k: [min(a), max(a), len(a)] for k, a in run_axs.items()},
+        )
 
-    if len(records) != 0 and len(dfs) != 0:
-        df = pd.concat([pd.DataFrame.from_records(records)] + dfs, ignore_index=True)
-    elif records:
-        df = pd.DataFrame.from_records(records)
-    elif dfs:
-        df = pd.concat(dfs, ignore_index=True)
-    else:
-        df = pd.DataFrame()
+        step_table = list(itertools.product(*run_axs.values()))
 
-    lf = LogFile(df, meta, fname, indeps, [i for i in df.columns if i not in indeps])
-    return lf
+        with logging_redirect_tqdm():
+            self.add_meta(capture_start_time=now())
+            try:
+                for step in tqdm(step_table, ncols=90):
+                    step_kws = dict(zip(run_axs.keys(), step))
+                    ret_kws = func(**step_kws, **const_axs)
+                    self.add_row(**step_kws, **ret_kws)
+            finally:
+                self.add_meta(capture_stop_time=now())
+
+    def plot(self):
+        """Simple data plot."""
+        import matplotlib.pyplot as plt
+        from labcodes import plotter
+
+        indeps = list(self.meta["dim"].keys())
+        deps = [i for i in self.df.columns if i not in indeps]
+        if len(indeps) == 1:
+            _, ax = plt.subplots()
+            ax.plot(indeps[0], deps[0], data=self.df)
+            ax.set_xlabel(indeps[0])
+            ax.set_ylabel(deps[0])
+        else:
+            ax = plotter.plot2d_auto(self.df, indeps[0], indeps[1], deps[0])
+        return ax
+
+    def save(self, path: str = None):
+        if path is None:
+            path = self.path
+        if path is None:
+            raise ValueError("No path provided.")
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+
+        if not self.df.empty:
+            self.df.to_feather(p.with_suffix(".feather"))
+
+        if self.meta:
+            data_to_json(self.meta, p.with_suffix(".json"))
+
+    @classmethod
+    def load(cls, path: str) -> "DataLogger":
+        p = Path(path)
+        dlog = cls(path=p)
+
+        if p.with_suffix(".json").exists():
+            dlog = data_from_json(p.with_suffix(".json"))
+
+        if p.with_suffix(".feather").exists():
+            df = pd.read_feather(p.with_suffix(".feather"))
+            dlog._segs = [df]
+
+        return dlog
 
 
-# Test functions.
 if __name__ == "__main__":
 
-    def func(a):
-        return {"s21": a * np.arange(11)}
+    def func(x, y):
+        return {"z": x + y}
+        # return {"z": x + y, "w": x - y * np.ones(5)}
 
-    lf = capture(
-        func,
-        [np.linspace(-1, 1, 21)],
-        title="test",
-    )
-    lf.plot()
-    import matplotlib.pyplot as plt
-
-    plt.show()
-
-if __name__ == "__main__":
-
-    def func(a, b, c):
-        return {"d": a * np.sin(b)}
-
-    lf = capture(
-        func,
-        [np.linspace(-1, 1, 21), np.linspace(-np.pi, np.pi, 21), 6],
-        title="orthogonal sweep",
-    )
-    lf.plot()
-    import matplotlib.pyplot as plt
-
-    plt.show()
-
-if __name__ == "__main__":
-
-    def func(zpa, df):
-        f = zpa**2 + df
-        p = np.cos(df)
-        return {"f": f, "p": p}
-
-    lf = capture(
-        func,
-        dict(zpa=np.linspace(-0.5, 1, 21), df=np.linspace(-np.pi, np.pi, 21)),
-        title="non-orthogonal sweep",
-        indeps=["zpa", "f"],
-    )
-    lf.plot()
-    import matplotlib.pyplot as plt
-
-    plt.show()
+    dlog = DataLogger()
+    dlog.capture(func, [[1, 2, 3], [4, 5, 6]])
+    # dlog.capture(func, {"x": [1, 2, 3], "y": [4, 5, 6]})
+    print(dlog.df)
+    # dlog.save("test.feather")

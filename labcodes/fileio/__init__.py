@@ -3,7 +3,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from labcodes.fileio.base import LogFile, LogName
-from labcodes.fileio.data_logger import capture
+from labcodes.fileio.data_logger import DataLogger
 
 try:
     from labcodes.fileio.labber import read_labber
