@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.interpolate
+import scipy.optimize
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +160,8 @@ def guess_phase(
     >>> guess_phase(x, y, freq)  # Given accurate freq. makes it robust.
     1.0053096491487343
     """
-    logger.warning(
+    import warnings
+    warnings.warn(
         "guess_phase works right only if osci has zero offset."
         "but similar accuracy can be achieved by fitting with given offset."
     )
@@ -417,6 +419,32 @@ def inverse_interp(
     else:
         return x
     
+def find_zeros(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return the zeros and derivative there.
+    
+    Assumes smooth function, approximate (x,y) with cubic spline.
+
+    Example:
+    >>> x = np.linspace(0, 1, 100)
+    >>> y = np.cos(2*np.pi*x)
+    >>> x_zeros, deri = find_zeros(x, y)
+    >>> x_zeros
+    array([0.25, 0.75])
+    >>> np.allclose(deri, 2*np.pi*np.array([-1,1]), atol=1e-3)
+    True
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+    spline = scipy.interpolate.CubicSpline(x, y)
+    spline_derivative = spline.derivative()
+
+    i0 = np.arange(len(y) - 1)[(y[:-1] * y[1:]) < 0]  # Check sign changes.
+    i1 = i0 + 1
+    x_zeros = x[i0] - y[i0] * (x[i1] - x[i0]) / (y[i1] - y[i0])
+    sol = scipy.optimize.root(spline, x_zeros)
+    x_zeros = sol.x
+    deri = spline_derivative(x_zeros)
+    return x_zeros, deri
 
 def remove_wrong_spaces(s: str):
     """Return a string with multiple spaces replaced with a single space
