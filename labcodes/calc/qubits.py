@@ -237,7 +237,7 @@ class Gmon(RF_SQUID):
         if delta_ext is None: delta_ext = np.linspace(0,2*np.pi,200)
         gmon = self.copy(delta_ext=delta_ext)
 
-        r = gmon.L_linear() / gmon.Lj0()
+        r = gmon['L_linear'] / gmon['Lj0']
 
         fig, ax = plt.subplots()
         ax.set(

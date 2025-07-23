@@ -3,6 +3,7 @@ import logging
 import math
 from collections.abc import Hashable
 from typing import Optional, Union
+from typing_extensions import deprecated
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -131,6 +132,10 @@ find_freq_guess = guess_freq  # Old name, for backward compatibility.
 
 
 # TODO: remove this function.
+@deprecated(
+    "guess_phase works right only if osci has zero offset."
+    "but similar accuracy can be achieved by fitting with given offset."
+)
 def guess_phase(
     x: np.ndarray,
     y: np.ndarray,
@@ -160,16 +165,12 @@ def guess_phase(
     >>> guess_phase(x, y, freq)  # Given accurate freq. makes it robust.
     1.0053096491487343
     """
-    import warnings
-    warnings.warn(
-        "guess_phase works right only if osci has zero offset."
-        "but similar accuracy can be achieved by fitting with given offset."
-    )
     if freq is None:
         freq = find_freq_guess(x, y)  # Could be inaccurate.
     if phi_space is None:
         phi_space = np.linspace(-np.pi, np.pi, 101)
-    integral = [np.sum(y * np.sin(2 * np.pi * freq * x + phase)) for phase in phi_space]
+    y1 = y - np.median(y)
+    integral = [np.sum(y1 * np.sin(2 * np.pi * freq * x + phase)) for phase in phi_space]
     imax = np.argmax(integral)
     return phi_space[imax]
 
