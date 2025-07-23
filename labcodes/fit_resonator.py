@@ -57,7 +57,7 @@ class FitResonator:
         **fit_kws,
     ):
         """Prepare data, guess initial parameters, then fit.
-        
+
         Usage:
 
         - To skip data preparation, provide `df`.
@@ -69,7 +69,7 @@ class FitResonator:
         if df is None:
             self.df = self.prepare_data(freq, s21_dB, s21_rad)
         else:
-            self.df = df.copy()[['freq', 's21_dB', 's21_rad']]
+            self.df = df.copy()[["freq", "s21_dB", "s21_rad"]]
 
         self.init_params = None
         self.init_params = self.guess_params()
@@ -90,35 +90,40 @@ class FitResonator:
         n_pts_bg = freq.size // 10
         s21_rad = np.unwrap(s21_rad)
         s21_dB = remove_background(s21_dB, freq, fit_mask=n_pts_bg, offset=0)
-        s21_rad = remove_background(s21_rad, freq, fit_mask=slice(0, n_pts_bg), 
-                                    offset=0)
-        s21_rad = s21_rad - s21_rad[np.argmin(s21_dB)]  # Move phase of dip to 0.
+        s21_rad = remove_background(
+            s21_rad, freq, fit_mask=slice(0, n_pts_bg), offset=0
+        )
+        s21_rad = s21_rad - np.median(s21_rad)  # Move phase around dip to 0.
 
         return pd.DataFrame(dict(freq=freq, s21_dB=s21_dB, s21_rad=s21_rad))
-    
+
     @property
     def s21_cplx(self) -> np.ndarray:
-        return self.df.eval('10 ** (s21_dB / 20) * exp(1j * s21_rad)').values
+        return self.df.eval("10 ** (s21_dB / 20) * exp(1j * s21_rad)").values
 
     def fit(self, **fit_kws) -> lmfit.minimizer.MinimizerResult:
         """fit(Qi=1e6) to overwrite initial guess.
-        
+
         Defaultly uses `weights=np.abs(s21_cplx)`. Pass `weights=None` to disable any weights.
         """
         freq = self.df.freq.values
         s21_cplx = self.s21_cplx
         s21m1_cplx = 1 / s21_cplx
 
-        if 'weights' not in fit_kws:
+        if "weights" not in fit_kws:
             # Lower weight around dip, for improved robustness with noisy data.
             # pass weights=None to disable any weights.
-            fit_kws['weights'] = np.abs(s21_cplx)
+            fit_kws["weights"] = np.abs(s21_cplx)
+
+        if "params" not in fit_kws:
+            fit_kws["params"] = self.init_params
+
+        if "method" not in fit_kws:
+            fit_kws["method"] = "Powell"
 
         self.result = model.fit(
             s21m1_cplx,
             x=freq,
-            params=self.init_params,
-            method="Powell",
             **fit_kws,
         )
         return self.result
@@ -133,10 +138,10 @@ class FitResonator:
         fr = freq[idip]
 
         pf = PeakFinder(freq, -np.abs(s21_cplx))
-        Qc = abs(pf['center'] / pf['hwhm']) / 2
+        Qc = abs(pf["center"] / pf["hwhm"]) / 2
 
         pf = PeakFinder(freq, np.abs(s21m1_cplx))
-        Qi = abs(pf['center'] / pf['hwhm'])
+        Qi = abs(pf["center"] / pf["hwhm"])
         if np.sum(np.real(s21m1_cplx)) < 1:
             Qi = -Qi
 
@@ -206,9 +211,7 @@ class FitResonator:
         if (self.result is not None) and plot_fit:
             plot(ax, freq, self.result.eval(x=freq), "-")
             ax.annotate(
-                (f"$f_0={f0:.4g}$\n"
-                 f"$Q_i={Qi:+.4g}$\n"
-                 f"$Q_c={Qc:+.4g}$"),
+                (f"$f_0={f0:.4g}$\n" f"$Q_i={Qi:+.4g}$\n" f"$Q_c={Qc:+.4g}$"),
                 (0.5, 0.5),
                 xycoords="axes fraction",
                 ha="center",
@@ -243,35 +246,37 @@ class FitResonator:
         Qc = self["Qc"]
         dfi = abs(f0 / Qi / 2)
         dfc = abs(f0 / Qc / 2)
+        f_off = self.init_params["f0"].value
 
         def plot(ax: plt.Axes, x: np.ndarray, y: np.ndarray, sty="-"):
             dx = np.abs(x - f0)
             mask1 = dx <= dfi
             mask3 = dx >= dfc
             mask2 = np.logical_not(mask1 | mask3)
-            mask2a = mask2 & (x < f0)
-            mask2b = mask2 & (x >= f0)
-            mask3a = mask3 & (x < f0)
-            mask3b = mask3 & (x >= f0)
-            ax.plot(x[mask1], y[mask1], sty, color="C0")
-            ax.plot(x[mask2a], y[mask2a], sty, color="C1")
-            ax.plot(x[mask2b], y[mask2b], sty, color="C1")
-            ax.plot(x[mask3a], y[mask3a], sty, color="C2")
-            ax.plot(x[mask3b], y[mask3b], sty, color="C2")
+            ax.plot(x[mask1] - f_off, y[mask1], sty, color="C0")
+            ax.plot(x[mask2] - f_off, y[mask2], sty, color="C1")
+            ax.plot(x[mask3] - f_off, y[mask3], sty, color="C2")
 
         plot(ax, self.df.freq.values, self.df.s21_dB.values, ".")
         plot(ax2, self.df.freq.values, np.rad2deg(self.df.s21_rad.values), ".")
+        ax.annotate(f"+{f_off:.4g}", (1, -0.15), xycoords="axes fraction", ha="right")
+        ax2.annotate(f"+{f_off:.4g}", (1, -0.15), xycoords="axes fraction", ha="right")
 
         if (self.result is not None) and plot_fit:
             s21_cplx = 1 / self.result.eval(x=freq)
-            ax.plot(freq, 20 * np.log10(np.abs(s21_cplx)), "k-")
-            ax2.plot(freq, np.rad2deg(np.unwrap(np.angle(s21_cplx))), "k-")
+            ax.plot(freq - f_off, 20 * np.log10(np.abs(s21_cplx)), "k-")
+            ax2.plot(freq - f_off, np.rad2deg(np.unwrap(np.angle(s21_cplx))), "k-")
 
         if plot_init:
             init_param = {k: p.init_value for k, p in self.result.params.items()}
             s21_cplx = 1 / model.eval(x=freq, **init_param)
-            ax.plot(freq, 20 * np.log10(np.abs(s21_cplx)), "--", color="gray")
-            ax2.plot(freq, np.rad2deg(np.unwrap(np.angle(s21_cplx))), "--", color="gray")
+            ax.plot(freq - f_off, 20 * np.log10(np.abs(s21_cplx)), "--", color="gray")
+            ax2.plot(
+                freq - f_off,
+                np.rad2deg(np.unwrap(np.angle(s21_cplx))),
+                "--",
+                color="gray",
+            )
 
         return ax, ax2
 
@@ -371,9 +376,9 @@ def remove_background(
     return new_y
 
 
-
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
 
     freq = misc.segments(
