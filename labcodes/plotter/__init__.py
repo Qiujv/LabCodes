@@ -17,7 +17,7 @@ mpl.rcParams['svg.fonttype'] = 'none'  # Make saved svg text editable. Assume fo
 mpl.rcParams['savefig.facecolor'] = 'w'  # Make white background of saved figure, instead of transparent.
 mpl.rcParams['savefig.dpi'] = 200
 mpl.rcParams['savefig.bbox'] = 'tight'
-# mpl.rcParams['figure.autolayout'] = True  # Enable default tight_layout.
+mpl.rcParams['figure.autolayout'] = True  # Enable default tight_layout.
 mpl.rcParams['figure.figsize'] = (6,4)
 mpl.rcParams['xtick.direction'] = 'in'  # Change by ax.tick_param(direction='in')
 mpl.rcParams['ytick.direction'] = 'in'

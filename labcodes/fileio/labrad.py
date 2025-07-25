@@ -48,6 +48,25 @@ def LabradRead(*args, **kwargs):
     return read_labrad(*args, **kwargs)
 
 
+def cached_load(dir: Path | str, id: int, cache_folder: str = "./data_cache"):
+    """Read LabRAD logfile by given data ID and cache it to CWD."""
+    dir = Path(dir)
+    dir_str = str(dir).replace(".dir", "").replace("\\", ".").replace(":", "")
+    dir_str = dir_str.removeprefix("..")
+    subdir = Path(cache_folder) / dir_str
+    if subdir.exists():
+        all_match = list(subdir.glob(f"#{id}, *.feather"))
+        if all_match:
+            return LogFile.load(subdir, id)
+    else:
+        subdir.mkdir()
+
+    print(f"No cache found for {dir}, {id}, loading from given directory.")
+    lf = read_labrad(dir, id)
+    lf.save(subdir)
+    return lf
+
+
 class LabradDirectory:
     def __init__(self, path: Path | str):
         if isinstance(path, str):
@@ -144,7 +163,7 @@ class LabradDirectory:
             id = self.latest_id + id + 1
         paths = self.find_paths(id, *keywords)
         if len(paths) == 0:
-            raise FileNotFoundError(f"No logfile with name #{id}, *{keywords} found.")
+            raise FileNotFoundError(f"No logfile with name #{id}, *{','.join(keywords)} found.")
         if len(paths) > 1:
             logger.warning(f"Multiple matches found for ID {id}, using the first one")
 

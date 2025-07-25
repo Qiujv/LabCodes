@@ -237,11 +237,11 @@ class Gmon(RF_SQUID):
         if delta_ext is None: delta_ext = np.linspace(0,2*np.pi,200)
         gmon = self.copy(delta_ext=delta_ext)
 
-        r = gmon['L_linear'] / gmon['Lj0']
+        r = gmon["L_linear"] / gmon["Lj0"]
 
         fig, ax = plt.subplots()
         ax.set(
-            title=f'Gmon, r=$L_{{linear}}/L_{{j0}}$={r:.3f}',
+            title=f'{gmon["L_linear"]/1e-9=:.2f}, {gmon["Lj0"]/1e-9=:.2f}',
             xlabel='Delta_ext (rad)',
             ylabel='Mutual inductance L (nH)',
         )
@@ -249,8 +249,8 @@ class Gmon(RF_SQUID):
         ax.xaxis.set_major_locator(plt.MultipleLocator(np.pi / 2))
         ax.xaxis.set_major_formatter(plotter.misc.multiple_formatter())
 
-        ax.plot(gmon.delta(), gmon.M()/1e-9, label='vs delta')
-        ax.plot(gmon.delta_ext, gmon.M()/1e-9, label='vs delta_ext')
+        ax.plot(gmon["delta"], gmon["M"]/1e-9, label='vs delta')
+        ax.plot(gmon["delta_ext"], gmon["M"]/1e-9, label='vs delta_ext')
         ax.legend()
         return ax
 

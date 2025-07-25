@@ -355,7 +355,7 @@ class BatchFit(object):
         if index is None:
             index = np.arange(self.num_of_fits)
         if ax is None:
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(4,3))
             
         color_idx = -1
         for i in index:

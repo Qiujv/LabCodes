@@ -122,15 +122,20 @@ class FitEnrCross:
         return EnrCross(**self.params.valuesdict())
 
     def __getitem__(self, key: str):
-        if self.result is not None:
-            if key == "chi":
-                return np.sqrt(self.result.chisqr)
-            elif key.endswith("_err"):
-                return self.result.params[key[:-4]].stderr
-            else:
-                return self.result.params[key].value
+        if self.result is None:
+            ret = self.params[key].value
         else:
-            return self.params[key].value
+            if key == "chi":
+                ret = np.sqrt(self.result.chisqr)
+            elif key.endswith("_err"):
+                ret = self.result.params[key[:-4]].stderr
+            else:
+                ret = self.result.params[key].value
+        
+        if ret is None:
+            return np.nan
+        else:
+            return ret
 
     def plot(
         self,

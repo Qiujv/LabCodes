@@ -58,13 +58,14 @@ def plot_mat(
     """
     mat = np.asarray(mat).T  # Make it same as plt.imshow.
     if ax is None: fig, ax = plt.subplots(figsize=(3,3))
-    if zmax is None: zmax = np.max(mat)
-    if zmin is None: zmin = np.min(mat)
+    if zmax is None: zmax = np.nanmax(mat)
+    if zmin is None: zmin = np.nanmin(mat)
     xdim, ydim = mat.shape
     cmap = mpl.colormaps.get_cmap(cmap)
     norm, _ = misc.get_norm(mat, cmin=zmin, cmax=zmax)
     if vary_size:
-        size = np.abs(mat).clip(0, zmax) / zmax * 0.9 + 0.1
+        absmax = np.nanmax(np.abs(mat))
+        size = np.abs(mat).clip(0, absmax) / absmax * 0.9 + 0.1
     else:
         size = np.ones_like(mat)
 
@@ -73,6 +74,7 @@ def plot_mat(
     for x, y in product(range(xdim), range(ydim)):
         v = mat[x, y]
         s = size[x, y]
+        if np.isnan(v): continue
         if omit_below is not None:
             if np.abs(v) <= omit_below: continue
         squares.append(mpl.patches.Rectangle((x-s/2, y-s/2), s, s))

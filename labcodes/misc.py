@@ -437,6 +437,7 @@ def find_zeros(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(x)
     y = np.asarray(y)
     spline = scipy.interpolate.CubicSpline(x, y)
+    # spline = scipy.interpolate.UnivariateSpline(x, y, k=1)  # CAUTION: step derivative
     spline_derivative = spline.derivative()
 
     i0 = np.arange(len(y) - 1)[(y[:-1] * y[1:]) < 0]  # Check sign changes.
@@ -594,6 +595,53 @@ ENG_PREFIXES = {
     21: "Z",
     24: "Y",
 }
+
+def eng_num(s: str) -> float:
+    """
+    Converts a string representing a number in engineering notation (e.g., "100n", "1.2k")
+    into its float equivalent.
+
+    Examples:
+    >>> eng_num('100n')
+    1e-08
+    >>> eng_num('1.2k')
+    1200.0
+
+    Args:
+        s (str): The string in engineering notation. Case-insensitive.
+
+    Returns:
+        float: The numerical value.
+
+    Raises:
+        ValueError: If the string format is invalid or contains an unknown prefix.
+    """
+    suffixes = {
+        'T': 1e12,  # Tera
+        'G': 1e9,   # Giga
+        'M': 1e6,   # Mega
+        'k': 1e3,   # Kilo
+        'm': 1e-3,  # Milli
+        'u': 1e-6,  # Micro (often represented as 'u' or 'mu')
+        'μ': 1e-6,
+        'n': 1e-9,  # Nano
+        'p': 1e-12, # Pico
+        'f': 1e-15, # Femto
+        'a': 1e-18, # Atto
+    }
+
+    s = s.strip()
+    if not s:
+        raise ValueError("Input string cannot be empty.")
+
+    try:
+        if s[-1] in suffixes:
+            value = float(s[:-1])
+            return value * suffixes[s[-1]]
+        else:
+            return float(s)
+    except ValueError:
+        raise ValueError(f"Invalid engineering notation or plain number: '{s}'")
 
 
 def cache_with_bypass(
