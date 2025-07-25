@@ -7,10 +7,8 @@ dependencies = [
     "matplotlib",
     "pandas",
     "lmfit>=0.9.5",
-    # 'h5py>=2.6',
     "tqdm",
     "attrs",
-    # 'dpath',
     "json-numpy",
     "cvxpy",  # for tomography.
     "scikit-learn",  # for state_disc.
@@ -22,12 +20,16 @@ description = "Simple routines for superconducting quantum circuits."
 readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     # "Operating System :: OS Independent",
 ]
+license = "GPL-3.0-or-later"
+license-files = ["LICEN[CS]E.*"]
 
 [project.urls]
 Homepage = "https://github.com/Qiujv/LabCodes"
+
+[project.optional-dependencies]
+labber = ["h5py>=2.6"]
 
 [build-system]
 requires = ["hatchling"]
