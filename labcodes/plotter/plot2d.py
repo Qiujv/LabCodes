@@ -9,7 +9,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.colors import Normalize
 from matplotlib.patches import Rectangle
 
-from labcodes.plotter import misc
+from labcodes.plotter.misc import get_norm
 
 
 def cut(cell_centers: list[float] | np.ndarray) -> np.ndarray:
@@ -96,7 +96,7 @@ def plot2d_collection(
 
     z = df[z_name]
     if norm is None:
-        norm, extend_cbar = misc.get_norm(z, cmin=cmin, cmax=cmax)
+        norm, extend_cbar = get_norm(z, cmin=cmin, cmax=cmax)
     else:
         extend_cbar = "neither"
     cmap = plt.get_cmap(cmap)
@@ -158,7 +158,7 @@ def plot2d_imshow(
         tab.index[-1] + dy,
     ]
     if norm is None:
-        norm, extend_cbar = misc.get_norm(z, cmin=cmin, cmax=cmax)
+        norm, extend_cbar = get_norm(z, cmin=cmin, cmax=cmax)
     else:
         extend_cbar = "neither"
     cmap = plt.get_cmap(cmap)
@@ -220,7 +220,7 @@ def plot2d_pcolor(
     xsize = df[x_name].unique().size
 
     if norm is None:
-        norm, extend_cbar = misc.get_norm(df[z_name].values, cmin=cmin, cmax=cmax)
+        norm, extend_cbar = get_norm(df[z_name].values, cmin=cmin, cmax=cmax)
     else:
         extend_cbar = "neither"
 

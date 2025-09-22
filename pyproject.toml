@@ -12,9 +12,8 @@ dependencies = [
     "json-numpy",
     "cvxpy",  # for tomography.
     "scikit-learn",  # for state_disc.
-    "cmocean",  # for matrix plot.
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [{ name = "Qiujv", email = "qiujv@outlook.com" }]
 description = "Simple routines for superconducting quantum circuits."
 readme = "README.md"

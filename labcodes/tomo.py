@@ -406,7 +406,7 @@ def qpt_transform_matrix(
     return_basis: bool = False,
 ) -> np.matrix:
     """Returns the transformation matrix for process tomography:
-    `rho_out @ pointer = rho_in`
+    `rho_in @ pointer = rho_out`
     `transform @ chi.ravel() = pointer.ravel()`
 
     >>> qpt_transform_matrix("sigma").shape
@@ -468,7 +468,7 @@ def qpt_cvx(
     semi-positive-definite.
 
     It is actually solving the linear equations:
-    `rho_out @ pointer = rho_in`
+    `rho_in @ pointer = rho_out`
     `transform @ chi.ravel() = pointer.ravel()`
 
     Returns:
@@ -521,7 +521,7 @@ def qpt_lstsq(
     or semi-positive-definite.
 
     It is actually solving the linear equations:
-    `rho_out @ pointer = rho_in`
+    `rho_in @ pointer = rho_out`
     `transform @ chi.ravel() = pointer.ravel()`
 
     Returns:

@@ -4,12 +4,13 @@ import math
 import warnings
 from itertools import product
 from typing import Callable, Literal, Union
+from typing_extensions import deprecated
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-from labcodes.plotter import misc
+from labcodes.plotter.misc import get_compact_font, get_norm, txt_effect
 
 qutip_cmap = mpl.colors.LinearSegmentedColormap(
     'phase_colormap', 
@@ -37,7 +38,7 @@ except ImportError:
     warnings.warn("cmocean not found. Using twilight instead.", ImportWarning)
     cmap_phase = None
 
-
+@deprecated("use mat.plot_mat instead")
 def plot_mat(
     mat: np.ndarray,
     zmax: float = None,
@@ -57,17 +58,23 @@ def plot_mat(
     <Axes: >
     """
     mat = np.asarray(mat).T  # Make it same as plt.imshow.
-    if ax is None: fig, ax = plt.subplots(figsize=(3,3))
+    if ax is None: fig, ax = plt.subplots(figsize=get_fig_size_for_mat(mat))
     if zmax is None: zmax = np.nanmax(mat)
     if zmin is None: zmin = np.nanmin(mat)
     xdim, ydim = mat.shape
     cmap = mpl.colormaps.get_cmap(cmap)
-    norm, _ = misc.get_norm(mat, cmin=zmin, cmax=zmax)
+    norm, _ = get_norm(mat, cmin=zmin, cmax=zmax)
     if vary_size:
         absmax = np.nanmax(np.abs(mat))
         size = np.abs(mat).clip(0, absmax) / absmax * 0.9 + 0.1
     else:
         size = np.ones_like(mat)
+
+    fkws = dict(
+        fontsize="small",
+        fontstretch="condensed",
+        fontfamily=get_compact_font(),
+    )
 
     squares = []
     colors = []
@@ -80,11 +87,8 @@ def plot_mat(
         squares.append(mpl.patches.Rectangle((x-s/2, y-s/2), s, s))
         c = cmap(norm(v))  # RGBA values.
         colors.append(c)
-        # Use black text if squares are light; otherwise white.
-        txt_color = 'k' if mpl.colors.rgb_to_hsv(c[:3])[2] > 0.5 else 'w'
-        txt = ax.annotate(fmt(v), (x, y), ha='center', va='center', color=txt_color)
-        stroke_color = 'k' if txt_color == 'w' else 'w'
-        txt.set_path_effects([misc.txt_effect(color=stroke_color)])
+        txt = ax.annotate(fmt(v), (x, y), ha='center', va='center', color="k", **fkws)
+        txt.set_path_effects([txt_effect()])
 
     col = mpl.collections.PatchCollection(squares, facecolors=colors, cmap=cmap, 
                                           norm=norm, linewidth=0)
@@ -100,9 +104,8 @@ def plot_mat(
         ax.yaxis.set_inverted(True)
     return ax
 
-
+@deprecated("use mat.plot_mat instead.")
 def plot_mat2d(mat, txt=None, fmt='{:.2f}'.format, ax=None, cmap='binary', **kwargs):
-    warnings.warn("plot_mat2d is deprecated. Use plot_mat instead.", DeprecationWarning)
     return plot_mat(mat, ax=ax, fmt=fmt, cmap=cmap)
 
 
@@ -142,7 +145,7 @@ def _plot_mat3d(
     dz = mat.flatten()
 
     symmetric_clims = (cmin is None) or (cmax is None)
-    norm, extend_cbar = misc.get_norm(cval.flatten(), cmin=cmin, cmax=cmax, 
+    norm, extend_cbar = get_norm(cval.flatten(), cmin=cmin, cmax=cmax, 
                                       symmetric=symmetric_clims)
     cmap = mpl.colormaps.get_cmap(cmap)
     colors = cmap(norm(cval.flatten()))
@@ -161,7 +164,7 @@ def _plot_mat3d(
             if omit_below is not None:
                 if np.abs(z) <= omit_below: continue
             ax.text(x + bar_width / 2, y + bar_width / 2, z, fmt(z), 
-                    ha='center', va='bottom', path_effects=[misc.txt_effect()])
+                    ha='center', va='bottom', path_effects=[txt_effect()])
 
     ax.set_xticks(np.arange(1, mat.shape[0] + 1, 1))
     ax.set_yticks(np.arange(1, mat.shape[1] + 1, 1))
@@ -173,6 +176,7 @@ def _plot_mat3d(
 
     return bar_col, extend_cbar
 
+@deprecated("Use mat.plot_mat instead.")
 def plot_mat3d(
     mat: np.matrix,
     ax: plt.Axes = None,
@@ -216,7 +220,7 @@ def plot_mat3d(
             cbar.set_ticklabels((r'$-\pi$', r'$-\pi/2$', r'$0$', r'$\pi/2$', r'$\pi$'))
     return ax
 
-
+@deprecated("use mat.plot_mat_real_imag instead.")
 def plot_complex_mat3d(
     mat: np.matrix,
     axs: tuple[plt.Axes] = None,
@@ -234,7 +238,7 @@ def plot_complex_mat3d(
     (<Axes3D: >, <Axes3D: >)
     """
     mat = np.asarray(mat)
-    norm, _ = misc.get_norm(np.hstack((mat.imag, mat.real)), cmin=cmin, cmax=cmax)
+    norm, _ = get_norm(np.hstack((mat.imag, mat.real)), cmin=cmin, cmax=cmax)
     kws = dict(
         cmap=cmap,
         cmin=norm.vmin,
@@ -255,6 +259,16 @@ def plot_complex_mat3d(
     _plot_mat3d(ax_real, mat.real, mat.real, **kws)
     _plot_mat3d(ax_imag, mat.imag, mat.imag, **kws)
     return ax_real, ax_imag
+
+
+def get_fig_size_for_mat(
+    mat: np.ndarray, max_width: float = 10, max_height: float = 10
+) -> tuple[float, float]:
+    """Get a suitable figure size for plotting a matrix."""
+    nrows, ncols = mat.shape
+    width = ncols * 0.1 + 2
+    height = nrows * 0.1 + 2
+    return min(width, max_width), min(height, max_height)
 
 
 if __name__ == "__main__":
