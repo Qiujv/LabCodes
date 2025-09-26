@@ -19,11 +19,11 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install Hatch
-        run: pip install hatch
+      - name: Install uv
+        run: pip install uv
 
-      - name: Build package with Hatch
-        run: hatch build
+      - name: Build package with uv
+        run: uv build
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
