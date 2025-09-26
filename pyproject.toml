@@ -10,8 +10,12 @@ dependencies = [
     "tqdm",
     "attrs",
     "json-numpy",
-    "cvxpy",  # for tomography.
-    "scikit-learn",  # for state_disc.
+    "cvxpy", # for tomography.
+    "scikit-learn", # for state_disc.
+    "duckdb>=1.4.0",
+    "json-tricks>=3.17.3",
+    "typing-extensions>=4.15.0",
+    "pyarrow>=21.0.0",
 ]
 requires-python = ">=3.10"
 authors = [{ name = "Qiujv", email = "qiujv@outlook.com" }]
@@ -28,8 +32,13 @@ license-files = ["LICENSE"]
 Homepage = "https://github.com/Qiujv/LabCodes"
 
 [project.optional-dependencies]
-labber = ["h5py>=2.6"]
+fileio = ["h5py>=2.6", "dpath"]
 
 [build-system]
 requires = ["uv_build>=0.8.0,<0.9.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
