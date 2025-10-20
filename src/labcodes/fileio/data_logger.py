@@ -8,7 +8,6 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
-import dpath
 from labcodes.fileio.misc import data_to_json, data_from_json
 import numpy as np
 import pandas as pd
@@ -44,13 +43,14 @@ class DataLogger:
         if meta is None:
             meta = {}
         meta.update(kwargs)
-        self.meta = dpath.merge(self.meta, meta)
+        self.meta.update(meta)
 
     def add_meta_to_head(self, meta: dict = None, **kwargs):
         if meta is None:
             meta = {}
         meta.update(kwargs)
-        self.meta = dpath.merge(meta, self.meta)
+        meta.update(self.meta)
+        self.meta = meta
 
     def add_row(self, **kwargs):
         if all(np.isscalar(v) for v in kwargs.values()):
