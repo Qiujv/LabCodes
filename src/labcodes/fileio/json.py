@@ -1,7 +1,10 @@
 import logging
+
 import json_tricks
 from typing_extensions import deprecated
+
 logger = logging.getLogger(__name__)
+
 
 @deprecated("use json_tricks instead for better readability")
 def data_to_json_numpy(data: dict, fname: str) -> str:
@@ -39,6 +42,7 @@ def data_from_json(fname: str) -> dict:
         s = f.read()
     data = json_tricks.loads(s)
     return data
+
 
 def fallback_encoder_str(obj, *args, is_changed=None, **kwargs):
     logger.error(f"Cannot encode {obj} to json, use str instead.")

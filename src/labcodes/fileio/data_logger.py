@@ -8,11 +8,12 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
-from labcodes.fileio.misc import data_to_json, data_from_json
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+
+from labcodes.fileio.json import data_from_json, data_to_json
 
 
 def now() -> str:
@@ -98,6 +99,7 @@ class DataLogger:
     def plot(self):
         """Simple data plot."""
         import matplotlib.pyplot as plt
+
         from labcodes import plotter
 
         indeps = list(self.meta["dim"].keys())

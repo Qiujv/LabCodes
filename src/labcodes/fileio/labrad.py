@@ -10,8 +10,9 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-from labcodes.fileio.base import LogFile, LogName
 from typing_extensions import deprecated
+
+from labcodes.fileio.base import LogFile, LogName
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +164,9 @@ class LabradDirectory:
             id = self.latest_id + id + 1
         paths = self.find_paths(id, *keywords)
         if len(paths) == 0:
-            raise FileNotFoundError(f"No logfile with name #{id}, *{','.join(keywords)} found.")
+            raise FileNotFoundError(
+                f"No logfile with name #{id}, *{','.join(keywords)} found."
+            )
         if len(paths) > 1:
             logger.warning(f"Multiple matches found for ID {id}, using the first one")
 
@@ -235,20 +238,20 @@ def read_ini_labrad(
 
     d["parameter"] = dict()
     for i in range(int(d["general"]["parameters"])):
-        sect = ini[f"Parameter {i+1}"]
+        sect = ini[f"Parameter {i + 1}"]
         data = sect["data"]
         # TODO: Maybe catch NameError?
         try:
             data = replace(data, _strange_numbers)
             data = eval(data, LABRAD_REG_GLOBLES)  # Parse string to proper objects.
         except:
-            logging.exception(f'error parsing {sect["label"]}:{sect["data"]}')
+            logging.exception(f"error parsing {sect['label']}:{sect['data']}")
         d["parameter"].update({sect["label"]: data})
 
     for k in ["independent", "dependent"]:
         d[k] = dict()
         for i in range(int(d["general"][k])):
-            sect = ini[f"{k.capitalize()} {i+1}"]
+            sect = ini[f"{k.capitalize()} {i + 1}"]
 
             name = "_".join([sect[c] for c in ["category", "label"] if sect.get(c)])
             # name = name.lower()

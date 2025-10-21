@@ -1,15 +1,14 @@
 import textwrap
 from copy import copy
 from pathlib import Path
+from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from attrs import define
-from typing import Callable
 
 from labcodes import plotter
-from labcodes.fileio.misc import data_from_json, data_to_json
 
 PATH_LEGAL = {
     "->": "→",
@@ -114,6 +113,8 @@ class LogFile:
     @classmethod
     def load(cls, dir: Path, id: int) -> "LogFile":
         """Load a logfile from a .feather and a .json files."""
+        from labcodes.fileio.json import data_from_json
+
         dir = Path(dir)
         path = cls.find(dir, id, ".feather")
         df = pd.read_feather(path)
@@ -125,6 +126,8 @@ class LogFile:
 
     def save(self, dir: Path) -> Path:
         """Save a logfile into a .feather file and a .json files."""
+        from labcodes.fileio.json import data_to_json
+
         dir = Path(dir).resolve()
         p = dir / (self.name.fname() + ".no_suffix")
         self.df.to_feather(p.with_suffix(".feather"))
@@ -202,27 +205,28 @@ class LogName:
     def folder(self) -> str:
         p = Path(self.dir)
 
-        dv_path = [i for i in p.parents if not i.name.endswith('.dir')]
+        dv_path = [i for i in p.parents if not i.name.endswith(".dir")]
         if dv_path:  # LabRAD style path.
             short_path = p.relative_to(dv_path[0])
-            parts = [i.removesuffix('.dir') for i in short_path.parts]
+            parts = [i.removesuffix(".dir") for i in short_path.parts]
         else:
             parts = list(p.parts[1:])
 
         if ":" in p.parts[0]:
             import socket
+
             parts.insert(0, socket.gethostname())
         else:
-            parts.insert(0, p.parts[0].replace("\\", "/").removesuffix('/'))
+            parts.insert(0, p.parts[0].replace("\\", "/").removesuffix("/"))
 
-        return '/'.join(parts)
+        return "/".join(parts)
 
     def as_plot_title(self, width: int = 60) -> str:
         s = f"#{self.id}, {self.title}"
         s = textwrap.fill(s, width=width)
 
         f = self.folder
-        
+
         if len(f) + len(s) <= width:
             return f"{f}/{s}"
         else:
