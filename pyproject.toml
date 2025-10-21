@@ -16,7 +16,7 @@ dependencies = [
     "pyarrow>=21.0.0",
     "h5py>=2.6",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.10, <=3.13"
 authors = [{ name = "Qiujv", email = "qiujv@outlook.com" }]
 description = "Simple routines for superconducting quantum circuits."
 readme = "README.md"
