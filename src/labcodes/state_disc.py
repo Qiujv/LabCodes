@@ -1,10 +1,11 @@
 """State discrimination routines for qubit states."""
 
 import logging
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
+
 import matplotlib.patheffects as patheffects
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import ListedColormap
 from sklearn.neighbors import NearestCentroid
 
 try:
@@ -44,17 +45,12 @@ class NCenter:
            [0.044, 0.044, 0.912]])
     """
 
-    def __init__(self, centers: list[np.ndarray[float]]):
-        clf = NearestCentroid()
-        clf.centroids_ = np.asarray(centers)
-        n_centers = len(centers)
-        clf.classes_ = np.arange(n_centers)
-        self._clf = clf
-        self.cmap = ListedColormap([f"C{i}" for i in range(n_centers)])
-
-    @property
-    def centers(self):
-        return self._clf.centroids_
+    def __init__(self, centers: np.ndarray):
+        """Args:
+        centers: Array of shape (n_centers, n_dim).
+        """
+        self.centers = np.asarray(centers)
+        self.cmap = ListedColormap([f"C{i}" for i in range(self.centers.shape[0])])
 
     @classmethod
     def fit(cls, list_points: list[np.ndarray[float]], plot: bool = False):
@@ -65,8 +61,6 @@ class NCenter:
         )
 
         self = cls(clf.centroids_)
-        self._clf = clf
-
         if not plot:
             return self
 
@@ -126,7 +120,17 @@ class NCenter:
             return fig
 
     def flags(self, points: np.ndarray[float]) -> np.ndarray[int]:
-        return self._clf.predict(np.vstack(points))
+        pts = np.asarray(points, dtype=float)
+        pts = np.atleast_2d(pts)
+
+        if pts.shape[1] != self.centers.shape[1]:
+            raise ValueError(
+                "points dimensionality does not match centroid dimensionality"
+            )
+
+        deltas = pts[:, None, :] - self.centers[None, :, :]
+        distances_sq = np.sum(deltas**2, axis=2)
+        return np.argmin(distances_sq, axis=1)
 
     def probs(self, points: np.ndarray[float]) -> np.ndarray[float]:
         flags = self.flags(points)
@@ -187,7 +191,7 @@ def probs_from_flags(
     Examples:
     >>> probs_from_flags([[1,1,0,0],[1,0,1,0]], 2, 2, True)
     (array([0.25, 0.25, 0.25, 0.25]), ['00', '01', '10', '11'])
-    
+
     >>> np.random.seed(0)
     >>> n_qbs, nlevels = 3, 2
     >>> flags = [np.random.randint(0, nlevels, 50) for _ in range(n_qbs)]

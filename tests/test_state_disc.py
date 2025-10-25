@@ -70,3 +70,16 @@ def test_ncenter_fit_recovers_high_classification_accuracy():
         assert np.isclose(np.sum(probs), 1.0)
         assert probs[idx] > 0.9
         assert np.isclose(probs[idx], accuracy, atol=1e-6)
+
+    stater2 = state_disc.NCenter(centers)
+    for idx, pts in enumerate(list_pts):
+        flags = stater2.flags(pts)
+        probs = stater2.probs(pts)
+
+        accuracy = np.mean(flags == idx)
+
+        assert accuracy > 0.9
+        assert probs.shape == (len(centers),)
+        assert np.isclose(np.sum(probs), 1.0)
+        assert probs[idx] > 0.9
+        assert np.isclose(probs[idx], accuracy, atol=1e-6)
