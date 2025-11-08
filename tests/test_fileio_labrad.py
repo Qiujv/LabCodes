@@ -8,22 +8,13 @@ import pytest
 
 from labcodes.fileio import labrad
 
+csv_content = """
+15,4.8,-17.440,-0.740
+16,4.82,-17.300,-0.755
+"""[1:]
 
-@pytest.fixture
-def labrad_dataset(tmp_path: Path):
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-
-    dataset_id = 3
-    stem = f"{dataset_id:05d} - power shift"
-
-    csv_lines = [
-        "15,4.8,-17.440,-0.740",
-        "16,4.82,-17.300,-0.755",
-    ]
-    (data_dir / f"{stem}.csv").write_text("\n".join(csv_lines))
-
-    ini_content = """[General]
+ini_content = """
+[General]
 independent = 2
 dependent = 2
 parameters = 1
@@ -53,16 +44,26 @@ data = 'example device'
 
 [Comments]
 
+"""[1:]
 
-"""
-    (data_dir / f"{stem}.ini").write_text(ini_content)
-
-    session_content = """[File System]
+session_content = """
+[File System]
 counter = 4
 
 [Tags]
 datasets = {'00003': {'star'}}
-"""
+"""[1:]
+
+@pytest.fixture
+def labrad_dataset(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+
+    dataset_id = 3
+    stem = f"{dataset_id:05d} - power shift"
+
+    (data_dir / f"{stem}.csv").write_text(csv_content)
+    (data_dir / f"{stem}.ini").write_text(ini_content)
     (data_dir / "session.ini").write_text(session_content)
 
     expected_columns = [
@@ -123,3 +124,39 @@ def test_read_labrad_from_directory_and_path(labrad_dataset) -> None:
 
     pdt.assert_frame_equal(logfile_from_dir.df.reset_index(drop=True), expected_df)
     pdt.assert_frame_equal(logfile_from_path.df.reset_index(drop=True), expected_df)
+
+
+def test_read_ini_labrad(labrad_dataset) -> None:
+    csv_path: Path = labrad_dataset["csv_path"]
+    ini_path = csv_path.with_suffix(".ini")
+
+    meta = labrad.read_ini_labrad(ini_path)
+
+    assert "general" in meta
+    assert meta["general"]["independent"] == 2
+    assert meta["general"]["dependent"] == 2
+    assert meta["general"]["parameters"] == 1
+    assert meta["general"]["comments"] == 0
+
+    assert "independent" in meta
+    assert "Power_dBm" in meta["independent"]
+    assert meta["independent"]["Power_dBm"]["label"] == "Power"
+    assert meta["independent"]["Power_dBm"]["units"] == "dBm"
+    assert "freq_GHz" in meta["independent"]
+    assert meta["independent"]["freq_GHz"]["label"] == "frequency"
+    assert meta["independent"]["freq_GHz"]["units"] == "GHz"
+
+    assert "dependent" in meta
+    assert "s21_mag_dB" in meta["dependent"]
+    assert meta["dependent"]["s21_mag_dB"]["category"] == "s21"
+    assert meta["dependent"]["s21_mag_dB"]["label"] == "log mag"
+    assert meta["dependent"]["s21_mag_dB"]["units"] == "dB"
+    assert "s21_phase_rad" in meta["dependent"]
+    assert meta["dependent"]["s21_phase_rad"]["category"] == "s21"
+    assert meta["dependent"]["s21_phase_rad"]["label"] == "phase"
+    assert meta["dependent"]["s21_phase_rad"]["units"] == "rad"
+
+    assert "parameter" in meta
+    assert meta["parameter"]["device"] == "example device"
+
+    assert "comments" in meta

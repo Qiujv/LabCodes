@@ -298,7 +298,7 @@ def qst_cvx(probs: np.ndarray, trans_mat: np.matrix) -> np.matrix:
     # to construct the transformation matrix, i.e. the reshape order should be "C".
     # Strange thing is: this fixs the problem in qpt but leads to error in qst.
     # So here we use the default of cvxpy, i.e. "F", but in qpt we use "C".
-    objective = cp.Minimize(cp.norm(trans_mat @ cp.reshape(rho, rho_size) - probs))
+    objective = cp.Minimize(cp.norm(trans_mat @ cp.reshape(rho, rho_size, "F") - probs))
     constraints = [
         cp.trace(rho) == 1,
         rho >> 0,
@@ -856,9 +856,9 @@ def purity(rho: np.matrix) -> float:
 
 
 def test_qst(list_n_qbs=(1, 2, 3), runs=100):
-    from tqdm.contrib.itertools import product
-    import pandas as pd
     import matplotlib.pyplot as plt
+    import pandas as pd
+    from tqdm.contrib.itertools import product
 
     def qst_one(tomo_ops, fit_method, n_qbs):
         rho = random_density_matrix(2**n_qbs)
@@ -910,9 +910,9 @@ def test_qst(list_n_qbs=(1, 2, 3), runs=100):
 
 
 def test_qpt(list_n_qbs=(1, 2), runs=50):
-    from tqdm.contrib.itertools import product
-    import pandas as pd
     import matplotlib.pyplot as plt
+    import pandas as pd
+    from tqdm.contrib.itertools import product
 
     def qpt_one(basis, fit_method, n_qbs):
         rho_in = get_rho_in(init_ops="0xy1", n_qbs=n_qbs)
